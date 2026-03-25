@@ -13,6 +13,15 @@ declare module 'shaka-player' {
     channelsCount?: number
   }
 
+  interface TextTrack {
+    id: number
+    active: boolean
+    language: string
+    label?: string
+    kind?: string
+    roles?: string[]
+  }
+
   class Player {
     constructor()
     static isBrowserSupported(): boolean
@@ -22,8 +31,13 @@ declare module 'shaka-player' {
     addEventListener(type: string, listener: EventListenerOrEventListenerObject): void
     removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void
     getVariantTracks(): VariantTrack[]
+    getTextTracks(): TextTrack[]
     selectVariantTrack(track: VariantTrack, clearBuffer?: boolean, safeMargin?: number): void
+    selectTextTrack(track: TextTrack): void
+    setTextTrackVisibility(isVisible: boolean): void
+    isTextTrackVisible(): boolean
   }
 
   export { polyfill, Player }
+  export type { VariantTrack, TextTrack }
 }
