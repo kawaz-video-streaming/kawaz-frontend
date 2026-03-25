@@ -9,7 +9,7 @@ interface TrackOption {
 
 interface ShakaModule {
   Player: {
-    new (): ShakaPlayer
+    new(): ShakaPlayer
     isBrowserSupported(): boolean
   }
   polyfill: {
