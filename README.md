@@ -1,6 +1,6 @@
 # Kawaz Frontend
 
-React and Vite frontend for the Kawaz video streaming platform.
+React and Vite frontend for the Kawaz-Plus video streaming platform.
 
 The app currently provides:
 
