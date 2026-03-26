@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router'
 import { AuthProvider } from './auth/AuthContext'
 import { Layout } from './components/layout/Layout'
-import { ProtectedRoute } from './components/ProtectedRoute'
+import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
 import { HomePage } from './pages/HomePage'
 import { UploadPage } from './pages/UploadPage'
@@ -11,7 +11,7 @@ export const App = () => (
   <AuthProvider>
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route
           path="/"
           element={
