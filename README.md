@@ -6,7 +6,7 @@ The app currently provides:
 
 - Protected application shell with token-based auth state stored in localStorage
 - Upload flow for video and image media
-- Direct video playback using Shaka Player and VOD manifests
+- Direct video playback using Shaka Player with built-in audio language and caption track switching
 - Placeholder home and login screens while backend endpoints are still being completed
 
 ## Tech Stack

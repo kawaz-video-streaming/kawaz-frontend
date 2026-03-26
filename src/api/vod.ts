@@ -20,7 +20,7 @@ const videoSchema = z.object({
   videoStreams: z.array(z.object({ title: z.string(), durationInMs: z.number() })),
   audioStreams: z.array(z.object({ language: z.string(), title: z.string(), durationInMs: z.number() })),
   subtitleStreams: z.array(z.object({ language: z.string(), title: z.string(), durationInMs: z.number() })),
-}).passthrough()
+}).loose()
 
 export const getVideo = async (id: string): Promise<Video> => {
   const raw = await vodRequest<unknown>(`/video/${id}`)

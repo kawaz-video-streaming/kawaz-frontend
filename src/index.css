@@ -70,6 +70,14 @@
   }
 }
 
+.shaka-turn-captions-off-button {
+  order: -1;
+}
+
+.shaka-text-languages .shaka-back-to-overflow-button {
+  display: none;
+}
+
 @layer base {
   * {
     border-color: var(--border);
