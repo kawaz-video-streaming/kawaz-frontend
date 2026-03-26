@@ -1,5 +1,4 @@
 import { Link, useNavigate } from 'react-router'
-import { Button } from '../ui/button'
 import { useAuth } from '../../auth/useAuth'
 
 export const Navbar = () => {
@@ -13,7 +12,7 @@ export const Navbar = () => {
 
   return (
     <nav className="border-b bg-background">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+      <div className="flex h-14 items-center justify-between px-4">
         <div className="flex items-center gap-6">
           <Link to="/" className="text-base font-semibold">
             Kawaz
@@ -25,9 +24,12 @@ export const Navbar = () => {
             Upload
           </Link>
         </div>
-        <Button variant="ghost" size="sm" onClick={handleLogout}>
+        <button
+          onClick={handleLogout}
+          className="cursor-pointer text-sm text-muted-foreground hover:font-semibold hover:text-foreground"
+        >
           Log out
-        </Button>
+        </button>
       </div>
     </nav>
   )
