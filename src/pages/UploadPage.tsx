@@ -1,19 +1,56 @@
-import { useState, useRef, type FormEvent, type ChangeEvent } from 'react'
-import { Button } from '../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { useState, useRef, type FormEvent, type ChangeEvent, type DragEvent } from 'react'
+import { toast } from 'sonner'
+import { UploadCloud, FileVideo, FileImage, CheckCircle, X } from 'lucide-react'
 import { Progress } from '../components/ui/progress'
 import { useUploadMedia } from '../hooks/useUploadMedia'
+
+const MAX_SIZE = 10 * 1024 ** 3 // 10 GB
+
+const formatSize = (bytes: number) => {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(2)} MB`
+  return `${(bytes / 1024).toFixed(2)} KB`
+}
+
+const FileIcon = ({ file }: { file: File }) => {
+  if (file.type.startsWith('image/')) return <FileImage size={32} className="text-red-500" />
+  return <FileVideo size={32} className="text-red-500" />
+}
 
 export const UploadPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const { mutate: upload, isPending, isSuccess, isError, error, reset } = useUploadMedia()
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null
+  const applyFile = (file: File | null) => {
+    if (file && file.size > MAX_SIZE) {
+      toast.error('File exceeds the 10 GB limit', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      })
+      return
+    }
     setSelectedFile(file)
     reset()
   }
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    applyFile(e.target.files?.[0] ?? null)
+  }
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) applyFile(file)
+  }
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = () => setIsDragging(false)
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -23,46 +60,87 @@ export const UploadPage = () => {
 
   return (
     <div className="mx-auto max-w-lg">
-      <h1 className="mb-6 text-2xl font-semibold">Upload</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload media</CardTitle>
-          <CardDescription>Supported formats: video and image files</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*,image/*"
-              onChange={handleFileChange}
-              className="text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary-foreground hover:file:bg-primary/90 hover:file:cursor-pointer"
-            />
+      <div className="mb-8">
+        <h1 className="text-3xl font-extrabold tracking-tight">Upload</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Add new content to the library</p>
+      </div>
 
-            {selectedFile && (
-              <p className="text-sm text-muted-foreground">
-                {selectedFile.name} — {(selectedFile.size / 1_000_000).toFixed(2)} MB
-              </p>
+      <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+          <div
+            onClick={() => !selectedFile && fileInputRef.current?.click()}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            className={[
+              'relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-12 transition-colors',
+              !selectedFile ? 'cursor-pointer' : '',
+              isDragging
+                ? 'border-red-500 bg-red-500/5'
+                : selectedFile
+                  ? 'border-border'
+                  : 'border-border hover:border-red-500/50 hover:bg-accent/50',
+            ].join(' ')}
+          >
+            {selectedFile ? (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); applyFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                  className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  aria-label="Remove file"
+                >
+                  <X size={16} />
+                </button>
+                <FileIcon file={selectedFile} />
+                <div className="text-center">
+                  <p className="text-sm font-medium">{selectedFile.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatSize(selectedFile.size)}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <UploadCloud size={32} className={isDragging ? 'text-red-500' : 'text-muted-foreground'} />
+                <div className="text-center">
+                  <p className="text-sm font-medium">{isDragging ? 'Drop to select' : 'Click or drag a file here'}</p>
+                  <p className="text-xs text-muted-foreground">Video and image files supported</p>
+                </div>
+              </>
             )}
+          </div>
 
-            {isPending && <Progress value={30} className="animate-pulse" />}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="video/*,image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
 
-            {isSuccess && (
-              <p className="text-sm text-green-600">Upload started. Processing in background.</p>
-            )}
+          {isPending && <Progress value={30} className="animate-pulse" />}
 
-            {isError && (
-              <p className="text-sm text-destructive">
-                {error instanceof Error ? error.message : 'Upload failed'}
-              </p>
-            )}
+          {isSuccess && (
+            <div className="flex items-center gap-2 rounded-lg bg-green-500/10 px-4 py-3 text-sm text-green-600 dark:text-green-400">
+              <CheckCircle size={16} />
+              Upload started. Processing in background.
+            </div>
+          )}
 
-            <Button type="submit" disabled={!selectedFile || isPending}>
-              {isPending ? 'Uploading...' : 'Upload'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          {isError && (
+            <div className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+              {error instanceof Error ? error.message : 'Upload failed'}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={!selectedFile || isPending}
+            className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isPending ? 'Uploading...' : 'Upload'}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

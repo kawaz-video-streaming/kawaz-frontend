@@ -33,7 +33,7 @@ Two separate HTTP clients exist because the VOD service is not yet proxied throu
 
 ### Auth
 
-`AuthContext` holds `token`, `isAuthenticated`, `login()`, and `logout()`, backed by `localStorage`. **`ProtectedRoute` currently has `bypassAuth = true`** — auth is not enforced until a real login endpoint exists.
+`AuthContext` holds `token`, `isAuthenticated`, `login()`, and `logout()`, backed by `localStorage`. `ProtectedRoute` enforces authentication — unauthenticated users are redirected to `/login`.
 
 ### Data Fetching
 

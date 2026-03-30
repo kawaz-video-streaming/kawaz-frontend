@@ -22,16 +22,26 @@ declare module 'shaka-player' {
     roles?: string[]
   }
 
+  interface Chapter {
+    id: string
+    title: string
+    startTime: number
+    endTime: number
+  }
+
   class Player {
     constructor()
     static isBrowserSupported(): boolean
     attach(video: HTMLMediaElement): Promise<void>
     load(uri: string): Promise<void>
+    addChaptersTrack(uri: string, language: string, mimeType?: string): Promise<TextTrack>
     destroy(): Promise<void>
     addEventListener(type: string, listener: EventListenerOrEventListenerObject): void
     removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void
     getVariantTracks(): VariantTrack[]
     getTextTracks(): TextTrack[]
+    getChaptersTracks(): TextTrack[]
+    getChaptersAsync(language: string): Promise<Chapter[]>
     selectVariantTrack(track: VariantTrack, clearBuffer?: boolean, safeMargin?: number): void
     selectTextTrack(track: TextTrack): void
     setTextTrackVisibility(isVisible: boolean): void
@@ -39,12 +49,12 @@ declare module 'shaka-player' {
   }
 
   export { polyfill, Player }
-  export type { VariantTrack, TextTrack }
+  export type { Chapter, VariantTrack, TextTrack }
 }
 
 declare module 'shaka-player/dist/shaka-player.ui.js' {
   import { Player, polyfill } from 'shaka-player'
-  import type { VariantTrack, TextTrack } from 'shaka-player'
+  import type { Chapter, VariantTrack, TextTrack } from 'shaka-player'
 
   namespace ui {
     class Overlay {
@@ -55,5 +65,5 @@ declare module 'shaka-player/dist/shaka-player.ui.js' {
   }
 
   export { Player, polyfill, ui }
-  export type { VariantTrack, TextTrack }
+  export type { Chapter, VariantTrack, TextTrack }
 }

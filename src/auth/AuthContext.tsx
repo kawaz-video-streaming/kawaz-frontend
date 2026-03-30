@@ -1,9 +1,20 @@
 import { createContext, useState, useCallback, type ReactNode } from 'react'
 import { setToken, clearToken } from '../api/client'
 
+const getRole = (token: string | null): string | null => {
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.role ?? null
+  } catch {
+    return null
+  }
+}
+
 interface AuthContextValue {
   token: string | null
   isAuthenticated: boolean
+  isAdmin: boolean
   login: (token: string) => void
   logout: () => void
 }
@@ -30,7 +41,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ token, isAuthenticated: token !== null, login, logout }}>
+    <AuthContext.Provider value={{ token, isAuthenticated: token !== null, isAdmin: getRole(token) === 'admin', login, logout }}>
       {children}
     </AuthContext.Provider>
   )

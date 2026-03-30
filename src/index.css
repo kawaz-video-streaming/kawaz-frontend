@@ -70,12 +70,110 @@
   }
 }
 
-.shaka-turn-captions-off-button {
+.shaka-text-languages .shaka-back-to-overflow-button {
+  order: -2;
+}
+
+.shaka-text-languages .shaka-turn-captions-off-button {
   order: -1;
 }
 
-.shaka-text-languages .shaka-back-to-overflow-button {
-  display: none;
+.shaka-text-languages .shaka-back-to-overflow-button,
+.shaka-audio-languages .shaka-back-to-overflow-button,
+.shaka-chapters .shaka-back-to-overflow-button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.12) !important;
+  background: transparent !important;
+}
+
+.shaka-text-languages .shaka-back-to-overflow-button .material-icons-round,
+.shaka-text-languages .shaka-back-to-overflow-button .material-icons,
+.shaka-text-languages .shaka-back-to-overflow-button .material-svg-icon,
+.shaka-audio-languages .shaka-back-to-overflow-button .material-icons-round,
+.shaka-audio-languages .shaka-back-to-overflow-button .material-icons,
+.shaka-audio-languages .shaka-back-to-overflow-button .material-svg-icon,
+.shaka-chapters .shaka-back-to-overflow-button .material-icons-round,
+.shaka-chapters .shaka-back-to-overflow-button .material-icons,
+.shaka-chapters .shaka-back-to-overflow-button .material-svg-icon {
+  display: none !important;
+}
+
+.shaka-text-languages .shaka-back-to-overflow-button span,
+.shaka-audio-languages .shaka-back-to-overflow-button span,
+.shaka-chapters .shaka-back-to-overflow-button span {
+  margin: 0 !important;
+  color: rgb(255 255 255 / 0.82);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+}
+
+.kawaz-chapter-seekbar {
+  position: relative;
+  overflow: visible;
+}
+
+.kawaz-chapter-markers {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.kawaz-chapter-hover-targets {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.kawaz-chapter-hover-target {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 0.8rem;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  padding: 0;
+  cursor: pointer;
+}
+
+.kawaz-chapter-hover-target::after {
+  content: attr(data-title);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.35rem);
+  transform: translateX(-50%);
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.35rem;
+  background: rgb(0 0 0 / 0.82);
+  color: white;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  z-index: 4;
+}
+
+.kawaz-chapter-hover-target:hover::after,
+.kawaz-chapter-hover-target:focus-visible::after {
+  opacity: 1;
+}
+
+.kawaz-chapter-hover-target:focus-visible {
+  outline: 1px solid rgb(255 255 255 / 0.85);
+  outline-offset: 1px;
 }
 
 @layer base {
@@ -86,5 +184,9 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
+  }
+
+  button, a, [role="button"], label[for], select {
+    cursor: pointer;
   }
 }
