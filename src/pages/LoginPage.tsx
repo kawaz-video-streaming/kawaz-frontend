@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SyntheticEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { Input } from '../components/ui/input'
@@ -23,7 +23,7 @@ export const LoginPage = () => {
   const passwordValid = validatePassword(password)
   const canSubmit = usernameValid && passwordValid
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (!canSubmit) return
 
@@ -32,6 +32,7 @@ export const LoginPage = () => {
       const path = mode === 'login' ? '/auth/login' : '/auth/signup'
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}${path}`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       })
@@ -39,8 +40,8 @@ export const LoginPage = () => {
         const body = await response.json().catch(() => null) as { error?: string } | null
         throw new Error(body?.error || `Request failed with status ${response.status}`)
       }
-      const { token } = await response.json() as { token: string }
-      login(token)
+      const data = await response.json() as { role?: string; username?: string }
+      login(data.role, data.username ?? username)
       void navigate('/')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Authentication failed', {

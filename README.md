@@ -4,10 +4,10 @@ React and Vite frontend for the Kawaz-Plus video streaming platform.
 
 The app currently provides:
 
-- Protected application shell with token-based auth state stored in localStorage
-- Upload flow for video and image media
+- Cookie-based authentication backed by `kawaz-token` HttpOnly cookie
+- Upload flow for video media (admin only)
+- Video library grid on the home page
 - Direct video playback using Shaka Player with built-in audio language and caption track switching
-- Placeholder home and login screens while backend endpoints are still being completed
 
 ## Tech Stack
 
@@ -63,38 +63,32 @@ npm run preview
 
 ## Environment Variables
 
-The frontend expects these variables:
-
 ```env
 VITE_BACKEND_URL=http://localhost:8080
-VITE_VOD_URL=http://localhost:8082
 ```
 
-- `VITE_BACKEND_URL`: base URL for authenticated API requests such as media upload
-- `VITE_VOD_URL`: base URL for direct VOD metadata and streaming routes
+- `VITE_BACKEND_URL`: base URL for all API requests. In development, set to `/api` to use the Vite proxy (configured in `vite.config.ts`).
 
 ## Application Routes
 
-- `/login`: sign-in screen placeholder
-- `/`: protected home page
-- `/upload`: protected media upload page
+- `/login`: sign-in / sign-up screen
+- `/`: protected home page — video library grid
+- `/upload`: protected media upload page (admin only)
 - `/videos/:id`: protected playback page for a specific video
 
-## Current Backend Assumptions
+## Backend API Dependencies
 
-This frontend currently depends on the following backend behavior:
+All requests go through `VITE_BACKEND_URL`:
 
-- `POST /media/upload` is available on `VITE_BACKEND_URL`
-- `GET /video/:id` is available on `VITE_VOD_URL`
-- `GET /stream/:playUrl` is available on `VITE_VOD_URL`
-
-Authentication is not fully wired yet. The login page is a placeholder until the backend exposes a real auth endpoint.
-
-## Known Gaps
-
-- The home page does not yet fetch a video list
-- The login page intentionally fails until the auth API exists
-- VOD calls are still split from the main backend client until proxying is added on the backend side
+- `POST /auth/login` — login, sets `kawaz-token` HttpOnly cookie
+- `POST /auth/signup` — register
+- `GET /auth/me` — returns `{ username, role }` for the current session
+- `POST /media/upload` — upload a video file (admin only)
+- `GET /media/videos` — list all videos
+- `GET /media/videos/:id` — get video metadata
+- `GET /media/videos/:id/output.mpd` — MPEG-DASH manifest
+- `GET /media/videos/:id/*.m4s` — video segments (redirects to presigned URL)
+- `GET /media/videos/:id/*.vtt` — VTT subtitle content
 
 ## Repository
 

@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useTheme } from '../../theme/ThemeContext'
 
 export const Navbar = () => {
-  const { logout, isAdmin } = useAuth()
+  const { logout, isAdmin, username } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
@@ -15,23 +15,28 @@ export const Navbar = () => {
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-        <div className="flex items-center gap-8">
+      <div className="flex items-center justify-between px-6 py-3">
+        {/* Left: Navigation Links */}
+        <div className="flex items-center gap-6">
+          <Link to="/" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            Videos
+          </Link>
+          {isAdmin && (
+            <Link to="/upload" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              Upload
+            </Link>
+          )}
+        </div>
+
+        {/* Center: Kawaz+ Logo & Welcome Message */}
+        <div className="flex flex-col items-center">
           <Link to="/" className="text-lg font-extrabold tracking-tight">
             Kawaz<span className="text-red-500">+</span>
           </Link>
-          <div className="flex items-center gap-6">
-            <Link to="/" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              Videos
-            </Link>
-            {isAdmin && (
-              <Link to="/upload" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                Upload
-              </Link>
-            )}
-          </div>
+          <p className="text-xs text-muted-foreground">Welcome back, <span className="font-semibold text-foreground">{username}</span>! 👋</p>
         </div>
 
+        {/* Right: Theme Toggle & Logout */}
         <div className="flex items-center gap-3">
           <button
             onClick={toggleTheme}
@@ -49,6 +54,6 @@ export const Navbar = () => {
           </button>
         </div>
       </div>
-    </nav>
+    </nav >
   )
 }

@@ -29,8 +29,8 @@ export const VideoPage = () => {
   return (
     <div>
       <VideoPlayer
-        manifestUrl={`${import.meta.env.VITE_VOD_URL}/stream/${video.playUrl}`}
-        chaptersUrl={video.chaptersUrl ? `${import.meta.env.VITE_VOD_URL}/stream/${video.chaptersUrl}` : undefined}
+        manifestUrl={`${import.meta.env.VITE_BACKEND_URL}/media/videos/${video.playUrl}`}
+        chaptersUrl={video.chaptersUrl ? `${import.meta.env.VITE_BACKEND_URL}/media/videos/${video.chaptersUrl}` : undefined}
         className="mb-6 overflow-hidden rounded-xl"
       />
 

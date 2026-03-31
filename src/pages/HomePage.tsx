@@ -1,17 +1,18 @@
-import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { Search } from 'lucide-react'
+import { useVideos } from '../hooks/useVideos'
 
-// TODO: replace with a real video grid once kawaz-backend exposes GET /videos
+const formatDuration = (ms: number) => {
+  const totalSeconds = Math.floor(ms / 1000)
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 export const HomePage = () => {
   const navigate = useNavigate()
-  const [videoId, setVideoId] = useState('')
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    if (!videoId.trim()) return
-    void navigate(`/videos/${videoId.trim()}`)
-  }
+  const { data: videos, isLoading, isError } = useVideos()
 
   return (
     <div>
@@ -20,30 +21,46 @@ export const HomePage = () => {
         <p className="mt-1 text-sm text-muted-foreground">Browse and watch your content</p>
       </div>
 
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-32 text-center">
-        <div className="mb-4 rounded-full bg-accent p-4">
-          <Search size={24} className="text-muted-foreground" />
+      {isLoading && (
+        <div className="flex items-center justify-center py-32 text-muted-foreground">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-red-500" />
         </div>
-        <p className="mb-1 font-medium">No video library yet</p>
-        <p className="mb-8 text-sm text-muted-foreground">
-          Video listing coming soon. Enter a video ID to watch directly.
-        </p>
-        <form onSubmit={handleSubmit} className="flex w-full max-w-sm gap-2">
-          <input
-            placeholder="Video ID"
-            value={videoId}
-            onChange={(e) => setVideoId(e.target.value)}
-            className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500"
-          />
-          <button
-            type="submit"
-            disabled={!videoId.trim()}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Watch
-          </button>
-        </form>
-      </div>
+      )}
+
+      {isError && (
+        <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
+          Failed to load videos.
+        </div>
+      )}
+
+      {videos && videos.length === 0 && (
+        <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
+          No videos yet.
+        </div>
+      )}
+
+      {videos && videos.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {videos.map((video) => (
+            <button
+              key={video._id}
+              onClick={() => void navigate(`/videos/${video._id}`)}
+              className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
+            >
+              <div className="flex aspect-video items-center justify-center bg-accent text-muted-foreground text-xs">
+                {video.thumbnailUrl
+                  ? <img src={video.thumbnailUrl} alt={video.title} className="h-full w-full object-cover" />
+                  : <span>No preview</span>
+                }
+              </div>
+              <div className="flex flex-col gap-1 p-3">
+                <p className="truncate text-sm font-semibold leading-tight">{video.title}</p>
+                <p className="text-xs text-muted-foreground">{formatDuration(video.durationInMs)}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

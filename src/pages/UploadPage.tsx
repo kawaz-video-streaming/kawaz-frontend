@@ -1,6 +1,6 @@
-import { useState, useRef, type FormEvent, type ChangeEvent, type DragEvent } from 'react'
+import { CheckCircle, FileVideo, UploadCloud, X } from 'lucide-react'
+import { useRef, useState, type ChangeEvent, type DragEvent, type SyntheticEvent } from 'react'
 import { toast } from 'sonner'
-import { UploadCloud, FileVideo, FileImage, CheckCircle, X } from 'lucide-react'
 import { Progress } from '../components/ui/progress'
 import { useUploadMedia } from '../hooks/useUploadMedia'
 
@@ -12,18 +12,19 @@ const formatSize = (bytes: number) => {
   return `${(bytes / 1024).toFixed(2)} KB`
 }
 
-const FileIcon = ({ file }: { file: File }) => {
-  if (file.type.startsWith('image/')) return <FileImage size={32} className="text-red-500" />
-  return <FileVideo size={32} className="text-red-500" />
-}
-
 export const UploadPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const { mutate: upload, isPending, isSuccess, isError, error, reset } = useUploadMedia()
+  const { mutate: upload, isPending, isSuccess, reset } = useUploadMedia()
 
   const applyFile = (file: File | null) => {
+    if (file && !file.type.startsWith('video/')) {
+      toast.error('Only video files are supported', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      })
+      return
+    }
     if (file && file.size > MAX_SIZE) {
       toast.error('File exceeds the 10 GB limit', {
         style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
@@ -52,7 +53,7 @@ export const UploadPage = () => {
 
   const handleDragLeave = () => setIsDragging(false)
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = (e: SyntheticEvent) => {
     e.preventDefault()
     if (!selectedFile) return
     upload(selectedFile)
@@ -92,7 +93,7 @@ export const UploadPage = () => {
                 >
                   <X size={16} />
                 </button>
-                <FileIcon file={selectedFile} />
+                <FileVideo size={32} className="text-red-500" />
                 <div className="text-center">
                   <p className="text-sm font-medium">{selectedFile.name}</p>
                   <p className="text-xs text-muted-foreground">{formatSize(selectedFile.size)}</p>
@@ -103,7 +104,7 @@ export const UploadPage = () => {
                 <UploadCloud size={32} className={isDragging ? 'text-red-500' : 'text-muted-foreground'} />
                 <div className="text-center">
                   <p className="text-sm font-medium">{isDragging ? 'Drop to select' : 'Click or drag a file here'}</p>
-                  <p className="text-xs text-muted-foreground">Video and image files supported</p>
+                  <p className="text-xs text-muted-foreground">Video files supported</p>
                 </div>
               </>
             )}
@@ -112,7 +113,7 @@ export const UploadPage = () => {
           <input
             ref={fileInputRef}
             type="file"
-            accept="video/*,image/*"
+            accept="video/*"
             onChange={handleFileChange}
             className="hidden"
           />
@@ -123,12 +124,6 @@ export const UploadPage = () => {
             <div className="flex items-center gap-2 rounded-lg bg-green-500/10 px-4 py-3 text-sm text-green-600 dark:text-green-400">
               <CheckCircle size={16} />
               Upload started. Processing in background.
-            </div>
-          )}
-
-          {isError && (
-            <div className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
-              {error instanceof Error ? error.message : 'Upload failed'}
             </div>
           )}
 
