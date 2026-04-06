@@ -1,6 +1,8 @@
-import { CheckCircle, FileVideo, UploadCloud, X } from 'lucide-react'
+import { CheckCircle, FileVideo, Image, UploadCloud, X } from 'lucide-react'
 import { useRef, useState, type ChangeEvent, type DragEvent, type SyntheticEvent } from 'react'
 import { toast } from 'sonner'
+import { MEDIA_TAGS } from '../constants/tags'
+import type { Coordinates } from '../types/api'
 import { Progress } from '../components/ui/progress'
 import { useUploadMedia } from '../hooks/useUploadMedia'
 
@@ -12,10 +14,72 @@ const formatSize = (bytes: number) => {
   return `${(bytes / 1024).toFixed(2)} KB`
 }
 
+const ThumbnailFocalPointPicker = ({
+  previewUrl,
+  value,
+  onChange,
+}: {
+  previewUrl: string
+  value: Coordinates
+  onChange: (focal: Coordinates) => void
+}) => {
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
+
+  const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+  }
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    onChange({
+      x: Math.round(((e.clientX - rect.left) / rect.width) * 100) / 100,
+      y: Math.round(((e.clientY - rect.top) / rect.height) * 100) / 100,
+    })
+  }
+
+  // Calculate 16:9 crop window as % of the displayed image dimensions
+  let cropL = 0, cropT = 0, cropW = 100, cropH = 100
+  if (naturalSize) {
+    const imgAspect = naturalSize.w / naturalSize.h
+    const thumbAspect = 16 / 9
+    if (imgAspect > thumbAspect) {
+      cropW = (thumbAspect / imgAspect) * 100
+      cropL = Math.max(0, Math.min(100 - cropW, value.x * 100 - cropW / 2))
+    } else if (imgAspect < thumbAspect) {
+      cropH = (imgAspect / thumbAspect) * 100
+      cropT = Math.max(0, Math.min(100 - cropH, value.y * 100 - cropH / 2))
+    }
+  }
+
+  return (
+    <div className="relative w-full cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
+      <img src={previewUrl} alt="Thumbnail preview" className="block w-full" draggable={false} onLoad={handleLoad} />
+      {naturalSize && (
+        <div
+          className="pointer-events-none absolute rounded-sm"
+          style={{
+            left: `${cropL}%`, top: `${cropT}%`,
+            width: `${cropW}%`, height: `${cropH}%`,
+            boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
+            border: '1.5px solid rgba(255,255,255,0.75)',
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
 export const UploadPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const thumbnailInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [tags, setTags] = useState<string[]>([])
+  const [thumbnail, setThumbnail] = useState<File | null>(null)
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
+  const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 })
   const { mutate: upload, isPending, isSuccess, reset } = useUploadMedia()
 
   const applyFile = (file: File | null) => {
@@ -32,11 +96,40 @@ export const UploadPage = () => {
       return
     }
     setSelectedFile(file)
+    if (!file) {
+      setTitle('')
+      setDescription('')
+      setTags([])
+      removeThumbnail()
+    }
     reset()
+  }
+
+  const removeThumbnail = () => {
+    setThumbnail(null)
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview)
+    setThumbnailPreview(null)
+    setThumbnailFocalPoint({ x: 0.5, y: 0.5 })
+    if (thumbnailInputRef.current) thumbnailInputRef.current.value = ''
   }
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     applyFile(e.target.files?.[0] ?? null)
+  }
+
+  const handleThumbnailChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Only image files are supported for thumbnails', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      })
+      return
+    }
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview)
+    setThumbnail(file)
+    setThumbnailPreview(URL.createObjectURL(file))
+    setThumbnailFocalPoint({ x: 0.5, y: 0.5 })
   }
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -53,10 +146,13 @@ export const UploadPage = () => {
 
   const handleDragLeave = () => setIsDragging(false)
 
+  const toggleTag = (tag: string) =>
+    setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
+
   const handleSubmit = (e: SyntheticEvent) => {
     e.preventDefault()
-    if (!selectedFile) return
-    upload(selectedFile)
+    if (!selectedFile || !title.trim() || !thumbnail) return
+    upload({ file: selectedFile, title: title.trim(), description: description.trim(), tags, thumbnail, thumbnailFocalPoint })
   }
 
   return (
@@ -68,6 +164,7 @@ export const UploadPage = () => {
 
       <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+          {/* Video file picker */}
           <div
             onClick={() => !selectedFile && fileInputRef.current?.click()}
             onDrop={handleDrop}
@@ -110,13 +207,106 @@ export const UploadPage = () => {
             )}
           </div>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="video/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
+          <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileChange} className="hidden" />
+
+          {/* Metadata form — shown after a file is selected */}
+          {selectedFile && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium" htmlFor="media-title">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="media-title"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Enter a title"
+                  required
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium" htmlFor="media-description">
+                  Description
+                </label>
+                <textarea
+                  id="media-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter a description (optional)"
+                  rows={3}
+                  className="resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Tags</label>
+                <div className="flex flex-wrap gap-2">
+                  {MEDIA_TAGS.map((tag) => {
+                    const selected = tags.includes(tag)
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className={[
+                          'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                          selected
+                            ? 'border-red-500 bg-red-500/10 text-red-500'
+                            : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
+                        ].join(' ')}
+                      >
+                        {tag}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">
+                  Thumbnail <span className="text-red-500">*</span>
+                </label>
+                {thumbnailPreview ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">Click the image to set the focal point.</p>
+                      <button
+                        type="button"
+                        onClick={removeThumbnail}
+                        className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <X size={12} /> Remove
+                      </button>
+                    </div>
+                    <ThumbnailFocalPointPicker
+                      previewUrl={thumbnailPreview}
+                      value={thumbnailFocalPoint}
+                      onChange={setThumbnailFocalPoint}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => thumbnailInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border py-4 text-sm text-muted-foreground transition-colors hover:border-red-500/50 hover:bg-accent/50 hover:text-foreground"
+                  >
+                    <Image size={16} />
+                    Choose thumbnail
+                  </button>
+                )}
+                <input
+                  ref={thumbnailInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleThumbnailChange}
+                  className="hidden"
+                />
+              </div>
+            </>
+          )}
 
           {isPending && <Progress value={30} className="animate-pulse" />}
 
@@ -129,7 +319,7 @@ export const UploadPage = () => {
 
           <button
             type="submit"
-            disabled={!selectedFile || isPending}
+            disabled={!selectedFile || !title.trim() || !thumbnail || isPending}
             className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isPending ? 'Uploading...' : 'Upload'}

@@ -112,6 +112,29 @@
   letter-spacing: 0.03em;
 }
 
+/* Tailwind's global img reset shrinks Shaka sprite sheets into the preview box.
+   Let the thumbnail image keep its natural size so Shaka's left/top offsets work. */
+.kawaz-video-player .shaka-player-ui-thumbnail-container,
+.kawaz-video-player #shaka-player-ui-thumbnail-container {
+  z-index: 4;
+}
+
+.kawaz-video-player .shaka-player-ui-thumbnail-image-container,
+.kawaz-video-player #shaka-player-ui-thumbnail-image-container {
+  overflow: hidden !important;
+  position: relative !important;
+  background-color: #000;
+}
+
+.kawaz-video-player .shaka-player-ui-thumbnail-image,
+.kawaz-video-player #shaka-player-ui-thumbnail-image,
+.kawaz-video-player #shaka-player-ui-thumbnail-container > img {
+  position: absolute !important;
+  display: block;
+  max-width: none !important;
+  max-height: none !important;
+}
+
 .kawaz-chapter-seekbar {
   position: relative;
   overflow: visible;

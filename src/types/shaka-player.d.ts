@@ -29,12 +29,30 @@ declare module 'shaka-player' {
     endTime: number
   }
 
+  interface ThumbnailData {
+    startTime: number
+    endTime: number
+    uris: string[]
+    width: number
+    height: number
+    positionX: number
+    positionY: number
+  }
+
+  interface ImageTrack {
+    id: number
+  }
+
   class Player {
     constructor()
     static isBrowserSupported(): boolean
     attach(video: HTMLMediaElement): Promise<void>
     load(uri: string): Promise<void>
+    getNetworkingEngine(): { registerRequestFilter(filter: (type: number, request: { allowCrossSiteCredentials: boolean }) => void): void } | null
     addChaptersTrack(uri: string, language: string, mimeType?: string): Promise<TextTrack>
+    addThumbnailsTrack(uri: string, mimeType?: string): Promise<TextTrack>
+    getImageTracks(): ImageTrack[]
+    getThumbnails(trackId: number, time: number): ThumbnailData | null
     destroy(): Promise<void>
     addEventListener(type: string, listener: EventListenerOrEventListenerObject): void
     removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void
@@ -49,7 +67,7 @@ declare module 'shaka-player' {
   }
 
   export { polyfill, Player }
-  export type { Chapter, VariantTrack, TextTrack }
+  export type { Chapter, VariantTrack, TextTrack, ThumbnailData, ImageTrack }
 }
 
 declare module 'shaka-player/dist/shaka-player.ui.js' {
@@ -65,5 +83,5 @@ declare module 'shaka-player/dist/shaka-player.ui.js' {
   }
 
   export { Player, polyfill, ui }
-  export type { Chapter, VariantTrack, TextTrack }
+  export type { Chapter, VariantTrack, TextTrack, ThumbnailData, ImageTrack }
 }

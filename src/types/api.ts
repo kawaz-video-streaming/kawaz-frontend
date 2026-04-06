@@ -18,25 +18,37 @@ export interface SubtitleStream {
 }
 
 export interface VideoChapter {
-  title: string
-  startTimeMs: number
+  chapterName: string
+  chapterStartTime: number
+  chapterEndTime: number
 }
 
 export interface Video {
   _id: string
   title: string
+  description?: string
+  tags: string[]
+  thumbnailFocalPoint: Coordinates
   durationInMs: number
   playUrl: string
   chaptersUrl?: string
+  thumbnailsUrl?: string
   chapters?: VideoChapter[]
   videoStreams: VideoStream[]
   audioStreams: AudioStream[]
   subtitleStreams: SubtitleStream[]
 }
 
+export interface Coordinates {
+  x: number
+  y: number
+}
+
 export interface VideoListItem {
   _id: string
   title: string
+  description?: string
   durationInMs: number
-  thumbnailUrl?: string
+  tags: string[]
+  thumbnailFocalPoint: Coordinates
 }
