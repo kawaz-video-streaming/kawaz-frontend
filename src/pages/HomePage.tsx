@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { MEDIA_TAGS } from '../constants/tags'
 import { useVideos } from '../hooks/useVideos'
+import { getObjectPositionFromFocalPoint } from '../lib/focalPoints'
+import type { Coordinates } from '../types/api'
 
 const formatDuration = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000)
@@ -10,6 +12,33 @@ const formatDuration = (ms: number) => {
   const s = totalSeconds % 60
   if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   return `${m}:${String(s).padStart(2, '0')}`
+}
+
+const VideoThumbnail = ({
+  id,
+  title,
+  focalPoint,
+}: {
+  id: string
+  title: string
+  focalPoint: Coordinates
+}) => {
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
+
+  return (
+    <img
+      src={`${import.meta.env.VITE_BACKEND_URL}/media/${id}/thumbnail`}
+      alt={title}
+      loading="lazy"
+      className="absolute inset-0 h-full w-full object-cover"
+      onLoad={(e) => setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+      style={{
+        objectPosition: naturalSize
+          ? getObjectPositionFromFocalPoint(naturalSize, focalPoint)
+          : `${focalPoint.x * 100}% ${focalPoint.y * 100}%`,
+      }}
+    />
+  )
 }
 
 export const HomePage = () => {
@@ -100,11 +129,10 @@ export const HomePage = () => {
               className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
             >
               <div className="relative w-full pt-[56.25%]">
-                <img
-                  src={`${import.meta.env.VITE_BACKEND_URL}/media/${video._id}/thumbnail`}
-                  alt={video.title}
-                  className="absolute inset-0 h-full w-full object-cover"
-                  style={{ objectPosition: `${video.thumbnailFocalPoint.x * 100}% ${video.thumbnailFocalPoint.y * 100}%` }}
+                <VideoThumbnail
+                  id={video._id}
+                  title={video.title}
+                  focalPoint={video.thumbnailFocalPoint}
                 />
               </div>
               <div className="flex flex-col gap-1 p-3">

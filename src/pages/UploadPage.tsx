@@ -5,6 +5,7 @@ import { MEDIA_TAGS } from '../constants/tags'
 import type { Coordinates } from '../types/api'
 import { Progress } from '../components/ui/progress'
 import { useUploadMedia } from '../hooks/useUploadMedia'
+import { getFocalCropArea } from '../lib/focalPoints'
 
 const MAX_SIZE = 10 * 1024 ** 3 // 10 GB
 
@@ -37,29 +38,17 @@ const ThumbnailFocalPointPicker = ({
     })
   }
 
-  // Calculate 16:9 crop window as % of the displayed image dimensions
-  let cropL = 0, cropT = 0, cropW = 100, cropH = 100
-  if (naturalSize) {
-    const imgAspect = naturalSize.w / naturalSize.h
-    const thumbAspect = 16 / 9
-    if (imgAspect > thumbAspect) {
-      cropW = (thumbAspect / imgAspect) * 100
-      cropL = Math.max(0, Math.min(100 - cropW, value.x * 100 - cropW / 2))
-    } else if (imgAspect < thumbAspect) {
-      cropH = (imgAspect / thumbAspect) * 100
-      cropT = Math.max(0, Math.min(100 - cropH, value.y * 100 - cropH / 2))
-    }
-  }
+  const crop = naturalSize ? getFocalCropArea(naturalSize, value) : null
 
   return (
     <div className="relative w-full cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
       <img src={previewUrl} alt="Thumbnail preview" className="block w-full" draggable={false} onLoad={handleLoad} />
-      {naturalSize && (
+      {crop && (
         <div
           className="pointer-events-none absolute rounded-sm"
           style={{
-            left: `${cropL}%`, top: `${cropT}%`,
-            width: `${cropW}%`, height: `${cropH}%`,
+            left: `${crop.left * 100}%`, top: `${crop.top * 100}%`,
+            width: `${crop.width * 100}%`, height: `${crop.height * 100}%`,
             boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
             border: '1.5px solid rgba(255,255,255,0.75)',
           }}
