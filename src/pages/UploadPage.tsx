@@ -19,10 +19,12 @@ const ThumbnailFocalPointPicker = ({
   previewUrl,
   value,
   onChange,
+  aspectRatio = 2 / 3,
 }: {
   previewUrl: string
   value: Coordinates
   onChange: (focal: Coordinates) => void
+  aspectRatio?: number
 }) => {
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
 
@@ -38,7 +40,7 @@ const ThumbnailFocalPointPicker = ({
     })
   }
 
-  const crop = naturalSize ? getFocalCropArea(naturalSize, value) : null
+  const crop = naturalSize ? getFocalCropArea(naturalSize, value, aspectRatio) : null
 
   return (
     <div className="relative w-full cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
@@ -260,8 +262,8 @@ export const UploadPage = () => {
                 </label>
                 {thumbnailPreview ? (
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">Click the image to set the focal point.</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs text-muted-foreground">Click the image to set the focal point. New media previews vertically.</p>
                       <button
                         type="button"
                         onClick={removeThumbnail}

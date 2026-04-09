@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { FolderOpen } from 'lucide-react'
 import { MEDIA_TAGS } from '../constants/tags'
 import { useVideos } from '../hooks/useVideos'
+import { useCollections } from '../hooks/useCollections'
+import { ORIENTATION_CONFIG } from '../hooks/useThumbnailOrientation'
 import { getObjectPositionFromFocalPoint } from '../lib/focalPoints'
-import type { Coordinates } from '../types/api'
+import type { CollectionListItem, VideoListItem, Coordinates } from '../types/api'
 
 const formatDuration = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000)
@@ -14,41 +17,138 @@ const formatDuration = (ms: number) => {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-const VideoThumbnail = ({
-  id,
+const ItemThumbnail = ({
+  src,
   title,
   focalPoint,
+  aspectRatio,
 }: {
-  id: string
+  src: string
   title: string
   focalPoint: Coordinates
+  aspectRatio: number
 }) => {
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
-
   return (
     <img
-      src={`${import.meta.env.VITE_BACKEND_URL}/media/${id}/thumbnail`}
+      src={src}
       alt={title}
       loading="lazy"
       className="absolute inset-0 h-full w-full object-cover"
       onLoad={(e) => setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
       style={{
         objectPosition: naturalSize
-          ? getObjectPositionFromFocalPoint(naturalSize, focalPoint)
+          ? getObjectPositionFromFocalPoint(naturalSize, focalPoint, aspectRatio)
           : `${focalPoint.x * 100}% ${focalPoint.y * 100}%`,
       }}
     />
   )
 }
 
+type PageItem =
+  | { type: 'video'; data: VideoListItem }
+  | { type: 'collection'; data: CollectionListItem }
+
 export const HomePage = () => {
   const navigate = useNavigate()
   const { data: videos, isLoading, isError } = useVideos()
-  const [activeTag, setActiveTag] = useState<string | null>(null)
+  const { data: collections } = useCollections()
+  const [selectedTabs, setSelectedTabs] = useState<string[]>([])
 
-  const filtered = activeTag
-    ? videos?.filter((v) => v.tags.includes(activeTag))
-    : videos
+  const config = ORIENTATION_CONFIG.vertical
+
+  const topLevelCollections = collections?.filter((c) => !c.collectionId) ?? []
+  const topLevelVideos = videos?.filter((v) => !v.collectionId) ?? []
+  const topLevelItems: PageItem[] = [
+    ...topLevelCollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
+    ...topLevelVideos.map((video): PageItem => ({ type: 'video', data: video })),
+  ]
+  const newestItems = [...topLevelItems].slice(-10).reverse()
+
+  const getDisplayGenre = (item: PageItem) => item.data.tags[0] ?? 'Other'
+
+  const genreTabs = MEDIA_TAGS.filter((tag) =>
+    topLevelItems.some((item) => getDisplayGenre(item) === tag),
+  )
+
+  const hasOtherItems = topLevelItems.some((item) => getDisplayGenre(item) === 'Other')
+  const availableTabs = hasOtherItems ? [...genreTabs, 'Other'] : genreTabs
+
+  const sections: Array<{ key: string; items: PageItem[] }> = [
+    ...(newestItems.length > 0 ? [{ key: 'Newest Releases', items: newestItems }] : []),
+    ...availableTabs
+      .map((tab) => ({
+        key: tab,
+        items: topLevelItems.filter((item) => getDisplayGenre(item) === tab),
+      }))
+      .filter((section) => section.items.length > 0),
+  ]
+
+  const visibleSections = selectedTabs.length > 0
+    ? sections.filter((section) => selectedTabs.includes(section.key))
+    : sections
+
+  const toggleTab = (tab: string) =>
+    setSelectedTabs((prev) => prev.includes(tab) ? prev.filter((t) => t !== tab) : [...prev, tab])
+
+  const renderItemCard = (item: PageItem) =>
+    item.type === 'collection' ? (
+      <button
+        key={item.data._id}
+        onClick={() => void navigate(`/collections/${item.data._id}`)}
+        className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
+      >
+        <div className={`relative w-full ${config.paddingClass}`}>
+          <ItemThumbnail
+            src={`${import.meta.env.VITE_BACKEND_URL}/mediaCollection/${item.data._id}/thumbnail`}
+            title={item.data.title}
+            focalPoint={item.data.thumbnailFocalPoint}
+            aspectRatio={config.aspectRatio}
+          />
+          <div className="absolute bottom-1.5 left-1.5">
+            <span className="flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">
+              <FolderOpen size={10} />
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-0.5 p-2.5">
+          <p className="text-sm font-semibold leading-tight">
+            {item.data.title}
+          </p>
+          {item.data.description && (
+            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{item.data.description}</p>
+          )}
+        </div>
+      </button>
+    ) : (
+      <button
+        key={item.data._id}
+        onClick={() => void navigate(`/videos/${item.data._id}`)}
+        className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
+      >
+        <div className={`relative w-full ${config.paddingClass}`}>
+          <ItemThumbnail
+            src={`${import.meta.env.VITE_BACKEND_URL}/media/${item.data._id}/thumbnail`}
+            title={item.data.title}
+            focalPoint={item.data.thumbnailFocalPoint}
+            aspectRatio={config.aspectRatio}
+          />
+        </div>
+        <div className="flex flex-col gap-0.5 p-2.5">
+          <p className="text-sm font-semibold leading-tight">
+            {item.data.title}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {formatDuration((item.data as VideoListItem).durationInMs)}
+          </p>
+          {(item.data as VideoListItem).description && (
+            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+              {(item.data as VideoListItem).description}
+            </p>
+          )}
+        </div>
+      </button>
+    )
 
   return (
     <div>
@@ -61,38 +161,35 @@ export const HomePage = () => {
         <p className="relative mt-1.5 text-sm text-muted-foreground">Browse and stream your library.</p>
       </div>
 
-      {/* Tag filter bar */}
-      {videos && videos.length > 0 && (
+      {(topLevelVideos.length > 0 || topLevelCollections.length > 0) && (
         <div className="mb-6 flex flex-wrap gap-2">
           <button
-            onClick={() => setActiveTag(null)}
+            type="button"
+            onClick={() => setSelectedTabs([])}
             className={[
-              'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-              activeTag === null
+              'rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
+              selectedTabs.length === 0
                 ? 'border-red-500 bg-red-500/10 text-red-500'
                 : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
             ].join(' ')}
           >
             All
           </button>
-          {MEDIA_TAGS.map((tag) => {
-            const hasVideos = videos.some((v) => v.tags.includes(tag))
-            if (!hasVideos) return null
-            return (
-              <button
-                key={tag}
-                onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-                className={[
-                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                  activeTag === tag
-                    ? 'border-red-500 bg-red-500/10 text-red-500'
-                    : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
-                ].join(' ')}
-              >
-                {tag}
-              </button>
-            )
-          })}
+          {sections.map((section) => (
+            <button
+              key={section.key}
+              type="button"
+              onClick={() => toggleTab(section.key)}
+              className={[
+                'rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
+                selectedTabs.includes(section.key)
+                  ? 'border-red-500 bg-red-500/10 text-red-500'
+                  : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
+              ].join(' ')}
+            >
+              {section.key}
+            </button>
+          ))}
         </div>
       )}
 
@@ -101,57 +198,34 @@ export const HomePage = () => {
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-red-500" />
         </div>
       )}
-
       {isError && (
         <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
-          Failed to load videos.
+          Failed to load content.
         </div>
       )}
-
-      {videos && videos.length === 0 && (
+      {!isLoading && visibleSections.length === 0 && (
         <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
-          No videos yet.
+          {selectedTabs.length > 0 ? 'No items in the selected sections.' : 'No content yet.'}
         </div>
       )}
 
-      {filtered && filtered.length === 0 && videos && videos.length > 0 && (
-        <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
-          No videos with this tag.
-        </div>
-      )}
-
-      {filtered && filtered.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((video) => (
-            <button
-              key={video._id}
-              onClick={() => void navigate(`/videos/${video._id}`)}
-              className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
-            >
-              <div className="relative w-full pt-[56.25%]">
-                <VideoThumbnail
-                  id={video._id}
-                  title={video.title}
-                  focalPoint={video.thumbnailFocalPoint}
-                />
+      {visibleSections.length > 0 && (
+        <div className="space-y-6">
+          {visibleSections.map((section) => (
+            <section key={section.key}>
+              <div className="mb-3">
+                <h2 className="text-lg font-semibold tracking-tight">{section.key}</h2>
               </div>
-              <div className="flex flex-col gap-1 p-3">
-                <p className="text-sm font-semibold leading-tight">{video.title}</p>
-                <p className="text-xs text-muted-foreground">{formatDuration(video.durationInMs)}</p>
-                {video.description && (
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{video.description}</p>
-                )}
-                {video.tags.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {video.tags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-accent px-2 py-0.5 text-xs text-muted-foreground">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div className="rounded-2xl border border-border bg-card/70 p-4 shadow-sm">
+                <div className={`grid ${config.gridClass}`}>
+                  {section.items.map((item) => (
+                    <div key={`${section.key}-${item.type}-${item.data._id}`}>
+                      {renderItemCard(item)}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </button>
+            </section>
           ))}
         </div>
       )}

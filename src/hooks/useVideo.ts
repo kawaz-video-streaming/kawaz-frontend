@@ -9,6 +9,7 @@ const mediaSchema = z.object({
   description: z.string().optional(),
   tags: z.array(z.string()).default([]),
   thumbnailFocalPoint: z.object({ x: z.number(), y: z.number() }).default({ x: 0.5, y: 0.5 }),
+  collectionId: z.string().optional(),
   metadata: z.object({
     durationInMs: z.number(),
     playUrl: z.string(),
@@ -30,8 +31,8 @@ export const useVideo = (id: string) =>
     queryKey: ['videos', id],
     queryFn: async () => {
       const raw = await apiRequest<unknown>(`/media/${id}`)
-      const { _id, title, description, tags, thumbnailFocalPoint, metadata } = mediaSchema.parse(raw)
-      return { _id, title, description, tags, thumbnailFocalPoint, ...metadata }
+      const { _id, title, description, tags, thumbnailFocalPoint, collectionId, metadata } = mediaSchema.parse(raw)
+      return { _id, title, description, tags, thumbnailFocalPoint, collectionId, ...metadata }
     },
     retry: false,
     enabled: id.length > 0,

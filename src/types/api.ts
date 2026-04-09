@@ -29,6 +29,7 @@ export interface Video {
   description?: string
   tags: string[]
   thumbnailFocalPoint: Coordinates
+  collectionId?: string
   durationInMs: number
   playUrl: string
   chaptersUrl?: string
@@ -51,4 +52,14 @@ export interface VideoListItem {
   durationInMs: number
   tags: string[]
   thumbnailFocalPoint: Coordinates
+  collectionId?: string
+}
+
+export interface CollectionListItem {
+  _id: string
+  title: string
+  description?: string
+  tags: string[]
+  thumbnailFocalPoint: Coordinates
+  collectionId?: string
 }

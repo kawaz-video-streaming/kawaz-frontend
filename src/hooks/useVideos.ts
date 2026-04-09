@@ -9,6 +9,7 @@ const mediaListItemSchema = z.object({
   description: z.string().optional(),
   tags: z.array(z.string()).default([]),
   thumbnailFocalPoint: z.object({ x: z.number(), y: z.number() }).default({ x: 0.5, y: 0.5 }),
+  collectionId: z.string().optional(),
   metadata: z.object({
     durationInMs: z.number(),
   }).optional(),
@@ -20,8 +21,8 @@ export const useVideos = () =>
     queryFn: async () => {
       const raw = await apiRequest<unknown[]>('/media')
       return raw.map(item => {
-        const { _id, title, description, tags, thumbnailFocalPoint, metadata } = mediaListItemSchema.parse(item)
-        return { _id, title, description, tags, thumbnailFocalPoint, durationInMs: metadata?.durationInMs ?? 0 }
+        const { _id, title, description, tags, thumbnailFocalPoint, collectionId, metadata } = mediaListItemSchema.parse(item)
+        return { _id, title, description, tags, thumbnailFocalPoint, durationInMs: metadata?.durationInMs ?? 0, collectionId }
       })
     },
     retry: false,

@@ -19,9 +19,14 @@ export const Navbar = () => {
         {/* Left: Navigation Links */}
         <div className="flex items-center gap-6">
           {isAdmin && (
-            <Link to="/upload" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              Upload
-            </Link>
+            <>
+              <Link to="/upload" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                Upload
+              </Link>
+              <Link to="/collections/new" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                New Collection
+              </Link>
+            </>
           )}
         </div>
 

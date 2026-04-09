@@ -1,46 +1,38 @@
-import z from 'zod'
 import { apiRequest, apiUpload } from './client'
 import type { Coordinates } from '../types/api'
 
-const uploadMediaResponseSchema = z.object({
-  message: z.string(),
-})
-
-export type UploadMediaResponse = z.infer<typeof uploadMediaResponseSchema>
-
-export interface UploadMediaParams {
-  file: File
+export interface CreateCollectionParams {
   title: string
-  description: string
+  description?: string
   tags: string[]
   thumbnail: File
   thumbnailFocalPoint: Coordinates
+  collectionId?: string
 }
 
-export const uploadMedia = async ({ file, title, description, tags, thumbnail, thumbnailFocalPoint }: UploadMediaParams): Promise<UploadMediaResponse> => {
+export const createCollection = ({ title, description, tags, thumbnail, thumbnailFocalPoint, collectionId }: CreateCollectionParams) => {
   const formData = new FormData()
-  formData.append('file', file)
   formData.append('title', title)
-  formData.append('description', description)
+  if (description) formData.append('description', description)
   tags.forEach((tag) => formData.append('tags', tag))
   formData.append('thumbnail', thumbnail)
   formData.append('thumbnailFocalPoint[x]', String(thumbnailFocalPoint.x))
   formData.append('thumbnailFocalPoint[y]', String(thumbnailFocalPoint.y))
-  const raw = await apiUpload<unknown>('/media/upload', formData)
-  return uploadMediaResponseSchema.parse(raw)
+  if (collectionId) formData.append('collectionId', collectionId)
+  return apiUpload<{ message: string }>('/mediaCollection', formData)
 }
 
-export interface UpdateMediaParams {
+export interface UpdateCollectionParams {
   id: string
   title: string
   description?: string
   tags: string[]
   thumbnailFocalPoint: Coordinates
   thumbnail?: File
-  collectionId?: string | null  // null = remove from collection
+  collectionId?: string | null  // null = remove parent
 }
 
-export const updateMedia = ({ id, title, description, tags, thumbnailFocalPoint, thumbnail, collectionId }: UpdateMediaParams) => {
+export const updateCollection = ({ id, title, description, tags, thumbnailFocalPoint, thumbnail, collectionId }: UpdateCollectionParams) => {
   const formData = new FormData()
   formData.append('title', title)
   if (description !== undefined) formData.append('description', description)
@@ -49,8 +41,8 @@ export const updateMedia = ({ id, title, description, tags, thumbnailFocalPoint,
   formData.append('thumbnailFocalPoint[y]', String(thumbnailFocalPoint.y))
   if (thumbnail) formData.append('thumbnail', thumbnail)
   if (collectionId !== undefined) formData.append('collectionId', collectionId === null ? 'null' : collectionId)
-  return apiUpload<{ message: string }>(`/media/${id}`, formData, 'PUT')
+  return apiUpload<{ message: string }>(`/mediaCollection/${id}`, formData, 'PUT')
 }
 
-export const deleteMedia = (id: string) =>
-  apiRequest<{ message: string }>(`/media/${id}`, { method: 'DELETE' })
+export const deleteCollection = (id: string) =>
+  apiRequest<{ message: string }>(`/mediaCollection/${id}`, { method: 'DELETE' })

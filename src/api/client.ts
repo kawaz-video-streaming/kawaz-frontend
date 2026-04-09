@@ -20,9 +20,9 @@ export const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T
   return handleResponse<T>(response)
 }
 
-export const apiUpload = async <T>(path: string, formData: FormData): Promise<T> => {
+export const apiUpload = async <T>(path: string, formData: FormData, method = 'POST'): Promise<T> => {
   const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}${path}`, {
-    method: 'POST',
+    method,
     credentials: 'include',
     body: formData,
   })

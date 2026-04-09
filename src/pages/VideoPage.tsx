@@ -1,26 +1,28 @@
-import { Captions, Mic, Pencil, Trash2, X, Check } from 'lucide-react'
-import { useState } from 'react'
+import { Captions, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { MEDIA_TAGS } from '../constants/tags'
 import type { Coordinates } from '../types/api'
 import { useVideo } from '../hooks/useVideo'
 import { useUpdateMedia } from '../hooks/useUpdateMedia'
 import { useDeleteMedia } from '../hooks/useDeleteMedia'
+import { useCollections } from '../hooks/useCollections'
 import { useAuth } from '../auth/useAuth'
 import { VideoPlayer } from '../components/VideoPlayer'
 import { getFocalCropArea } from '../lib/focalPoints'
 
 const FocalPointPicker = ({
-  id,
+  src,
   value,
   onChange,
+  aspectRatio = 2 / 3,
 }: {
-  id: string
+  src: string
   value: Coordinates
   onChange: (focal: Coordinates) => void
+  aspectRatio?: number
 }) => {
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
-  const thumbnailUrl = `${import.meta.env.VITE_BACKEND_URL}/media/${id}/thumbnail`
 
   const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
@@ -34,14 +36,13 @@ const FocalPointPicker = ({
     })
   }
 
-  const crop = naturalSize ? getFocalCropArea(naturalSize, value) : null
+  const crop = naturalSize ? getFocalCropArea(naturalSize, value, aspectRatio) : null
 
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium">Thumbnail focal point</label>
       <p className="text-xs text-muted-foreground">Click the image to set which part stays visible in thumbnails.</p>
       <div className="relative w-full cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
-        <img src={thumbnailUrl} alt="Thumbnail" className="block w-full" draggable={false} onLoad={handleLoad} />
+        <img src={src} alt="Thumbnail" className="block w-full" draggable={false} onLoad={handleLoad} />
         {crop && (
           <div
             className="pointer-events-none absolute rounded-sm"
@@ -65,12 +66,17 @@ export const VideoPage = () => {
   const { data: video, isError, isLoading } = useVideo(id ?? '')
   const { mutate: update, isPending: isUpdating } = useUpdateMedia(id ?? '')
   const { mutate: remove, isPending: isDeleting } = useDeleteMedia()
+  const { data: collections } = useCollections()
 
+  const thumbnailInputRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editTags, setEditTags] = useState<string[]>([])
   const [editFocalPoint, setEditFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 })
+  const [editCollectionId, setEditCollectionId] = useState<string>('')
+  const [newThumbnail, setNewThumbnail] = useState<File | null>(null)
+  const [newThumbnailPreview, setNewThumbnailPreview] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const openEdit = () => {
@@ -79,16 +85,57 @@ export const VideoPage = () => {
     setEditDescription(video.description ?? '')
     setEditTags(video.tags)
     setEditFocalPoint(video.thumbnailFocalPoint)
+    setEditCollectionId(video.collectionId ?? '')
+    setNewThumbnail(null)
+    setNewThumbnailPreview(null)
     setEditing(true)
   }
 
-  const cancelEdit = () => setEditing(false)
+  const cancelEdit = () => {
+    setEditing(false)
+    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
+    setNewThumbnail(null)
+    setNewThumbnailPreview(null)
+  }
+
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    if (!file) return
+    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
+    setNewThumbnail(file)
+    setNewThumbnailPreview(URL.createObjectURL(file))
+    setEditFocalPoint({ x: 0.5, y: 0.5 })
+  }
+
+  const removeNewThumbnail = () => {
+    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
+    setNewThumbnail(null)
+    setNewThumbnailPreview(null)
+    setEditFocalPoint(video?.thumbnailFocalPoint ?? { x: 0.5, y: 0.5 })
+    if (thumbnailInputRef.current) thumbnailInputRef.current.value = ''
+  }
 
   const submitEdit = () => {
     if (!editTitle.trim()) return
+    const collectionId = editCollectionId === '' ? null : editCollectionId
+    const originalCollectionId = video?.collectionId ?? null
     update(
-      { title: editTitle.trim(), description: editDescription.trim(), tags: editTags, thumbnailFocalPoint: editFocalPoint },
-      { onSuccess: () => setEditing(false) },
+      {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        tags: editTags,
+        thumbnailFocalPoint: editFocalPoint,
+        thumbnail: newThumbnail ?? undefined,
+        collectionId: collectionId !== originalCollectionId ? collectionId : undefined,
+      },
+      {
+        onSuccess: () => {
+          setEditing(false)
+          if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
+          setNewThumbnail(null)
+          setNewThumbnailPreview(null)
+        },
+      },
     )
   }
 
@@ -118,6 +165,9 @@ export const VideoPage = () => {
       </div>
     )
   }
+
+  const thumbnailSrc = `${import.meta.env.VITE_BACKEND_URL}/media/${video._id}/thumbnail`
+  const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3
 
   return (
     <div>
@@ -172,7 +222,62 @@ export const VideoPage = () => {
               </div>
             </div>
 
-            <FocalPointPicker id={video._id} value={editFocalPoint} onChange={setEditFocalPoint} />
+            {collections && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Collection</label>
+                <select
+                  value={editCollectionId}
+                  onChange={(e) => setEditCollectionId(e.target.value)}
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                >
+                  <option value="">— None —</option>
+                  {collections.map((col) => (
+                    <option key={col._id} value={col._id}>{col.title}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Thumbnail</label>
+                {newThumbnail ? (
+                  <button
+                    type="button"
+                    onClick={removeNewThumbnail}
+                    className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <X size={12} /> Revert to original
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => thumbnailInputRef.current?.click()}
+                    className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Image size={12} /> Replace thumbnail
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {editCollectionId
+                  ? 'Nested media previews horizontally.'
+                  : 'Top-level media previews vertically.'}
+              </p>
+              <FocalPointPicker
+                src={newThumbnailPreview ?? thumbnailSrc}
+                value={editFocalPoint}
+                onChange={setEditFocalPoint}
+                aspectRatio={thumbnailAspectRatio}
+              />
+              <input
+                ref={thumbnailInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleThumbnailChange}
+                className="hidden"
+              />
+            </div>
 
             <div className="flex gap-2">
               <button

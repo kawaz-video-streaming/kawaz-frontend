@@ -8,6 +8,8 @@ import { LoginPage } from './pages/LoginPage'
 import { HomePage } from './pages/HomePage'
 import { UploadPage } from './pages/UploadPage'
 import { VideoPage } from './pages/VideoPage'
+import { CollectionPage } from './pages/CollectionPage'
+import { CreateCollectionPage } from './pages/CreateCollectionPage'
 
 export const App = () => (
   <ThemeProvider>
@@ -27,6 +29,8 @@ export const App = () => (
           <Route index element={<HomePage />} />
           <Route path="upload" element={<UploadPage />} />
           <Route path="videos/:id" element={<VideoPage />} />
+          <Route path="collections/:id" element={<CollectionPage />} />
+          <Route path="collections/new" element={<CreateCollectionPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
