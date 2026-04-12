@@ -74,3 +74,10 @@ export interface Avatar {
   name: string
   category: string
 }
+
+export interface PendingMediaItem {
+  _id: string
+  title: string
+  status: MediaStatus
+  percentage: number
+}

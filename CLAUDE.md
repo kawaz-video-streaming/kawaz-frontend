@@ -26,7 +26,7 @@ VITE_BACKEND_URL=http://localhost:8080  # Main backend API
 ### API Layer
 
 - **`src/api/client.ts`** — Authenticated fetch wrapper for `VITE_BACKEND_URL`. Sends cookies via `credentials: 'include'`. Use `apiRequest<T>()` for JSON endpoints and `apiUpload<T>()` for multipart uploads.
-- **`src/api/media.ts`** — Media upload, update, delete. Upload accepts optional `collectionId`.
+- **`src/api/media.ts`** — Media upload, update, delete, and `getUploadingMedia()` (returns pending/processing/failed items; treats 404 as `[]`). Upload accepts optional `collectionId`.
 - **`src/api/mediaCollection.ts`** — Collection CRUD.
 - **`src/api/avatar.ts`** — Avatar catalog: list, image URL helper, upload (admin), delete (admin).
 - **`src/api/user.ts`** — User profile CRUD: get, create, update (change avatar), delete.
@@ -67,7 +67,8 @@ After login, users land on `/profiles`. Selecting a profile stores it in `AuthCo
 
 - **ProfilesPage** — Netflix-style profile picker. No navbar. Users select a profile to enter the app. Supports creating (name + avatar picker dialog) and deleting profiles. The avatar picker dialog is a separate modal showing only images grouped by category.
 - **AvatarAdminPage** — Admin-only. Shows all avatar categories (always, even if empty) with fixed-height rows. Supports uploading new avatars (name, category from fixed enum, image) and deleting existing ones with a confirmation dialog.
-- **Navbar** — Shows a circular profile avatar button (links to `/profiles`) and uses the selected profile name in the welcome message. Admin links (Upload, New Collection, Avatars) shown only for admins.
+- **Navbar** — Circular avatar button (rightmost) opens a dropdown with "Change profile" and "Log out". Admin-only `Loader2` button shows a live media processing panel (polls `GET /media/uploading` every 3 s; spins + red badge when items are in flight). Uses selected profile name in the welcome message. Admin nav links (Upload, New Collection, Avatars) shown only for admins.
+- **MediaProcessingPanel** (`src/components/MediaProcessingPanel.tsx`) — Dropdown panel listing all non-ready media with SVG circular progress bars (floored %). Color-coded by status: yellow=pending, blue=processing, red=failed. Closes on outside click.
 
 ### Avatar Categories (fixed enum)
 
