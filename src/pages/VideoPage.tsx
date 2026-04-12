@@ -10,6 +10,7 @@ import { useCollections } from '../hooks/useCollections'
 import { useAuth } from '../auth/useAuth'
 import { VideoPlayer } from '../components/VideoPlayer'
 import { getFocalCropArea } from '../lib/focalPoints'
+import { buildTopographicList } from '../lib/collections'
 
 const FocalPointPicker = ({
   src,
@@ -231,8 +232,10 @@ export const VideoPage = () => {
                   className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 >
                   <option value="">— None —</option>
-                  {collections.map((col) => (
-                    <option key={col._id} value={col._id}>{col.title}</option>
+                  {buildTopographicList(collections).map(({ item, depth }) => (
+                    <option key={item._id} value={item._id}>
+                      {'\u00a0\u00a0'.repeat(depth * 2)}{depth > 0 ? '↳ ' : ''}{item.title}
+                    </option>
                   ))}
                 </select>
               </div>

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
-import { FolderOpen } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react'
 import { MEDIA_TAGS } from '../constants/tags'
 import { useVideos } from '../hooks/useVideos'
 import { useCollections } from '../hooks/useCollections'
@@ -49,6 +49,176 @@ type PageItem =
   | { type: 'video'; data: VideoListItem }
   | { type: 'collection'; data: CollectionListItem }
 
+const CAROUSEL_GAP_PX = 16
+const CAROUSEL_ANIMATION_MS = 280
+
+const SectionCarousel = ({
+  sectionKey,
+  items,
+  renderItemCard,
+}: {
+  sectionKey: string
+  items: PageItem[]
+  renderItemCard: (item: PageItem) => ReactNode
+}) => {
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const animationTimeoutRef = useRef<number | null>(null)
+  const [hasOverflow, setHasOverflow] = useState(false)
+  const [orderedItems, setOrderedItems] = useState(items)
+  const [translateX, setTranslateX] = useState(0)
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [transitionEnabled, setTransitionEnabled] = useState(false)
+
+  useEffect(() => {
+    setOrderedItems(items)
+    setTranslateX(0)
+    setTransitionEnabled(false)
+    setIsAnimating(false)
+  }, [items])
+
+  useEffect(() => {
+    const updateOverflow = () => {
+      const viewport = viewportRef.current
+      const track = trackRef.current
+      if (!viewport || !track) return
+      setHasOverflow(track.scrollWidth > viewport.clientWidth + 1)
+    }
+
+    updateOverflow()
+    window.addEventListener('resize', updateOverflow)
+
+    return () => {
+      window.removeEventListener('resize', updateOverflow)
+    }
+  }, [])
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    const track = trackRef.current
+    if (!viewport || !track) return
+
+    const frame = window.requestAnimationFrame(() => {
+      setHasOverflow(track.scrollWidth > viewport.clientWidth + 1)
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [orderedItems])
+
+  useEffect(() => {
+    return () => {
+      if (animationTimeoutRef.current !== null) {
+        window.clearTimeout(animationTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const getStep = () => {
+    const firstCard = trackRef.current?.querySelector<HTMLElement>('[data-carousel-item="true"]')
+    return firstCard ? firstCard.offsetWidth + CAROUSEL_GAP_PX : 240
+  }
+
+  const rotateItems = (direction: 'left' | 'right') => {
+    if (isAnimating || !hasOverflow || orderedItems.length <= 1) return
+
+    const step = getStep()
+
+    if (animationTimeoutRef.current !== null) {
+      window.clearTimeout(animationTimeoutRef.current)
+    }
+
+    if (direction === 'right') {
+      setIsAnimating(true)
+      setTransitionEnabled(true)
+      setTranslateX(-step)
+
+      animationTimeoutRef.current = window.setTimeout(() => {
+        setTransitionEnabled(false)
+        setOrderedItems((prev) => (prev.length > 1 ? [...prev.slice(1), prev[0]] : prev))
+        setTranslateX(0)
+        setIsAnimating(false)
+      }, CAROUSEL_ANIMATION_MS)
+
+      return
+    }
+
+    setIsAnimating(true)
+    setTransitionEnabled(false)
+    setOrderedItems((prev) => (prev.length > 1 ? [prev[prev.length - 1], ...prev.slice(0, -1)] : prev))
+    setTranslateX(-step)
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTransitionEnabled(true)
+        setTranslateX(0)
+      })
+    })
+
+    animationTimeoutRef.current = window.setTimeout(() => {
+      setIsAnimating(false)
+    }, CAROUSEL_ANIMATION_MS)
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card/70 p-4 shadow-sm">
+      {hasOverflow && (
+        <div className="mb-3 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => rotateItems('left')}
+            aria-disabled={isAnimating}
+            className={[
+              'rounded-full border border-border p-2 text-muted-foreground transition-colors',
+              isAnimating
+                ? 'opacity-50'
+                : 'hover:border-red-500/50 hover:text-foreground',
+            ].join(' ')}
+            aria-label={`Scroll ${sectionKey} left`}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => rotateItems('right')}
+            aria-disabled={isAnimating}
+            className={[
+              'rounded-full border border-border p-2 text-muted-foreground transition-colors',
+              isAnimating
+                ? 'opacity-50'
+                : 'hover:border-red-500/50 hover:text-foreground',
+            ].join(' ')}
+            aria-label={`Scroll ${sectionKey} right`}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+
+      <div ref={viewportRef} className="overflow-hidden pb-2">
+        <div
+          ref={trackRef}
+          className={[
+            'grid grid-flow-col gap-4',
+            'auto-cols-[85%] sm:auto-cols-[calc((100%-1rem)/2)] lg:auto-cols-[calc((100%-2rem)/3)] xl:auto-cols-[calc((100%-3rem)/4)]',
+            transitionEnabled ? 'transition-transform duration-300 ease-out' : '',
+          ].join(' ')}
+          style={{ transform: `translateX(${translateX}px)` }}
+        >
+          {orderedItems.map((item) => (
+            <div
+              key={`${sectionKey}-${item.type}-${item.data._id}`}
+              data-carousel-item="true"
+              className="min-w-0"
+            >
+              {renderItemCard(item)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export const HomePage = () => {
   const navigate = useNavigate()
   const { data: videos, isLoading, isError } = useVideos()
@@ -96,7 +266,7 @@ export const HomePage = () => {
       <button
         key={item.data._id}
         onClick={() => void navigate(`/collections/${item.data._id}`)}
-        className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
+        className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
       >
         <div className={`relative w-full ${config.paddingClass}`}>
           <ItemThumbnail
@@ -124,7 +294,7 @@ export const HomePage = () => {
       <button
         key={item.data._id}
         onClick={() => void navigate(`/videos/${item.data._id}`)}
-        className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
+        className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
       >
         <div className={`relative w-full ${config.paddingClass}`}>
           <ItemThumbnail
@@ -162,34 +332,36 @@ export const HomePage = () => {
       </div>
 
       {(topLevelVideos.length > 0 || topLevelCollections.length > 0) && (
-        <div className="mb-6 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setSelectedTabs([])}
-            className={[
-              'rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
-              selectedTabs.length === 0
-                ? 'border-red-500 bg-red-500/10 text-red-500'
-                : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
-            ].join(' ')}
-          >
-            All
-          </button>
-          {sections.map((section) => (
+        <div className="mb-6 overflow-x-auto pb-1">
+          <div className="flex min-w-max gap-2">
             <button
-              key={section.key}
               type="button"
-              onClick={() => toggleTab(section.key)}
+              onClick={() => setSelectedTabs([])}
               className={[
-                'rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
-                selectedTabs.includes(section.key)
+                'shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
+                selectedTabs.length === 0
                   ? 'border-red-500 bg-red-500/10 text-red-500'
                   : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
               ].join(' ')}
             >
-              {section.key}
+              All
             </button>
-          ))}
+            {sections.map((section) => (
+              <button
+                key={section.key}
+                type="button"
+                onClick={() => toggleTab(section.key)}
+                className={[
+                  'shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
+                  selectedTabs.includes(section.key)
+                    ? 'border-red-500 bg-red-500/10 text-red-500'
+                    : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
+                ].join(' ')}
+              >
+                {section.key}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -216,15 +388,11 @@ export const HomePage = () => {
               <div className="mb-3">
                 <h2 className="text-lg font-semibold tracking-tight">{section.key}</h2>
               </div>
-              <div className="rounded-2xl border border-border bg-card/70 p-4 shadow-sm">
-                <div className={`grid ${config.gridClass}`}>
-                  {section.items.map((item) => (
-                    <div key={`${section.key}-${item.type}-${item.data._id}`}>
-                      {renderItemCard(item)}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <SectionCarousel
+                sectionKey={section.key}
+                items={section.items}
+                renderItemCard={renderItemCard}
+              />
             </section>
           ))}
         </div>

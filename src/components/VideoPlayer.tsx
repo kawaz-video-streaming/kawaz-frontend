@@ -12,14 +12,34 @@ interface VideoPlayerProps {
 export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className }: VideoPlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const destroyPromiseRef = useRef<Promise<void>>(Promise.resolve())
   const [playerError, setPlayerError] = useState<string | null>(null)
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true)
+
+  const formatVideoError = () => {
+    const error = videoRef.current?.error
+    if (!error) return 'Playback failed during buffering.'
+
+    switch (error.code) {
+      case MediaError.MEDIA_ERR_ABORTED:
+        return 'Playback was aborted.'
+      case MediaError.MEDIA_ERR_NETWORK:
+        return 'A network error interrupted playback.'
+      case MediaError.MEDIA_ERR_DECODE:
+        return 'This video could not be decoded by the browser.'
+      case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+        return 'This video format or manifest is not supported by the browser.'
+      default:
+        return 'Playback failed during buffering.'
+    }
+  }
 
   useEffect(() => {
     let isDisposed = false
     let player: import('shaka-player').Player | null = null
     let uiOverlay: { configure(config: object): void; destroy(): Promise<void> } | null = null
     let markerRenderRetryTimer: number | null = null
+    let stallRecoveryTimer: number | null = null
 
     const removeChapterMarkers = () => {
       const seekBarContainer = containerRef.current?.querySelector<HTMLElement>('.shaka-seek-bar-container')
@@ -104,18 +124,49 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
       void renderChapterMarkers()
     }
 
+    const clearStallRecoveryTimer = () => {
+      if (stallRecoveryTimer !== null) {
+        window.clearTimeout(stallRecoveryTimer)
+        stallRecoveryTimer = null
+      }
+    }
+
+    const attemptPlaybackRecovery = () => {
+      const video = videoRef.current
+      if (!video || !player || isDisposed) return
+
+      try {
+        ; (player as import('shaka-player').Player & { retryStreaming?: () => boolean }).retryStreaming?.()
+      } catch (e) {
+        console.warn('Failed to retry Shaka streaming:', e)
+      }
+
+      if (video.readyState < 3 && video.currentTime < 0.25) {
+        try {
+          video.currentTime = 0.1
+        } catch {
+          // Ignore seek recovery failures.
+        }
+      }
+    }
+
     const setupPlayer = async (): Promise<(() => void) | undefined> => {
       setIsLoadingPlayer(true)
       setPlayerError(null)
 
-      if (!videoRef.current || !containerRef.current) {
+      await destroyPromiseRef.current
+      if (isDisposed) return undefined
+
+      const video = videoRef.current
+      const container = containerRef.current
+      if (!video || !container) {
         setIsLoadingPlayer(false)
         return undefined
       }
 
       try {
         const shaka = await import('shaka-player/dist/shaka-player.ui.js')
-        if (isDisposed) return
+        if (isDisposed) return undefined
 
         shaka.polyfill.installAll()
 
@@ -126,22 +177,61 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
         }
 
         player = new shaka.Player()
-        await player.attach(videoRef.current)
+        await player.attach(video)
+
+        const configurablePlayer = player as import('shaka-player').Player & {
+          configure?: (config: object) => void
+          retryStreaming?: () => boolean
+        }
+
+        configurablePlayer.configure?.({
+          streaming: {
+            lowLatencyMode: false,
+            stallEnabled: true,
+            stallThreshold: 1,
+            gapDetectionThreshold: 0.1,
+          },
+        })
 
         player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
           request.allowCrossSiteCredentials = true
         })
 
+
         const handleTracksChanged = () => scheduleChapterMarkersRender()
         const handleDurationChange = () => scheduleChapterMarkersRender()
+        const handlePlayerError = (event: Event) => {
+          const detail = (event as Event & { detail?: { code?: number; message?: string; data?: unknown[] } }).detail
+          console.error('Shaka runtime error', detail)
+          setPlayerError('Could not play this video stream.')
+        }
+        const handleVideoError = () => {
+          const message = formatVideoError()
+          console.error('HTML video error', video.error)
+          setPlayerError(message)
+        }
+        const handlePotentialStall = () => {
+          clearStallRecoveryTimer()
+          stallRecoveryTimer = window.setTimeout(() => attemptPlaybackRecovery(), 1200)
+        }
+        const handlePlaybackProgress = () => {
+          clearStallRecoveryTimer()
+          if (!isDisposed) setPlayerError(null)
+        }
 
         player.addEventListener('trackschanged', handleTracksChanged)
-        videoRef.current.addEventListener('durationchange', handleDurationChange)
-        videoRef.current.addEventListener('loadedmetadata', handleDurationChange)
+        player.addEventListener('error', handlePlayerError)
+        video.addEventListener('durationchange', handleDurationChange)
+        video.addEventListener('loadedmetadata', handleDurationChange)
+        video.addEventListener('error', handleVideoError)
+        video.addEventListener('waiting', handlePotentialStall)
+        video.addEventListener('stalled', handlePotentialStall)
+        video.addEventListener('playing', handlePlaybackProgress)
+        video.addEventListener('canplay', handlePlaybackProgress)
 
         if (isDisposed) return undefined
 
-        uiOverlay = new shaka.ui.Overlay(player, containerRef.current, videoRef.current)
+        uiOverlay = new shaka.ui.Overlay(player, container, video)
         uiOverlay.configure({
           controlPanelElements: [
             'play_pause', 'time_and_duration', 'mute', 'volume', 'spacer',
@@ -173,9 +263,16 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
         }
 
         return () => {
+          clearStallRecoveryTimer()
           player?.removeEventListener('trackschanged', handleTracksChanged)
-          videoRef.current?.removeEventListener('durationchange', handleDurationChange)
-          videoRef.current?.removeEventListener('loadedmetadata', handleDurationChange)
+          player?.removeEventListener('error', handlePlayerError)
+          video.removeEventListener('durationchange', handleDurationChange)
+          video.removeEventListener('loadedmetadata', handleDurationChange)
+          video.removeEventListener('error', handleVideoError)
+          video.removeEventListener('waiting', handlePotentialStall)
+          video.removeEventListener('stalled', handlePotentialStall)
+          video.removeEventListener('playing', handlePlaybackProgress)
+          video.removeEventListener('canplay', handlePlaybackProgress)
         }
       } catch (error: unknown) {
         if (!isDisposed) {
@@ -194,10 +291,48 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
     return () => {
       isDisposed = true
       cleanupPlayerListeners?.()
+      clearStallRecoveryTimer()
       if (markerRenderRetryTimer !== null) window.clearTimeout(markerRenderRetryTimer)
       removeChapterMarkers()
-      void uiOverlay?.destroy()
-      void player?.destroy()
+
+      const overlayToDestroy = uiOverlay
+      const playerToDestroy = player
+      const videoToReset = videoRef.current
+      uiOverlay = null
+      player = null
+
+      destroyPromiseRef.current = (async () => {
+        try {
+          await overlayToDestroy?.destroy()
+        } catch (error) {
+          console.warn('Failed to destroy Shaka UI overlay:', error)
+        }
+
+        try {
+          await playerToDestroy?.destroy()
+        } catch (error) {
+          console.warn('Failed to destroy Shaka player:', error)
+        }
+
+        if (videoToReset) {
+          try {
+            await new Promise<void>((resolve) => {
+              const done = () => {
+                videoToReset.removeEventListener('emptied', done)
+                resolve()
+              }
+              videoToReset.addEventListener('emptied', done)
+              videoToReset.pause()
+              videoToReset.removeAttribute('src')
+              videoToReset.load()
+              // Fallback: resolve after 500ms if emptied never fires
+              setTimeout(resolve, 500)
+            })
+          } catch (error) {
+            console.warn('Failed to reset video element:', error)
+          }
+        }
+      })()
     }
   }, [manifestUrl, chaptersUrl, thumbnailsUrl])
 

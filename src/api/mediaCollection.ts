@@ -1,6 +1,10 @@
 import { apiRequest, apiUpload } from './client'
 import type { Coordinates } from '../types/api'
 
+const appendTags = (formData: FormData, tags: string[]) => {
+  tags.forEach((tag, index) => formData.append(`tags[${index}]`, tag))
+}
+
 export interface CreateCollectionParams {
   title: string
   description?: string
@@ -14,7 +18,7 @@ export const createCollection = ({ title, description, tags, thumbnail, thumbnai
   const formData = new FormData()
   formData.append('title', title)
   if (description) formData.append('description', description)
-  tags.forEach((tag) => formData.append('tags', tag))
+  appendTags(formData, tags)
   formData.append('thumbnail', thumbnail)
   formData.append('thumbnailFocalPoint[x]', String(thumbnailFocalPoint.x))
   formData.append('thumbnailFocalPoint[y]', String(thumbnailFocalPoint.y))
@@ -32,16 +36,51 @@ export interface UpdateCollectionParams {
   collectionId?: string | null  // null = remove parent
 }
 
-export const updateCollection = ({ id, title, description, tags, thumbnailFocalPoint, thumbnail, collectionId }: UpdateCollectionParams) => {
+const buildCollectionUpdateBody = ({
+  title,
+  description,
+  tags,
+  thumbnailFocalPoint,
+  collectionId,
+}: Omit<UpdateCollectionParams, 'id' | 'thumbnail'>) => ({
+  title,
+  ...(description !== undefined ? { description } : {}),
+  tags,
+  thumbnailFocalPoint,
+  ...(collectionId !== undefined ? { collectionId } : {}),
+})
+
+export const updateCollection = async ({ id, title, description, tags, thumbnailFocalPoint, thumbnail, collectionId }: UpdateCollectionParams) => {
+  const body = buildCollectionUpdateBody({ title, description, tags, thumbnailFocalPoint, collectionId })
+
+  if (collectionId === null && !thumbnail) {
+    return apiRequest<{ message: string }>(`/mediaCollection/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
   const formData = new FormData()
   formData.append('title', title)
   if (description !== undefined) formData.append('description', description)
-  tags.forEach((tag) => formData.append('tags', tag))
+  appendTags(formData, tags)
   formData.append('thumbnailFocalPoint[x]', String(thumbnailFocalPoint.x))
   formData.append('thumbnailFocalPoint[y]', String(thumbnailFocalPoint.y))
   if (thumbnail) formData.append('thumbnail', thumbnail)
-  if (collectionId !== undefined) formData.append('collectionId', collectionId === null ? 'null' : collectionId)
-  return apiUpload<{ message: string }>(`/mediaCollection/${id}`, formData, 'PUT')
+  if (typeof collectionId === 'string') formData.append('collectionId', collectionId)
+
+  const result = await apiUpload<{ message: string }>(`/mediaCollection/${id}`, formData, 'PUT')
+
+  if (collectionId === null) {
+    return apiRequest<{ message: string }>(`/mediaCollection/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  return result
 }
 
 export const deleteCollection = (id: string) =>

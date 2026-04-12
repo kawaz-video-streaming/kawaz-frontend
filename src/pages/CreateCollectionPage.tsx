@@ -1,11 +1,13 @@
 import { CheckCircle, Image, X } from 'lucide-react'
 import { useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { MEDIA_TAGS } from '../constants/tags'
 import type { Coordinates } from '../types/api'
 import { useCreateCollection } from '../hooks/useCreateCollection'
 import { useCollections } from '../hooks/useCollections'
 import { getFocalCropArea } from '../lib/focalPoints'
+import { buildTopographicList } from '../lib/collections'
 
 const ThumbnailFocalPointPicker = ({
   previewUrl,
@@ -53,6 +55,7 @@ const ThumbnailFocalPointPicker = ({
 }
 
 export const CreateCollectionPage = () => {
+  const navigate = useNavigate()
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -110,6 +113,7 @@ export const CreateCollectionPage = () => {
           setParentCollectionId('')
           removeThumbnail()
           reset()
+          void navigate('/')
         },
       },
     )
@@ -189,8 +193,10 @@ export const CreateCollectionPage = () => {
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
               >
                 <option value="">— None (top level) —</option>
-                {collections.map((col) => (
-                  <option key={col._id} value={col._id}>{col.title}</option>
+                {buildTopographicList(collections).map(({ item, depth }) => (
+                  <option key={item._id} value={item._id}>
+                    {'\u00a0\u00a0'.repeat(depth * 2)}{depth > 0 ? '↳ ' : ''}{item.title}
+                  </option>
                 ))}
               </select>
             </div>

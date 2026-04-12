@@ -42,7 +42,7 @@ export const LoginPage = () => {
       }
       const data = await response.json() as { role?: string; username?: string }
       login(data.role, data.username ?? username)
-      void navigate('/')
+      void navigate('/profiles')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Authentication failed', {
         style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },

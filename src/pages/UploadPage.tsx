@@ -1,11 +1,14 @@
 import { CheckCircle, FileVideo, Image, UploadCloud, X } from 'lucide-react'
 import { useRef, useState, type ChangeEvent, type DragEvent, type SyntheticEvent } from 'react'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { MEDIA_TAGS } from '../constants/tags'
 import type { Coordinates } from '../types/api'
 import { Progress } from '../components/ui/progress'
 import { useUploadMedia } from '../hooks/useUploadMedia'
+import { useCollections } from '../hooks/useCollections'
 import { getFocalCropArea } from '../lib/focalPoints'
+import { buildTopographicList } from '../lib/collections'
 
 const MAX_SIZE = 10 * 1024 ** 3 // 10 GB
 
@@ -61,6 +64,7 @@ const ThumbnailFocalPointPicker = ({
 }
 
 export const UploadPage = () => {
+  const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -71,7 +75,9 @@ export const UploadPage = () => {
   const [thumbnail, setThumbnail] = useState<File | null>(null)
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
   const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 })
+  const [collectionId, setCollectionId] = useState<string>('')
   const { mutate: upload, isPending, isSuccess, reset } = useUploadMedia()
+  const { data: collections } = useCollections()
 
   const applyFile = (file: File | null) => {
     if (file && !file.type.startsWith('video/')) {
@@ -91,6 +97,7 @@ export const UploadPage = () => {
       setTitle('')
       setDescription('')
       setTags([])
+      setCollectionId('')
       removeThumbnail()
     }
     reset()
@@ -143,7 +150,10 @@ export const UploadPage = () => {
   const handleSubmit = (e: SyntheticEvent) => {
     e.preventDefault()
     if (!selectedFile || !title.trim() || !thumbnail) return
-    upload({ file: selectedFile, title: title.trim(), description: description.trim(), tags, thumbnail, thumbnailFocalPoint })
+    upload(
+      { file: selectedFile, title: title.trim(), description: description.trim(), tags, thumbnail, thumbnailFocalPoint, collectionId: collectionId || undefined },
+      { onSuccess: () => void navigate('/') },
+    )
   }
 
   return (
@@ -255,6 +265,27 @@ export const UploadPage = () => {
                   })}
                 </div>
               </div>
+
+              {collections && collections.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium" htmlFor="upload-collection">
+                    Collection
+                  </label>
+                  <select
+                    id="upload-collection"
+                    value={collectionId}
+                    onChange={(e) => setCollectionId(e.target.value)}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  >
+                    <option value="">— None —</option>
+                    {buildTopographicList(collections).map(({ item, depth }) => (
+                      <option key={item._id} value={item._id}>
+                        {'\u00a0\u00a0'.repeat(depth * 2)}{depth > 0 ? '↳ ' : ''}{item.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium">

@@ -63,3 +63,14 @@ export interface CollectionListItem {
   thumbnailFocalPoint: Coordinates
   collectionId?: string
 }
+
+export interface Profile {
+  name: string
+  avatarId: string
+}
+
+export interface Avatar {
+  _id: string
+  name: string
+  category: string
+}

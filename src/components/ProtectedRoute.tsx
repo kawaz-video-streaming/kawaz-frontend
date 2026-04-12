@@ -20,7 +20,7 @@ export const PublicRoute = ({ children }: RouteProps) => {
   const { isAuthenticated } = useAuth()
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/profiles" replace />
   }
 
   return <>{children}</>
