@@ -6,6 +6,7 @@ import { useTheme } from '../../theme/ThemeContext'
 import { avatarImageUrl } from '../../api/avatar'
 import { usePendingMedia } from '../../hooks/usePendingMedia'
 import { MediaProcessingPanel } from '../MediaProcessingPanel'
+import { NavSearch } from '../NavSearch'
 
 export const Navbar = () => {
   const { logout, isAdmin, username, selectedProfile } = useAuth()
@@ -72,15 +73,15 @@ export const Navbar = () => {
           )}
         </div>
 
-        {/* Center: Kawaz+ Logo & Welcome Message */}
-        <div className="flex flex-col items-center">
+        {/* Center: Kawaz+ Logo & Welcome Message — absolutely centered on screen */}
+        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
           <Link to="/" className="text-lg font-extrabold tracking-tight">
             Kawaz<span className="text-red-500">+</span>
           </Link>
           <p className="text-xs text-muted-foreground">Welcome back, <span className="font-semibold text-foreground">{selectedProfile?.name ?? username}</span>! 👋</p>
         </div>
 
-        {/* Right: Theme Toggle + Avatar Menu */}
+        {/* Right: Theme Toggle + Processing + Search + Avatar Menu */}
         <div className="flex items-center gap-3">
           <button
             onClick={toggleTheme}
@@ -108,6 +109,8 @@ export const Navbar = () => {
               {processingOpen && <MediaProcessingPanel onClose={() => setProcessingOpen(false)} />}
             </div>
           )}
+
+          <NavSearch />
 
           {/* Avatar button + dropdown */}
           <div ref={menuRef} className="relative">
