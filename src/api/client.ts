@@ -10,7 +10,7 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 }
 
 export const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}${path}`, {
+  const response = await fetch(`/api${path}`, {
     ...init,
     credentials: 'include',
     headers: {
@@ -21,7 +21,7 @@ export const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T
 }
 
 export const apiUpload = async <T>(path: string, formData: FormData, method = 'POST'): Promise<T> => {
-  const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}${path}`, {
+  const response = await fetch(`/api${path}`, {
     method,
     credentials: 'include',
     body: formData,
