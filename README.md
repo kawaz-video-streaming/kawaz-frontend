@@ -1,13 +1,16 @@
 # Kawaz Frontend
 
-React and Vite frontend for the Kawaz-Plus video streaming platform.
+React and Vite frontend for the Kawaz+ video streaming platform.
 
-The app currently provides:
+## Features
 
 - Cookie-based authentication backed by `kawaz-token` HttpOnly cookie
-- Upload flow for video media (admin only)
-- Video library grid on the home page
-- Direct video playback using Shaka Player with built-in audio language and caption track switching
+- Netflix-style profile picker (per-user profiles with avatar selection)
+- Home page with tag-filtered carousels and navbar search
+- Video playback via Shaka Player with audio language and caption track switching
+- Collections — nested media groupings with topographic tree picker
+- Admin: media upload, collection creation, avatar catalog management
+- Live media processing panel (admin) — polls in-flight uploads with circular progress bars
 
 ## Tech Stack
 
@@ -15,7 +18,9 @@ The app currently provides:
 - TypeScript
 - Vite 6
 - TanStack Query
+- React Router
 - Shaka Player
+- Tailwind CSS + shadcn/ui
 - Zod
 
 ## Prerequisites
@@ -67,31 +72,55 @@ npm run preview
 VITE_BACKEND_URL=http://localhost:8080
 ```
 
-- `VITE_BACKEND_URL`: base URL for all API requests. In development, set to `/api` to use the Vite proxy (configured in `vite.config.ts`).
-
 ## Application Routes
 
-- `/login`: sign-in / sign-up screen
-- `/`: protected home page — video library grid
-- `/upload`: protected media upload page (admin only)
-- `/videos/:id`: protected playback page for a specific video
+```
+/login                → Sign-in screen (public)
+/profiles             → Profile picker — Netflix-style (protected, no navbar)
+/                     → Home page — tag-filtered carousels + search
+/videos/:id           → Video playback page
+/collections/:id      → Collection page
+/upload               → Media upload (admin only)
+/collections/new      → Create collection (admin only)
+/admin/avatars        → Avatar catalog management (admin only)
+```
 
 ## Backend API Dependencies
 
 All requests go through `VITE_BACKEND_URL`:
 
+**Auth**
 - `POST /auth/login` — login, sets `kawaz-token` HttpOnly cookie
 - `POST /auth/signup` — register
-- `GET /auth/me` — returns `{ username, role }` for the current session
+- `GET /user/me` — returns `{ username, role }` for the current session
+
+**Media**
 - `POST /media/upload` — upload a video file (admin only)
-- `GET /media/videos` — list all videos
+- `GET /media` — list all media
 - `GET /media/videos/:id` — get video metadata
 - `GET /media/videos/:id/output.mpd` — MPEG-DASH manifest
-- `GET /media/videos/:id/*.m4s` — video segments (redirects to presigned URL)
-- `GET /media/videos/:id/*.vtt` — VTT subtitle content
+- `GET /media/:id/thumbnail` — video thumbnail
+- `GET /media/uploading` — in-flight uploads (admin); 404 when empty
+
+**Collections**
+- `GET /mediaCollection` — list all collections
+- `POST /mediaCollection` — create collection (admin)
+- `PUT /mediaCollection/:id` — update collection (admin)
+- `DELETE /mediaCollection/:id` — delete collection (admin)
+- `GET /mediaCollection/:id/thumbnail` — collection thumbnail
+
+**Profiles**
+- `GET /user/profiles` — list profiles for current user
+- `POST /user/profile` — create profile
+- `PUT /user/profile` — update profile avatar
+- `DELETE /user/profile/:name` — delete profile
+
+**Avatars**
+- `GET /avatar` — list all avatars
+- `GET /avatar/:id/image` — avatar image (302 → presigned S3)
+- `POST /avatar` — upload avatar (admin)
+- `DELETE /avatar/:id` — delete avatar (admin)
 
 ## Repository
-
-GitHub repository:
 
 - https://github.com/kawaz-video-streaming/kawaz-frontend
