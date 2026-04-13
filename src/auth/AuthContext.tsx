@@ -1,10 +1,21 @@
-import { createContext, useState, useCallback, type ReactNode } from 'react'
-import { setToken, clearToken } from '../api/client'
+import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { apiRequest } from '../api/client'
+
+const AUTH_KEY = 'kawaz_authed'
+
+export interface SelectedProfile {
+  name: string
+  avatarId: string
+}
 
 interface AuthContextValue {
-  token: string | null
   isAuthenticated: boolean
-  login: (token: string) => void
+  isAdmin: boolean
+  username: string | null
+  selectedProfile: SelectedProfile | null
+  selectProfile: (profile: SelectedProfile) => void
+  login: (role?: string, username?: string) => void
   logout: () => void
 }
 
@@ -15,22 +26,52 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [token, setTokenState] = useState<string | null>(
-    () => localStorage.getItem('kawaz_token')
+  const queryClient = useQueryClient()
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
+    () => localStorage.getItem(AUTH_KEY) === 'true'
   )
+  // Role and username are kept in memory only — not persisted — so they cannot be spoofed via localStorage.
+  const [role, setRole] = useState<string | null>(null)
+  const [username, setUsername] = useState<string | null>(null)
+  const [selectedProfile, setSelectedProfile] = useState<SelectedProfile | null>(null)
 
-  const login = useCallback((newToken: string) => {
-    setToken(newToken)
-    setTokenState(newToken)
+  // On mount, if we think the user is authenticated, verify with the server and restore role + username.
+  // The cookie is sent automatically; the backend is the source of truth.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    apiRequest<{ role?: string; username?: string }>('/user/me')
+      .then((data) => {
+        setRole(data.role ?? null)
+        setUsername(data.username ?? null)
+      })
+      .catch(() => {
+        localStorage.removeItem(AUTH_KEY)
+        setIsAuthenticated(false)
+      })
+  }, [isAuthenticated])
+
+  const login = useCallback((newRole?: string, newUsername?: string) => {
+    localStorage.setItem(AUTH_KEY, 'true')
+    setIsAuthenticated(true)
+    setRole(newRole ?? null)
+    setUsername(newUsername ?? null)
   }, [])
 
   const logout = useCallback(() => {
-    clearToken()
-    setTokenState(null)
+    localStorage.removeItem(AUTH_KEY)
+    setIsAuthenticated(false)
+    setRole(null)
+    setUsername(null)
+    setSelectedProfile(null)
+    queryClient.clear()
+  }, [queryClient])
+
+  const selectProfile = useCallback((profile: SelectedProfile) => {
+    setSelectedProfile(profile)
   }, [])
 
   return (
-    <AuthContext.Provider value={{ token, isAuthenticated: token !== null, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, isAdmin: role === 'admin', username, selectedProfile, selectProfile, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

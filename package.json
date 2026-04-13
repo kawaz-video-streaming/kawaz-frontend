@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node --max-http-header-size=65536 node_modules/vite/bin/vite.js",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "clean": "rimraf dist"
@@ -18,7 +18,8 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router": "^7.6.0",
-    "shaka-player": "^4.14.10",
+    "shaka-player": "^5.0.0",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.0",
     "zod": "^4.3.6"
   },

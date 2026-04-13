@@ -1,58 +1,48 @@
-import z from 'zod'
 import { apiRequest, apiUpload } from './client'
-import type { Coordinates, PendingMediaItem } from '../types/api'
-
-const uploadMediaResponseSchema = z.object({
-  message: z.string(),
-})
-
-export type UploadMediaResponse = z.infer<typeof uploadMediaResponseSchema>
+import type { Coordinates } from '../types/api'
 
 const appendTags = (formData: FormData, tags: string[]) => {
   tags.forEach((tag, index) => formData.append(`tags[${index}]`, tag))
 }
 
-export interface UploadMediaParams {
-  file: File
+export interface CreateCollectionParams {
   title: string
-  description: string
+  description?: string
   tags: string[]
   thumbnail: File
   thumbnailFocalPoint: Coordinates
   collectionId?: string
 }
 
-export const uploadMedia = async ({ file, title, description, tags, thumbnail, thumbnailFocalPoint, collectionId }: UploadMediaParams): Promise<UploadMediaResponse> => {
+export const createCollection = ({ title, description, tags, thumbnail, thumbnailFocalPoint, collectionId }: CreateCollectionParams) => {
   const formData = new FormData()
-  formData.append('file', file)
   formData.append('title', title)
-  formData.append('description', description)
+  if (description) formData.append('description', description)
   appendTags(formData, tags)
   formData.append('thumbnail', thumbnail)
   formData.append('thumbnailFocalPoint[x]', String(thumbnailFocalPoint.x))
   formData.append('thumbnailFocalPoint[y]', String(thumbnailFocalPoint.y))
   if (collectionId) formData.append('collectionId', collectionId)
-  const raw = await apiUpload<unknown>('/media/upload', formData)
-  return uploadMediaResponseSchema.parse(raw)
+  return apiUpload<{ message: string }>('/mediaCollection', formData)
 }
 
-export interface UpdateMediaParams {
+export interface UpdateCollectionParams {
   id: string
   title: string
   description?: string
   tags: string[]
   thumbnailFocalPoint: Coordinates
   thumbnail?: File
-  collectionId?: string | null  // null = remove from collection
+  collectionId?: string | null  // null = remove parent
 }
 
-const buildMediaUpdateBody = ({
+const buildCollectionUpdateBody = ({
   title,
   description,
   tags,
   thumbnailFocalPoint,
   collectionId,
-}: Omit<UpdateMediaParams, 'id' | 'thumbnail'>) => ({
+}: Omit<UpdateCollectionParams, 'id' | 'thumbnail'>) => ({
   title,
   ...(description !== undefined ? { description } : {}),
   tags,
@@ -60,11 +50,11 @@ const buildMediaUpdateBody = ({
   ...(collectionId !== undefined ? { collectionId } : {}),
 })
 
-export const updateMedia = async ({ id, title, description, tags, thumbnailFocalPoint, thumbnail, collectionId }: UpdateMediaParams) => {
-  const body = buildMediaUpdateBody({ title, description, tags, thumbnailFocalPoint, collectionId })
+export const updateCollection = async ({ id, title, description, tags, thumbnailFocalPoint, thumbnail, collectionId }: UpdateCollectionParams) => {
+  const body = buildCollectionUpdateBody({ title, description, tags, thumbnailFocalPoint, collectionId })
 
   if (collectionId === null && !thumbnail) {
-    return apiRequest<{ message: string }>(`/media/${id}`, {
+    return apiRequest<{ message: string }>(`/mediaCollection/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -80,10 +70,10 @@ export const updateMedia = async ({ id, title, description, tags, thumbnailFocal
   if (thumbnail) formData.append('thumbnail', thumbnail)
   if (typeof collectionId === 'string') formData.append('collectionId', collectionId)
 
-  const result = await apiUpload<{ message: string }>(`/media/${id}`, formData, 'PUT')
+  const result = await apiUpload<{ message: string }>(`/mediaCollection/${id}`, formData, 'PUT')
 
   if (collectionId === null) {
-    return apiRequest<{ message: string }>(`/media/${id}`, {
+    return apiRequest<{ message: string }>(`/mediaCollection/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -93,14 +83,5 @@ export const updateMedia = async ({ id, title, description, tags, thumbnailFocal
   return result
 }
 
-export const deleteMedia = (id: string) =>
-  apiRequest<{ message: string }>(`/media/${id}`, { method: 'DELETE' })
-
-export const getUploadingMedia = async (): Promise<PendingMediaItem[]> => {
-  const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/media/uploading`, {
-    credentials: 'include',
-  })
-  if (response.status === 404) return []
-  if (!response.ok) throw new Error(`Request failed with status ${response.status}`)
-  return response.json() as Promise<PendingMediaItem[]>
-}
+export const deleteCollection = (id: string) =>
+  apiRequest<{ message: string }>(`/mediaCollection/${id}`, { method: 'DELETE' })

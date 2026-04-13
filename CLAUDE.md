@@ -19,39 +19,60 @@ Requires a `.env.local` file (see `.env.example`):
 
 ```env
 VITE_BACKEND_URL=http://localhost:8080  # Main backend API
-VITE_VOD_URL=http://localhost:8082      # VOD service (temporary, TODO: proxy through backend)
 ```
 
 ## Architecture
 
 ### API Layer
 
-Two separate HTTP clients exist because the VOD service is not yet proxied through the main backend:
-
-- **`src/api/client.ts`** — Authenticated fetch wrapper for `VITE_BACKEND_URL`. Manages a Bearer token in `localStorage` (key `kawaz_token`) and auto-redirects to `/login` on 401. Use `apiRequest<T>()` for JSON endpoints and `apiUpload<T>()` for multipart uploads.
-- **`src/api/vod.ts`** — Direct calls to `VITE_VOD_URL`. TODO: remove once the backend proxies these routes.
+- **`src/api/client.ts`** — Authenticated fetch wrapper for `VITE_BACKEND_URL`. Sends cookies via `credentials: 'include'`. Use `apiRequest<T>()` for JSON endpoints and `apiUpload<T>()` for multipart uploads.
+- **`src/api/media.ts`** — Media upload, update, delete, and `getUploadingMedia()` (returns pending/processing/failed items; treats 404 as `[]`). Upload accepts optional `collectionId`.
+- **`src/api/mediaCollection.ts`** — Collection CRUD.
+- **`src/api/avatar.ts`** — Avatar catalog: list, image URL helper, upload (admin), delete (admin).
+- **`src/api/user.ts`** — User profile CRUD: get, create, update (change avatar), delete.
 
 ### Auth
 
-`AuthContext` holds `token`, `isAuthenticated`, `login()`, and `logout()`, backed by `localStorage`. **`ProtectedRoute` currently has `bypassAuth = true`** — auth is not enforced until a real login endpoint exists.
+`AuthContext` holds `isAuthenticated`, `isAdmin`, `username`, `selectedProfile`, `login()`, `logout()`, and `selectProfile()`. Backed by `localStorage` for the auth flag; role/username are in-memory only. On logout, `queryClient.clear()` wipes the TanStack Query cache so no user's data leaks to the next session. `ProtectedRoute` enforces authentication — unauthenticated users are redirected to `/login`, authenticated users on public routes are redirected to `/profiles`.
 
 ### Data Fetching
 
-TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`. `useVideo(id)` fetches video metadata and validates the response shape with Zod (`src/types/api.ts`). `useVideos` is a placeholder with the query disabled.
+TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`. `useVideo(id)` fetches video metadata from `/media/videos/:id` and validates the response shape with Zod. `useVideos()` fetches the full video list from `/media/videos`. Profile and avatar hooks follow the same pattern.
 
 ### Video Player
 
 `VideoPlayer` lazily loads `shaka-player/dist/shaka-player.ui.js` (the full Shaka bundle with built-in UI). It uses `shaka.ui.Overlay` to render the player controls — including the audio language selector — directly in the player. The CSS for the controls comes from `shaka-player/dist/controls.css` (imported statically at the top of the component). Custom Shaka type declarations are in `src/types/shaka-player.d.ts`.
 
+### Collections
+
+`src/lib/collections.ts` exports `buildTopographicList(collections)` which returns a depth-annotated flat list for rendering a tree-indented `<select>` in collection pickers. Used in UploadPage, VideoPage, and CreateCollectionPage.
+
 ### Routing
 
 ```
-/login          → LoginPage (public, placeholder)
-/               → Layout (ProtectedRoute)
-  /             → HomePage (manual video ID lookup)
-  /upload       → UploadPage
+/login          → LoginPage (public)
+/profiles       → ProfilesPage (protected, no navbar — standalone like login)
+/               → Layout (ProtectedRoute, with Navbar)
+  /             → HomePage (video grid)
+  /upload       → UploadPage (admin)
   /videos/:id   → VideoPage (player + metadata)
+  /collections/:id     → CollectionPage
+  /collections/new     → CreateCollectionPage (admin)
+  /admin/avatars       → AvatarAdminPage (admin)
 ```
+
+After login, users land on `/profiles`. Selecting a profile stores it in `AuthContext.selectedProfile` and navigates to `/`.
+
+### Profiles & Avatars
+
+- **ProfilesPage** — Netflix-style profile picker. No navbar. Users select a profile to enter the app. Supports creating (name + avatar picker dialog) and deleting profiles. The avatar picker dialog is a separate modal showing only images grouped by category.
+- **AvatarAdminPage** — Admin-only. Shows all avatar categories (always, even if empty) with fixed-height rows. Supports uploading new avatars (name, category from fixed enum, image) and deleting existing ones with a confirmation dialog.
+- **Navbar** — Circular avatar button (rightmost) opens a dropdown with "Change profile" and "Log out". Admin-only `Loader2` button shows a live media processing panel (polls `GET /media/uploading` every 3 s; spins + red badge when items are in flight). Uses selected profile name in the welcome message. Admin nav links (Upload, New Collection, Avatars) shown only for admins.
+- **MediaProcessingPanel** (`src/components/MediaProcessingPanel.tsx`) — Dropdown panel listing all non-ready media with SVG circular progress bars (floored %). Color-coded by status: yellow=pending, blue=processing, red=failed. Closes on outside click.
+
+### Avatar Categories (fixed enum)
+
+`France` | `Israel` | `Japan` | `United Kingdom` | `United States`
 
 ### UI Components
 

@@ -2,18 +2,25 @@ import { type ReactNode } from 'react'
 import { Navigate } from 'react-router'
 import { useAuth } from '../auth/useAuth'
 
-interface ProtectedRouteProps {
+interface RouteProps {
   children: ReactNode
 }
 
-export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children }: RouteProps) => {
   const { isAuthenticated } = useAuth()
 
-  // TODO: remove bypass once kawaz-backend exposes POST /auth/login
-  const bypassAuth = true
-
-  if (!bypassAuth && !isAuthenticated) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
+}
+
+export const PublicRoute = ({ children }: RouteProps) => {
+  const { isAuthenticated } = useAuth()
+
+  if (isAuthenticated) {
+    return <Navigate to="/profiles" replace />
   }
 
   return <>{children}</>
