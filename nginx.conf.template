@@ -16,8 +16,9 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Cache static assets aggressively
-    location ~* \.(js|css|png|jpg|svg|ico|woff2)$ {
+    # Cache static assets aggressively (exclude /api/ paths)
+    location ~* ^(?!/api/).+\.(js|css|png|jpg|svg|ico|woff2)$ {
+        try_files $uri =404;
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
