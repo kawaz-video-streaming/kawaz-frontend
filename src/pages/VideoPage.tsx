@@ -1,5 +1,5 @@
 import { Captions, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { MEDIA_TAGS } from '../constants/tags'
 import type { Coordinates } from '../types/api'
@@ -139,6 +139,13 @@ export const VideoPage = () => {
       },
     )
   }
+
+  useEffect(() => {
+    if (!isDeleting) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDeleting])
 
   const toggleEditTag = (tag: string) =>
     setEditTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
@@ -365,6 +372,9 @@ export const VideoPage = () => {
             <p className="mt-1 text-sm text-muted-foreground">
               This will permanently delete <span className="font-medium text-foreground">"{video.title}"</span> and all its files. This cannot be undone.
             </p>
+            {isDeleting && (
+              <p className="mt-3 text-xs text-yellow-500">Please don't close or refresh the page until deletion finishes.</p>
+            )}
             <div className="mt-5 flex gap-2">
               <button
                 onClick={handleDelete}
@@ -374,8 +384,9 @@ export const VideoPage = () => {
                 {isDeleting ? 'Deleting…' : 'Delete'}
               </button>
               <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 rounded-lg border border-border py-2 text-sm font-medium transition-colors hover:bg-accent"
+                onClick={() => !isDeleting && setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="flex-1 rounded-lg border border-border py-2 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Cancel
               </button>
