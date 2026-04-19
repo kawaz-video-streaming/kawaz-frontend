@@ -270,7 +270,7 @@ export const HomePage = () => {
       >
         <div className={`relative w-full ${config.paddingClass}`}>
           <ItemThumbnail
-            src={`${import.meta.env.VITE_BACKEND_URL}/mediaCollection/${item.data._id}/thumbnail`}
+            src={`/api/mediaCollection/${item.data._id}/thumbnail`}
             title={item.data.title}
             focalPoint={item.data.thumbnailFocalPoint}
             aspectRatio={config.aspectRatio}
@@ -298,7 +298,7 @@ export const HomePage = () => {
       >
         <div className={`relative w-full ${config.paddingClass}`}>
           <ItemThumbnail
-            src={`${import.meta.env.VITE_BACKEND_URL}/media/${item.data._id}/thumbnail`}
+            src={`/api/media/${item.data._id}/thumbnail`}
             title={item.data.title}
             focalPoint={item.data.thumbnailFocalPoint}
             aspectRatio={config.aspectRatio}

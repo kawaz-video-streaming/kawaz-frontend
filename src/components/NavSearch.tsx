@@ -91,8 +91,8 @@ export const NavSearch = () => {
                       <img
                         src={
                           item.type === 'collection'
-                            ? `${import.meta.env.VITE_BACKEND_URL}/mediaCollection/${item.data._id}/thumbnail`
-                            : `${import.meta.env.VITE_BACKEND_URL}/media/${item.data._id}/thumbnail`
+                            ? `/api/mediaCollection/${item.data._id}/thumbnail`
+                            : `/api/media/${item.data._id}/thumbnail`
                         }
                         alt={item.data.title}
                         className="h-full w-full object-cover"
