@@ -1,5 +1,7 @@
-import { X } from 'lucide-react'
+import { Loader2, Trash2, X } from 'lucide-react'
+import { useState } from 'react'
 import { usePendingMedia } from '../hooks/usePendingMedia'
+import { useDeleteMedia } from '../hooks/useDeleteMedia'
 import type { MediaStatus } from '../types/api'
 
 const STATUS_LABEL: Record<MediaStatus, string> = {
@@ -66,6 +68,16 @@ const CircularProgress = ({ percentage, status }: { percentage: number; status: 
 
 export const MediaProcessingPanel = ({ onClose }: { onClose: () => void }) => {
   const { data: items, isLoading } = usePendingMedia(true)
+  const { mutate: remove, isPending: isDeleting } = useDeleteMedia()
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const handleDelete = (id: string) => {
+    setDeletingId(id)
+    remove(id, {
+      onSuccess: () => setDeletingId(null),
+      onError: () => setDeletingId(null),
+    })
+  }
 
   return (
     <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-card shadow-xl">
@@ -82,7 +94,7 @@ export const MediaProcessingPanel = ({ onClose }: { onClose: () => void }) => {
       </div>
 
       {/* Body */}
-      <div className="max-h-[420px] overflow-y-auto py-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground">
+      <div className="max-h-105 overflow-y-auto py-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground">
         {isLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-red-500" />
@@ -100,6 +112,20 @@ export const MediaProcessingPanel = ({ onClose }: { onClose: () => void }) => {
                     {STATUS_LABEL[item.status]}
                   </p>
                 </div>
+                {item.status === 'failed' && (
+                  <button
+                    onClick={() => handleDelete(item._id)}
+                    disabled={isDeleting}
+                    className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
+                    aria-label="Delete failed item"
+                  >
+                    {deletingId === item._id ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
+                  </button>
+                )}
               </li>
             ))}
           </ul>

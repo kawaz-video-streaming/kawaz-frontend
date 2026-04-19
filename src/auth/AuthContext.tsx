@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '../api/client'
 
 const AUTH_KEY = 'kawaz_authed'
+const PROFILE_KEY = 'kawaz_profile'
 
 export interface SelectedProfile {
   name: string
@@ -33,7 +34,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Role and username are kept in memory only — not persisted — so they cannot be spoofed via localStorage.
   const [role, setRole] = useState<string | null>(null)
   const [username, setUsername] = useState<string | null>(null)
-  const [selectedProfile, setSelectedProfile] = useState<SelectedProfile | null>(null)
+  const [selectedProfile, setSelectedProfile] = useState<SelectedProfile | null>(() => {
+    const stored = localStorage.getItem(PROFILE_KEY)
+    return stored ? JSON.parse(stored) : null
+  })
 
   // On mount, if we think the user is authenticated, verify with the server and restore role + username.
   // The cookie is sent automatically; the backend is the source of truth.
@@ -63,10 +67,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setRole(null)
     setUsername(null)
     setSelectedProfile(null)
+    localStorage.removeItem(PROFILE_KEY)
     queryClient.clear()
   }, [queryClient])
 
   const selectProfile = useCallback((profile: SelectedProfile) => {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile))
     setSelectedProfile(profile)
   }, [])
 

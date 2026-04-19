@@ -1,0 +1,52 @@
+name: kawaz-frontend
+
+on:
+  push:
+    branches: [master]
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/kawaz-frontend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: kawaz
+          location: europe-west3-a
+          project_id: kawaz-video-streaming
+
+      - name: Deploy
+        run: |
+          kubectl set image deployment/kawaz-frontend \
+            kawaz-frontend=${{ env.IMAGE }}:${{ github.sha }} \
+            --namespace kawaz
+          kubectl rollout status deployment/kawaz-frontend --namespace kawaz --timeout=60s

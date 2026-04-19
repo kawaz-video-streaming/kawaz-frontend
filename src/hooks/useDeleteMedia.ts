@@ -8,6 +8,7 @@ export const useDeleteMedia = () => {
     mutationFn: (id: string) => deleteMedia(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['videos'] })
+      void queryClient.invalidateQueries({ queryKey: ['media', 'uploading'] })
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Delete failed', {
