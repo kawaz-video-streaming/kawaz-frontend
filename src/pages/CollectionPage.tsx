@@ -230,7 +230,7 @@ export const CollectionPage = () => {
     )
   }
 
-  const thumbnailSrc = `${import.meta.env.VITE_BACKEND_URL}/mediaCollection/${collection._id}/thumbnail`
+  const thumbnailSrc = `/api/mediaCollection/${collection._id}/thumbnail`
 
   return (
     <div>
@@ -398,7 +398,7 @@ export const CollectionPage = () => {
               >
                 <div className="relative w-full pt-[150%]">
                   <ItemThumbnail
-                    src={`${import.meta.env.VITE_BACKEND_URL}/mediaCollection/${item.data._id}/thumbnail`}
+                    src={`/api/mediaCollection/${item.data._id}/thumbnail`}
                     title={item.data.title}
                     focalPoint={item.data.thumbnailFocalPoint}
                     aspectRatio={2 / 3}
@@ -424,7 +424,7 @@ export const CollectionPage = () => {
               >
                 <div className="relative w-full pt-[56.25%]">
                   <ItemThumbnail
-                    src={`${import.meta.env.VITE_BACKEND_URL}/media/${item.data._id}/thumbnail`}
+                    src={`/api/media/${item.data._id}/thumbnail`}
                     title={item.data.title}
                     focalPoint={item.data.thumbnailFocalPoint}
                     aspectRatio={16 / 9}

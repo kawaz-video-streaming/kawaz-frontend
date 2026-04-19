@@ -174,15 +174,15 @@ export const VideoPage = () => {
     )
   }
 
-  const thumbnailSrc = `${import.meta.env.VITE_BACKEND_URL}/media/${video._id}/thumbnail`
+  const thumbnailSrc = `/api/media/${video._id}/thumbnail`
   const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3
 
   return (
     <div>
       <VideoPlayer
-        manifestUrl={`${import.meta.env.VITE_BACKEND_URL}/media/stream/${video.playUrl}`}
-        chaptersUrl={video.chaptersUrl ? `${import.meta.env.VITE_BACKEND_URL}/media/stream/${video.chaptersUrl}` : undefined}
-        thumbnailsUrl={video.thumbnailsUrl ? `${import.meta.env.VITE_BACKEND_URL}/media/stream/${video.thumbnailsUrl}` : undefined}
+        manifestUrl={`/api/media/stream/${video.playUrl}`}
+        chaptersUrl={video.chaptersUrl ? `/api/media/stream/${video.chaptersUrl}` : undefined}
+        thumbnailsUrl={video.thumbnailsUrl ? `/api/media/stream/${video.thumbnailsUrl}` : undefined}
         className="mb-6 overflow-hidden rounded-xl"
       />
 

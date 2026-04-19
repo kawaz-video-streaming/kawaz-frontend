@@ -97,7 +97,7 @@ export const deleteMedia = (id: string) =>
   apiRequest<{ message: string }>(`/media/${id}`, { method: 'DELETE' })
 
 export const getUploadingMedia = async (): Promise<PendingMediaItem[]> => {
-  const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/media/uploading`, {
+  const response = await fetch(`/api/media/uploading`, {
     credentials: 'include',
   })
   if (response.status === 404) return []

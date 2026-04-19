@@ -30,7 +30,7 @@ export const LoginPage = () => {
     setLoading(true)
     try {
       const path = mode === 'login' ? '/auth/login' : '/auth/signup'
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}${path}`, {
+      const response = await fetch(`/api${path}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
