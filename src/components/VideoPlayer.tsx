@@ -193,10 +193,6 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
           },
         })
 
-        player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
-          request.allowCrossSiteCredentials = true
-        })
-
 
         const handleTracksChanged = () => scheduleChapterMarkersRender()
         const handleDurationChange = () => scheduleChapterMarkersRender()
