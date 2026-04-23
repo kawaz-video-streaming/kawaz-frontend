@@ -49,7 +49,7 @@ type PageItem =
   | { type: 'video'; data: VideoListItem }
   | { type: 'collection'; data: CollectionListItem }
 
-const CAROUSEL_GAP_PX = 16
+const CAROUSEL_GAP_PX = 12
 const CAROUSEL_ANIMATION_MS = 280
 
 const SectionCarousel = ({
@@ -160,68 +160,58 @@ const SectionCarousel = ({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card/70 p-4 shadow-sm">
-      <div className="flex items-center gap-2">
+    <div className="relative">
+      <div ref={viewportRef} className="overflow-hidden">
+        <div
+          ref={trackRef}
+          className={[
+            'grid grid-flow-col gap-3',
+            'auto-cols-[calc((100%-0.75rem)/2)] sm:auto-cols-[calc((100%-1.5rem)/3)] lg:auto-cols-[calc((100%-2.25rem)/4)]',
+            transitionEnabled ? 'transition-transform duration-300 ease-out' : '',
+          ].join(' ')}
+          style={{ transform: `translateX(${translateX}px)` }}
+        >
+          {orderedItems.map((item) => (
+            <div
+              key={`${sectionKey}-${item.type}-${item.data._id}`}
+              data-carousel-item="true"
+              className="min-w-0"
+            >
+              {renderItemCard(item)}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {hasOverflow && (
         <button
           type="button"
           onClick={() => rotateItems('left')}
           aria-disabled={isAnimating}
-          tabIndex={hasOverflow ? 0 : -1}
-          aria-hidden={!hasOverflow}
           className={[
-            'shrink-0 rounded-full border border-border p-2 text-muted-foreground transition-colors',
-            !hasOverflow
-              ? 'invisible pointer-events-none'
-              : isAnimating
-                ? 'opacity-50'
-                : 'hover:border-red-500/50 hover:text-foreground',
+            'absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-border bg-background/85 p-2 text-muted-foreground shadow-md backdrop-blur-sm transition-colors',
+            isAnimating ? 'opacity-50' : 'hover:border-red-500/50 hover:text-foreground',
           ].join(' ')}
           aria-label={`Scroll ${sectionKey} left`}
         >
           <ChevronLeft size={16} />
         </button>
+      )}
 
-        <div ref={viewportRef} className="min-w-0 flex-1 overflow-hidden pb-2">
-          <div
-            ref={trackRef}
-            className={[
-              'grid grid-flow-col gap-4',
-              'auto-cols-[85%] sm:auto-cols-[calc((100%-1rem)/2)] lg:auto-cols-[calc((100%-2rem)/3)] xl:auto-cols-[calc((100%-3rem)/4)]',
-              transitionEnabled ? 'transition-transform duration-300 ease-out' : '',
-            ].join(' ')}
-            style={{ transform: `translateX(${translateX}px)` }}
-          >
-            {orderedItems.map((item) => (
-              <div
-                key={`${sectionKey}-${item.type}-${item.data._id}`}
-                data-carousel-item="true"
-                className="min-w-0"
-              >
-                {renderItemCard(item)}
-              </div>
-            ))}
-          </div>
-        </div>
-
+      {hasOverflow && (
         <button
           type="button"
           onClick={() => rotateItems('right')}
           aria-disabled={isAnimating}
-          tabIndex={hasOverflow ? 0 : -1}
-          aria-hidden={!hasOverflow}
           className={[
-            'shrink-0 rounded-full border border-border p-2 text-muted-foreground transition-colors',
-            !hasOverflow
-              ? 'invisible pointer-events-none'
-              : isAnimating
-                ? 'opacity-50'
-                : 'hover:border-red-500/50 hover:text-foreground',
+            'absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-border bg-background/85 p-2 text-muted-foreground shadow-md backdrop-blur-sm transition-colors',
+            isAnimating ? 'opacity-50' : 'hover:border-red-500/50 hover:text-foreground',
           ].join(' ')}
           aria-label={`Scroll ${sectionKey} right`}
         >
           <ChevronRight size={16} />
         </button>
-      </div>
+      )}
     </div>
   )
 }
