@@ -8,40 +8,60 @@ type Mode = 'login' | 'signup'
 
 const validateUsername = (v: string) => v.length >= 3
 const validatePassword = (v: string) => v.length >= 12
+const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
 export const LoginPage = () => {
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('')
   const [usernameTouched, setUsernameTouched] = useState(false)
   const [passwordTouched, setPasswordTouched] = useState(false)
+  const [emailTouched, setEmailTouched] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [inlineMessage, setInlineMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const { login } = useAuth()
   const navigate = useNavigate()
 
   const usernameValid = validateUsername(username)
   const passwordValid = validatePassword(password)
-  const canSubmit = usernameValid && passwordValid
+  const emailValid = validateEmail(email)
+  const canSubmit = usernameValid && passwordValid && (mode === 'login' || emailValid)
+
+  const switchMode = (next: Mode) => {
+    setMode(next)
+    setInlineMessage(null)
+  }
 
   const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (!canSubmit) return
 
     setLoading(true)
+    setInlineMessage(null)
     try {
       const path = mode === 'login' ? '/auth/login' : '/auth/signup'
+      const body = mode === 'login'
+        ? { username, password }
+        : { username, password, email }
       const response = await fetch(`/api${path}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(body),
       })
-      if (!response.ok) {
-        const body = await response.json().catch(() => null) as { error?: string } | null
-        throw new Error(body?.error || `Request failed with status ${response.status}`)
+
+      if (mode === 'signup' && response.status === 202) {
+        setInlineMessage({ type: 'success', text: 'Your account is pending admin approval.' })
+        return
       }
-      const data = await response.json() as { role?: string; username?: string }
-      login(data.role, data.username ?? username)
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null) as { error?: string } | null
+        throw new Error(data?.error || `Request failed with status ${response.status}`)
+      }
+
+      login(undefined, username)
       void navigate('/profiles')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Authentication failed', {
@@ -85,6 +105,25 @@ export const LoginPage = () => {
               )}
             </div>
 
+            {mode === 'signup' && (
+              <div className="flex flex-col gap-1.5">
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => setEmailTouched(true)}
+                  className={[
+                    'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
+                    emailTouched && !emailValid ? 'bg-red-950/60 border-red-700' : '',
+                  ].join(' ')}
+                />
+                {emailTouched && !emailValid && (
+                  <p className="text-xs text-red-400">Enter a valid email address</p>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5">
               <Input
                 type="password"
@@ -102,6 +141,17 @@ export const LoginPage = () => {
               )}
             </div>
 
+            {inlineMessage && (
+              <p className={[
+                'rounded-lg px-3 py-2 text-sm text-center',
+                inlineMessage.type === 'success'
+                  ? 'bg-green-950/60 text-green-300 ring-1 ring-green-700'
+                  : 'bg-red-950/60 text-red-300 ring-1 ring-red-700',
+              ].join(' ')}>
+                {inlineMessage.text}
+              </p>
+            )}
+
             <button
               type="submit"
               disabled={loading || !canSubmit}
@@ -115,7 +165,7 @@ export const LoginPage = () => {
             <button
               type="button"
               className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
-              onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+              onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}
             >
               {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
             </button>

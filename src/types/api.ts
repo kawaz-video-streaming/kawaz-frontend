@@ -81,3 +81,10 @@ export interface PendingMediaItem {
   status: MediaStatus
   percentage: number
 }
+
+export interface PendingUser {
+  name: string
+  email: string
+  status: 'pending'
+  role: string
+}
