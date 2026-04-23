@@ -91,13 +91,13 @@ export const Navbar = () => {
         </div>
 
         {/* Center: Kawaz+ Logo & Welcome Message */}
-        <div className="flex shrink-0 flex-col items-center px-2">
+        <div className="flex shrink-0 items-center gap-2 px-2">
           <Link to="/" className="text-lg font-extrabold tracking-tight whitespace-nowrap">
             Kawaz<span className="text-red-500">+</span>
           </Link>
-          <p className="hidden max-w-[180px] truncate text-xs text-muted-foreground sm:block">
-            Welcome back, <span className="font-semibold text-foreground">{selectedProfile?.name ?? username}</span>! 👋
-          </p>
+          <span className="hidden max-w-[160px] truncate text-xs text-muted-foreground md:block">
+            Welcome, <span className="font-semibold text-foreground">{selectedProfile?.name ?? username}</span>
+          </span>
         </div>
 
         {/* Right: Theme Toggle + Processing + Search + Avatar Menu — flex-1 justified end */}
