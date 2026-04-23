@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Sun, Moon, LogOut, UserCircle2, Users, Loader2 } from 'lucide-react'
+import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useTheme } from '../../theme/ThemeContext'
 import { avatarImageUrl } from '../../api/avatar'
 import { usePendingMedia } from '../../hooks/usePendingMedia'
+import { usePendingUsers } from '../../hooks/usePendingUsers'
 import { MediaProcessingPanel } from '../MediaProcessingPanel'
+import { PendingSignupsPanel } from '../PendingSignupsPanel'
 import { NavSearch } from '../NavSearch'
 
 export const Navbar = () => {
@@ -14,9 +16,12 @@ export const Navbar = () => {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [processingOpen, setProcessingOpen] = useState(false)
+  const [signupsOpen, setSignupsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const processingRef = useRef<HTMLDivElement>(null)
-  const { data: pendingItems } = usePendingMedia(isAdmin)
+  const signupsRef = useRef<HTMLDivElement>(null)
+  const { data: pendingItems } = usePendingMedia(isAdmin, processingOpen)
+  const { data: pendingSignups } = usePendingUsers(isAdmin, signupsOpen)
 
   // Close avatar menu on outside click
   useEffect(() => {
@@ -41,6 +46,18 @@ export const Navbar = () => {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [processingOpen])
+
+  // Close signups panel on outside click
+  useEffect(() => {
+    if (!signupsOpen) return
+    const handler = (e: MouseEvent) => {
+      if (signupsRef.current && !signupsRef.current.contains(e.target as Node)) {
+        setSignupsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [signupsOpen])
 
   const handleLogout = () => {
     setMenuOpen(false)
@@ -107,6 +124,25 @@ export const Navbar = () => {
                 )}
               </button>
               {processingOpen && <MediaProcessingPanel onClose={() => setProcessingOpen(false)} />}
+            </div>
+          )}
+
+          {/* Pending signups panel (admin only) */}
+          {isAdmin && (
+            <div ref={signupsRef} className="relative">
+              <button
+                onClick={() => setSignupsOpen((o) => !o)}
+                className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label="Pending signups"
+              >
+                <UserPlus size={16} />
+                {pendingSignups && pendingSignups.length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                    {pendingSignups.length > 9 ? '9+' : pendingSignups.length}
+                  </span>
+                )}
+              </button>
+              {signupsOpen && <PendingSignupsPanel onClose={() => setSignupsOpen(false)} />}
             </div>
           )}
 
