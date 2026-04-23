@@ -228,6 +228,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
         if (isDisposed) return undefined
 
         uiOverlay = new shaka.ui.Overlay(player, container, video)
+
         uiOverlay.configure({
           controlPanelElements: [
             'play_pause', 'time_and_duration', 'mute', 'volume', 'spacer',

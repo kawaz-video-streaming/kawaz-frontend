@@ -233,7 +233,7 @@ export const CollectionPage = () => {
   const thumbnailSrc = `/api/mediaCollection/${collection._id}/thumbnail`
 
   return (
-    <div>
+    <div className="mx-auto max-w-5xl">
       {/* Breadcrumb */}
       <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
         <Link to="/" className="transition-colors hover:text-foreground">Home</Link>

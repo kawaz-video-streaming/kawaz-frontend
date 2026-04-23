@@ -178,7 +178,7 @@ export const VideoPage = () => {
   const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3
 
   return (
-    <div>
+    <div className="mx-auto max-w-6xl">
       <VideoPlayer
         manifestUrl={`/api/media/stream/${video.playUrl}`}
         chaptersUrl={video.chaptersUrl ? `/api/media/stream/${video.chaptersUrl}` : undefined}
