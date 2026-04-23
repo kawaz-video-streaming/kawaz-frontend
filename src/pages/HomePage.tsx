@@ -166,7 +166,7 @@ const SectionCarousel = ({
           ref={trackRef}
           className={[
             'grid grid-flow-col gap-3',
-            'auto-cols-[calc((100%-0.75rem)/2)] sm:auto-cols-[calc((100%-1.5rem)/3)] lg:auto-cols-[calc((100%-2.25rem)/4)]',
+            'auto-cols-[calc((100%-0.75rem)/2)] sm:auto-cols-[calc((100%-1.5rem)/3)] lg:auto-cols-[calc((100%-2.25rem)/4)] xl:auto-cols-[calc((100%-3rem)/5)] 2xl:auto-cols-[calc((100%-3.75rem)/6)]',
             transitionEnabled ? 'transition-transform duration-300 ease-out' : '',
           ].join(' ')}
           style={{ transform: `translateX(${translateX}px)` }}
