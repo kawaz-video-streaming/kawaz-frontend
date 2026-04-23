@@ -319,9 +319,9 @@ export const HomePage = () => {
     )
 
   return (
-    <div>
-      {/* Hero bar */}
-      <div className="relative mb-8 overflow-hidden rounded-2xl bg-linear-to-r from-red-600/20 via-red-500/10 to-transparent px-8 py-10 ring-1 ring-red-500/20">
+    <div className="flex h-full flex-col">
+      {/* Hero bar — always visible */}
+      <div className="relative mb-8 shrink-0 overflow-hidden rounded-2xl bg-linear-to-r from-red-600/20 via-red-500/10 to-transparent px-8 py-10 ring-1 ring-red-500/20">
         <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-red-500/10 blur-3xl" />
         <div className="absolute -bottom-8 left-1/3 h-32 w-32 rounded-full bg-red-600/10 blur-2xl" />
         <p className="relative text-xs font-semibold uppercase tracking-widest text-red-500">Kawaz+</p>
@@ -329,8 +329,9 @@ export const HomePage = () => {
         <p className="relative mt-1.5 text-sm text-muted-foreground">Browse and stream your library.</p>
       </div>
 
+      {/* Genre tabs — always visible */}
       {(topLevelVideos.length > 0 || topLevelCollections.length > 0) && (
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-6 shrink-0 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setSelectedTabs([])}
@@ -361,38 +362,41 @@ export const HomePage = () => {
         </div>
       )}
 
-      {isLoading && (
-        <div className="flex items-center justify-center py-32 text-muted-foreground">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-red-500" />
-        </div>
-      )}
-      {isError && (
-        <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
-          Failed to load content.
-        </div>
-      )}
-      {!isLoading && visibleSections.length === 0 && (
-        <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
-          {selectedTabs.length > 0 ? 'No items in the selected sections.' : 'No content yet.'}
-        </div>
-      )}
+      {/* Sections — only this area scrolls */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {isLoading && (
+          <div className="flex items-center justify-center py-32 text-muted-foreground">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-red-500" />
+          </div>
+        )}
+        {isError && (
+          <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
+            Failed to load content.
+          </div>
+        )}
+        {!isLoading && visibleSections.length === 0 && (
+          <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
+            {selectedTabs.length > 0 ? 'No items in the selected sections.' : 'No content yet.'}
+          </div>
+        )}
 
-      {visibleSections.length > 0 && (
-        <div className="space-y-6">
-          {visibleSections.map((section) => (
-            <section key={section.key}>
-              <div className="mb-3">
-                <h2 className="text-lg font-semibold tracking-tight">{section.key}</h2>
-              </div>
-              <SectionCarousel
-                sectionKey={section.key}
-                items={section.items}
-                renderItemCard={renderItemCard}
-              />
-            </section>
-          ))}
-        </div>
-      )}
+        {visibleSections.length > 0 && (
+          <div className="space-y-6 pb-8">
+            {visibleSections.map((section) => (
+              <section key={section.key}>
+                <div className="mb-3">
+                  <h2 className="text-lg font-semibold tracking-tight">{section.key}</h2>
+                </div>
+                <SectionCarousel
+                  sectionKey={section.key}
+                  items={section.items}
+                  renderItemCard={renderItemCard}
+                />
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
