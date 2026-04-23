@@ -161,59 +161,66 @@ const SectionCarousel = ({
 
   return (
     <div className="rounded-2xl border border-border bg-card/70 p-4 shadow-sm">
-      {hasOverflow && (
-        <div className="mb-3 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => rotateItems('left')}
-            aria-disabled={isAnimating}
-            className={[
-              'rounded-full border border-border p-2 text-muted-foreground transition-colors',
-              isAnimating
-                ? 'opacity-50'
-                : 'hover:border-red-500/50 hover:text-foreground',
-            ].join(' ')}
-            aria-label={`Scroll ${sectionKey} left`}
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={() => rotateItems('right')}
-            aria-disabled={isAnimating}
-            className={[
-              'rounded-full border border-border p-2 text-muted-foreground transition-colors',
-              isAnimating
-                ? 'opacity-50'
-                : 'hover:border-red-500/50 hover:text-foreground',
-            ].join(' ')}
-            aria-label={`Scroll ${sectionKey} right`}
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
-
-      <div ref={viewportRef} className="overflow-hidden pb-2">
-        <div
-          ref={trackRef}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => rotateItems('left')}
+          aria-disabled={isAnimating}
+          tabIndex={hasOverflow ? 0 : -1}
+          aria-hidden={!hasOverflow}
           className={[
-            'grid grid-flow-col gap-4',
-            'auto-cols-[85%] sm:auto-cols-[calc((100%-1rem)/2)] lg:auto-cols-[calc((100%-2rem)/3)] xl:auto-cols-[calc((100%-3rem)/4)]',
-            transitionEnabled ? 'transition-transform duration-300 ease-out' : '',
+            'shrink-0 rounded-full border border-border p-2 text-muted-foreground transition-colors',
+            !hasOverflow
+              ? 'invisible pointer-events-none'
+              : isAnimating
+                ? 'opacity-50'
+                : 'hover:border-red-500/50 hover:text-foreground',
           ].join(' ')}
-          style={{ transform: `translateX(${translateX}px)` }}
+          aria-label={`Scroll ${sectionKey} left`}
         >
-          {orderedItems.map((item) => (
-            <div
-              key={`${sectionKey}-${item.type}-${item.data._id}`}
-              data-carousel-item="true"
-              className="min-w-0"
-            >
-              {renderItemCard(item)}
-            </div>
-          ))}
+          <ChevronLeft size={16} />
+        </button>
+
+        <div ref={viewportRef} className="min-w-0 flex-1 overflow-hidden pb-2">
+          <div
+            ref={trackRef}
+            className={[
+              'grid grid-flow-col gap-4',
+              'auto-cols-[85%] sm:auto-cols-[calc((100%-1rem)/2)] lg:auto-cols-[calc((100%-2rem)/3)] xl:auto-cols-[calc((100%-3rem)/4)]',
+              transitionEnabled ? 'transition-transform duration-300 ease-out' : '',
+            ].join(' ')}
+            style={{ transform: `translateX(${translateX}px)` }}
+          >
+            {orderedItems.map((item) => (
+              <div
+                key={`${sectionKey}-${item.type}-${item.data._id}`}
+                data-carousel-item="true"
+                className="min-w-0"
+              >
+                {renderItemCard(item)}
+              </div>
+            ))}
+          </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => rotateItems('right')}
+          aria-disabled={isAnimating}
+          tabIndex={hasOverflow ? 0 : -1}
+          aria-hidden={!hasOverflow}
+          className={[
+            'shrink-0 rounded-full border border-border p-2 text-muted-foreground transition-colors',
+            !hasOverflow
+              ? 'invisible pointer-events-none'
+              : isAnimating
+                ? 'opacity-50'
+                : 'hover:border-red-500/50 hover:text-foreground',
+          ].join(' ')}
+          aria-label={`Scroll ${sectionKey} right`}
+        >
+          <ChevronRight size={16} />
+        </button>
       </div>
     </div>
   )
@@ -229,11 +236,12 @@ export const HomePage = () => {
 
   const topLevelCollections = collections?.filter((c) => !c.collectionId) ?? []
   const topLevelVideos = videos?.filter((v) => !v.collectionId) ?? []
-  const topLevelItems: PageItem[] = [
+  const topLevelItemsRaw: PageItem[] = [
     ...topLevelCollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
     ...topLevelVideos.map((video): PageItem => ({ type: 'video', data: video })),
   ]
-  const newestItems = [...topLevelItems].slice(-10).reverse()
+  const newestItems = [...topLevelItemsRaw].slice(-10).reverse()
+  const topLevelItems = [...topLevelItemsRaw].sort((a, b) => a.data.title.localeCompare(b.data.title))
 
   const getDisplayGenre = (item: PageItem) => item.data.tags[0] ?? 'Other'
 

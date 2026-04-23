@@ -128,7 +128,7 @@ export const CollectionPage = () => {
   const items: PageItem[] = [
     ...subcollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
     ...videos.map((video): PageItem => ({ type: 'video', data: video })),
-  ]
+  ].sort((a, b) => a.data.title.localeCompare(b.data.title))
 
   // Parent collection for breadcrumb
   const parentCollection = collection?.collectionId

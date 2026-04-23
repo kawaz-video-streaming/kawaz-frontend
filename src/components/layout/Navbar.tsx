@@ -72,34 +72,36 @@ export const Navbar = () => {
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
-      <div className="flex items-center justify-between px-6 py-3">
-        {/* Left: Navigation Links */}
-        <div className="flex items-center gap-6">
+      <div className="flex items-center px-3 py-3 sm:px-6">
+        {/* Left: Navigation Links — flex-1 so center stays naturally centered */}
+        <div className="flex flex-1 items-center gap-3 lg:gap-6">
           {isAdmin && (
             <>
-              <Link to="/upload" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <Link to="/upload" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
                 Upload
               </Link>
-              <Link to="/collections/new" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <Link to="/collections/new" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground whitespace-nowrap">
                 New Collection
               </Link>
-              <Link to="/admin/avatars" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <Link to="/admin/avatars" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
                 Avatars
               </Link>
             </>
           )}
         </div>
 
-        {/* Center: Kawaz+ Logo & Welcome Message — absolutely centered on screen */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
-          <Link to="/" className="text-lg font-extrabold tracking-tight">
+        {/* Center: Kawaz+ Logo & Welcome Message */}
+        <div className="flex shrink-0 flex-col items-center px-2">
+          <Link to="/" className="text-lg font-extrabold tracking-tight whitespace-nowrap">
             Kawaz<span className="text-red-500">+</span>
           </Link>
-          <p className="text-xs text-muted-foreground">Welcome back, <span className="font-semibold text-foreground">{selectedProfile?.name ?? username}</span>! 👋</p>
+          <p className="hidden max-w-[180px] truncate text-xs text-muted-foreground sm:block">
+            Welcome back, <span className="font-semibold text-foreground">{selectedProfile?.name ?? username}</span>! 👋
+          </p>
         </div>
 
-        {/* Right: Theme Toggle + Processing + Search + Avatar Menu */}
-        <div className="flex items-center gap-3">
+        {/* Right: Theme Toggle + Processing + Search + Avatar Menu — flex-1 justified end */}
+        <div className="flex flex-1 items-center justify-end gap-1 sm:gap-2">
           <button
             onClick={toggleTheme}
             className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

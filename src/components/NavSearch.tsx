@@ -59,7 +59,7 @@ export const NavSearch = () => {
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="relative w-52">
+      <div className="relative w-28 sm:w-40 md:w-52">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
