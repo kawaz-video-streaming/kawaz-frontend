@@ -330,36 +330,34 @@ export const HomePage = () => {
       </div>
 
       {(topLevelVideos.length > 0 || topLevelCollections.length > 0) && (
-        <div className="mb-6 overflow-x-auto pb-1">
-          <div className="flex min-w-max gap-2">
+        <div className="mb-6 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedTabs([])}
+            className={[
+              'rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:px-4 sm:py-1.5 sm:text-sm',
+              selectedTabs.length === 0
+                ? 'border-red-500 bg-red-500/10 text-red-500'
+                : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
+            ].join(' ')}
+          >
+            All
+          </button>
+          {sections.map((section) => (
             <button
+              key={section.key}
               type="button"
-              onClick={() => setSelectedTabs([])}
+              onClick={() => toggleTab(section.key)}
               className={[
-                'shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
-                selectedTabs.length === 0
+                'rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:px-4 sm:py-1.5 sm:text-sm',
+                selectedTabs.includes(section.key)
                   ? 'border-red-500 bg-red-500/10 text-red-500'
                   : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
               ].join(' ')}
             >
-              All
+              {section.key}
             </button>
-            {sections.map((section) => (
-              <button
-                key={section.key}
-                type="button"
-                onClick={() => toggleTab(section.key)}
-                className={[
-                  'shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
-                  selectedTabs.includes(section.key)
-                    ? 'border-red-500 bg-red-500/10 text-red-500'
-                    : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
-                ].join(' ')}
-              >
-                {section.key}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
       )}
 
