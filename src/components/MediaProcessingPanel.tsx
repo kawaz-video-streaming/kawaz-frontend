@@ -67,7 +67,7 @@ const CircularProgress = ({ percentage, status }: { percentage: number; status: 
 }
 
 export const MediaProcessingPanel = ({ onClose }: { onClose: () => void }) => {
-  const { data: items, isLoading } = usePendingMedia(true)
+  const { data: items, isLoading } = usePendingMedia(true, true)
   const { mutate: remove, isPending: isDeleting } = useDeleteMedia()
   const [deletingId, setDeletingId] = useState<string | null>(null)
 

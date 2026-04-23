@@ -111,7 +111,7 @@ export const ProfilesPage = () => {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-red-500" />
         </div>
       ) : (
-        <div className="flex flex-wrap justify-center gap-6">
+        <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
           {profiles?.map((profile) => {
             const avatar = avatarMap.get(profile.avatarId)
             return (
@@ -121,11 +121,11 @@ export const ProfilesPage = () => {
                   className="relative overflow-hidden rounded-full transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 >
                   {avatar ? (
-                    <div className="h-72 w-72 overflow-hidden rounded-full">
+                    <div className="h-36 w-36 overflow-hidden rounded-full sm:h-48 sm:w-48 lg:h-64 lg:w-64 xl:h-72 xl:w-72">
                       <img src={avatarImageUrl(avatar._id)} alt={avatar.name} className="h-full w-full object-cover" />
                     </div>
                   ) : (
-                    <div className="flex h-72 w-72 items-center justify-center rounded-full bg-accent text-3xl font-bold text-muted-foreground">
+                    <div className="flex h-36 w-36 items-center justify-center rounded-full bg-accent text-3xl font-bold text-muted-foreground sm:h-48 sm:w-48 lg:h-64 lg:w-64 xl:h-72 xl:w-72">
                       {profile.name[0]?.toUpperCase()}
                     </div>
                   )}
@@ -154,7 +154,7 @@ export const ProfilesPage = () => {
           <div className="flex flex-col items-center gap-2">
             <button
               onClick={() => setAdding(true)}
-              className="flex h-72 w-72 items-center justify-center rounded-full border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-red-500/50 hover:bg-accent/50 hover:text-foreground"
+              className="flex h-36 w-36 items-center justify-center rounded-full border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-red-500/50 hover:bg-accent/50 hover:text-foreground sm:h-48 sm:w-48 lg:h-64 lg:w-64 xl:h-72 xl:w-72"
               aria-label="Add profile"
             >
               <Plus size={28} />

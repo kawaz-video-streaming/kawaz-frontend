@@ -128,7 +128,7 @@ export const CollectionPage = () => {
   const items: PageItem[] = [
     ...subcollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
     ...videos.map((video): PageItem => ({ type: 'video', data: video })),
-  ]
+  ].sort((a, b) => a.data.title.localeCompare(b.data.title))
 
   // Parent collection for breadcrumb
   const parentCollection = collection?.collectionId
@@ -233,7 +233,7 @@ export const CollectionPage = () => {
   const thumbnailSrc = `/api/mediaCollection/${collection._id}/thumbnail`
 
   return (
-    <div>
+    <div className="mx-auto max-w-5xl">
       {/* Breadcrumb */}
       <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
         <Link to="/" className="transition-colors hover:text-foreground">Home</Link>
@@ -388,7 +388,7 @@ export const CollectionPage = () => {
       </div>
 
       {items.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((item) =>
             item.type === 'collection' ? (
               <button

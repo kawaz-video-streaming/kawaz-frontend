@@ -49,7 +49,7 @@ type PageItem =
   | { type: 'video'; data: VideoListItem }
   | { type: 'collection'; data: CollectionListItem }
 
-const CAROUSEL_GAP_PX = 16
+const CAROUSEL_GAP_PX = 12
 const CAROUSEL_ANIMATION_MS = 280
 
 const SectionCarousel = ({
@@ -160,46 +160,13 @@ const SectionCarousel = ({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card/70 p-4 shadow-sm">
-      {hasOverflow && (
-        <div className="mb-3 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => rotateItems('left')}
-            aria-disabled={isAnimating}
-            className={[
-              'rounded-full border border-border p-2 text-muted-foreground transition-colors',
-              isAnimating
-                ? 'opacity-50'
-                : 'hover:border-red-500/50 hover:text-foreground',
-            ].join(' ')}
-            aria-label={`Scroll ${sectionKey} left`}
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={() => rotateItems('right')}
-            aria-disabled={isAnimating}
-            className={[
-              'rounded-full border border-border p-2 text-muted-foreground transition-colors',
-              isAnimating
-                ? 'opacity-50'
-                : 'hover:border-red-500/50 hover:text-foreground',
-            ].join(' ')}
-            aria-label={`Scroll ${sectionKey} right`}
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
-
-      <div ref={viewportRef} className="overflow-hidden pb-2">
+    <div className="relative">
+      <div ref={viewportRef} className="overflow-hidden">
         <div
           ref={trackRef}
           className={[
-            'grid grid-flow-col gap-4',
-            'auto-cols-[85%] sm:auto-cols-[calc((100%-1rem)/2)] lg:auto-cols-[calc((100%-2rem)/3)] xl:auto-cols-[calc((100%-3rem)/4)]',
+            'grid grid-flow-col gap-3',
+            'auto-cols-[calc((100%-0.75rem)/2)] sm:auto-cols-[calc((100%-1.5rem)/3)] lg:auto-cols-[calc((100%-2.25rem)/4)] xl:auto-cols-[calc((100%-3rem)/5)] 2xl:auto-cols-[calc((100%-3.75rem)/6)]',
             transitionEnabled ? 'transition-transform duration-300 ease-out' : '',
           ].join(' ')}
           style={{ transform: `translateX(${translateX}px)` }}
@@ -215,6 +182,36 @@ const SectionCarousel = ({
           ))}
         </div>
       </div>
+
+      {hasOverflow && (
+        <button
+          type="button"
+          onClick={() => rotateItems('left')}
+          aria-disabled={isAnimating}
+          className={[
+            'absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-border bg-background/85 p-2 text-muted-foreground shadow-md backdrop-blur-sm transition-colors',
+            isAnimating ? 'opacity-50' : 'hover:border-red-500/50 hover:text-foreground',
+          ].join(' ')}
+          aria-label={`Scroll ${sectionKey} left`}
+        >
+          <ChevronLeft size={16} />
+        </button>
+      )}
+
+      {hasOverflow && (
+        <button
+          type="button"
+          onClick={() => rotateItems('right')}
+          aria-disabled={isAnimating}
+          className={[
+            'absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-border bg-background/85 p-2 text-muted-foreground shadow-md backdrop-blur-sm transition-colors',
+            isAnimating ? 'opacity-50' : 'hover:border-red-500/50 hover:text-foreground',
+          ].join(' ')}
+          aria-label={`Scroll ${sectionKey} right`}
+        >
+          <ChevronRight size={16} />
+        </button>
+      )}
     </div>
   )
 }
@@ -229,11 +226,12 @@ export const HomePage = () => {
 
   const topLevelCollections = collections?.filter((c) => !c.collectionId) ?? []
   const topLevelVideos = videos?.filter((v) => !v.collectionId) ?? []
-  const topLevelItems: PageItem[] = [
+  const topLevelItemsRaw: PageItem[] = [
     ...topLevelCollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
     ...topLevelVideos.map((video): PageItem => ({ type: 'video', data: video })),
   ]
-  const newestItems = [...topLevelItems].slice(-10).reverse()
+  const newestItems = [...topLevelItemsRaw].slice(-10).reverse()
+  const topLevelItems = [...topLevelItemsRaw].sort((a, b) => a.data.title.localeCompare(b.data.title))
 
   const getDisplayGenre = (item: PageItem) => item.data.tags[0] ?? 'Other'
 
@@ -321,9 +319,9 @@ export const HomePage = () => {
     )
 
   return (
-    <div>
-      {/* Hero bar */}
-      <div className="relative mb-8 overflow-hidden rounded-2xl bg-linear-to-r from-red-600/20 via-red-500/10 to-transparent px-8 py-10 ring-1 ring-red-500/20">
+    <div className="flex h-full flex-col">
+      {/* Hero bar — always visible */}
+      <div className="relative mb-8 shrink-0 overflow-hidden rounded-2xl bg-linear-to-r from-red-600/20 via-red-500/10 to-transparent px-8 py-10 ring-1 ring-red-500/20">
         <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-red-500/10 blur-3xl" />
         <div className="absolute -bottom-8 left-1/3 h-32 w-32 rounded-full bg-red-600/10 blur-2xl" />
         <p className="relative text-xs font-semibold uppercase tracking-widest text-red-500">Kawaz+</p>
@@ -331,72 +329,74 @@ export const HomePage = () => {
         <p className="relative mt-1.5 text-sm text-muted-foreground">Browse and stream your library.</p>
       </div>
 
+      {/* Genre tabs — always visible */}
       {(topLevelVideos.length > 0 || topLevelCollections.length > 0) && (
-        <div className="mb-6 overflow-x-auto pb-1">
-          <div className="flex min-w-max gap-2">
+        <div className="mb-6 shrink-0 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedTabs([])}
+            className={[
+              'rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:px-4 sm:py-1.5 sm:text-sm',
+              selectedTabs.length === 0
+                ? 'border-red-500 bg-red-500/10 text-red-500'
+                : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
+            ].join(' ')}
+          >
+            All
+          </button>
+          {sections.map((section) => (
             <button
+              key={section.key}
               type="button"
-              onClick={() => setSelectedTabs([])}
+              onClick={() => toggleTab(section.key)}
               className={[
-                'shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
-                selectedTabs.length === 0
+                'rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:px-4 sm:py-1.5 sm:text-sm',
+                selectedTabs.includes(section.key)
                   ? 'border-red-500 bg-red-500/10 text-red-500'
                   : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
               ].join(' ')}
             >
-              All
+              {section.key}
             </button>
-            {sections.map((section) => (
-              <button
-                key={section.key}
-                type="button"
-                onClick={() => toggleTab(section.key)}
-                className={[
-                  'shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
-                  selectedTabs.includes(section.key)
-                    ? 'border-red-500 bg-red-500/10 text-red-500'
-                    : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
-                ].join(' ')}
-              >
-                {section.key}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {isLoading && (
-        <div className="flex items-center justify-center py-32 text-muted-foreground">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-red-500" />
-        </div>
-      )}
-      {isError && (
-        <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
-          Failed to load content.
-        </div>
-      )}
-      {!isLoading && visibleSections.length === 0 && (
-        <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
-          {selectedTabs.length > 0 ? 'No items in the selected sections.' : 'No content yet.'}
-        </div>
-      )}
-
-      {visibleSections.length > 0 && (
-        <div className="space-y-6">
-          {visibleSections.map((section) => (
-            <section key={section.key}>
-              <div className="mb-3">
-                <h2 className="text-lg font-semibold tracking-tight">{section.key}</h2>
-              </div>
-              <SectionCarousel
-                sectionKey={section.key}
-                items={section.items}
-                renderItemCard={renderItemCard}
-              />
-            </section>
           ))}
         </div>
       )}
+
+      {/* Sections — only this area scrolls */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {isLoading && (
+          <div className="flex items-center justify-center py-32 text-muted-foreground">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-red-500" />
+          </div>
+        )}
+        {isError && (
+          <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
+            Failed to load content.
+          </div>
+        )}
+        {!isLoading && visibleSections.length === 0 && (
+          <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
+            {selectedTabs.length > 0 ? 'No items in the selected sections.' : 'No content yet.'}
+          </div>
+        )}
+
+        {visibleSections.length > 0 && (
+          <div className="space-y-6 pb-8">
+            {visibleSections.map((section) => (
+              <section key={section.key}>
+                <div className="mb-3">
+                  <h2 className="text-lg font-semibold tracking-tight">{section.key}</h2>
+                </div>
+                <SectionCarousel
+                  sectionKey={section.key}
+                  items={section.items}
+                  renderItemCard={renderItemCard}
+                />
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

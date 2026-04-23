@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Sun, Moon, LogOut, UserCircle2, Users, Loader2 } from 'lucide-react'
+import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useTheme } from '../../theme/ThemeContext'
 import { avatarImageUrl } from '../../api/avatar'
 import { usePendingMedia } from '../../hooks/usePendingMedia'
+import { usePendingUsers } from '../../hooks/usePendingUsers'
 import { MediaProcessingPanel } from '../MediaProcessingPanel'
+import { PendingSignupsPanel } from '../PendingSignupsPanel'
 import { NavSearch } from '../NavSearch'
 
 export const Navbar = () => {
@@ -14,9 +16,12 @@ export const Navbar = () => {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [processingOpen, setProcessingOpen] = useState(false)
+  const [signupsOpen, setSignupsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const processingRef = useRef<HTMLDivElement>(null)
-  const { data: pendingItems } = usePendingMedia(isAdmin)
+  const signupsRef = useRef<HTMLDivElement>(null)
+  const { data: pendingItems } = usePendingMedia(isAdmin, processingOpen)
+  const { data: pendingSignups } = usePendingUsers(isAdmin, signupsOpen)
 
   // Close avatar menu on outside click
   useEffect(() => {
@@ -42,6 +47,18 @@ export const Navbar = () => {
     return () => document.removeEventListener('mousedown', handler)
   }, [processingOpen])
 
+  // Close signups panel on outside click
+  useEffect(() => {
+    if (!signupsOpen) return
+    const handler = (e: MouseEvent) => {
+      if (signupsRef.current && !signupsRef.current.contains(e.target as Node)) {
+        setSignupsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [signupsOpen])
+
   const handleLogout = () => {
     setMenuOpen(false)
     logout()
@@ -55,34 +72,36 @@ export const Navbar = () => {
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
-      <div className="flex items-center justify-between px-6 py-3">
-        {/* Left: Navigation Links */}
-        <div className="flex items-center gap-6">
+      <div className="flex items-center px-3 py-3 sm:px-6">
+        {/* Left: Navigation Links — flex-1 so center stays naturally centered */}
+        <div className="flex flex-1 items-center gap-3 lg:gap-6">
           {isAdmin && (
             <>
-              <Link to="/upload" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <Link to="/upload" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
                 Upload
               </Link>
-              <Link to="/collections/new" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <Link to="/collections/new" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground whitespace-nowrap">
                 New Collection
               </Link>
-              <Link to="/admin/avatars" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <Link to="/admin/avatars" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
                 Avatars
               </Link>
             </>
           )}
         </div>
 
-        {/* Center: Kawaz+ Logo & Welcome Message — absolutely centered on screen */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
-          <Link to="/" className="text-lg font-extrabold tracking-tight">
+        {/* Center: Kawaz+ Logo & Welcome Message */}
+        <div className="flex shrink-0 flex-col items-center px-2">
+          <Link to="/" className="text-lg font-extrabold tracking-tight whitespace-nowrap">
             Kawaz<span className="text-red-500">+</span>
           </Link>
-          <p className="text-xs text-muted-foreground">Welcome back, <span className="font-semibold text-foreground">{selectedProfile?.name ?? username}</span>! 👋</p>
+          <p className="hidden max-w-[180px] truncate text-xs text-muted-foreground sm:block">
+            Welcome back, <span className="font-semibold text-foreground">{selectedProfile?.name ?? username}</span>! 👋
+          </p>
         </div>
 
-        {/* Right: Theme Toggle + Processing + Search + Avatar Menu */}
-        <div className="flex items-center gap-3">
+        {/* Right: Theme Toggle + Processing + Search + Avatar Menu — flex-1 justified end */}
+        <div className="flex flex-1 items-center justify-end gap-1 sm:gap-2">
           <button
             onClick={toggleTheme}
             className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -107,6 +126,25 @@ export const Navbar = () => {
                 )}
               </button>
               {processingOpen && <MediaProcessingPanel onClose={() => setProcessingOpen(false)} />}
+            </div>
+          )}
+
+          {/* Pending signups panel (admin only) */}
+          {isAdmin && (
+            <div ref={signupsRef} className="relative">
+              <button
+                onClick={() => setSignupsOpen((o) => !o)}
+                className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label="Pending signups"
+              >
+                <UserPlus size={16} />
+                {pendingSignups && pendingSignups.length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                    {pendingSignups.length > 9 ? '9+' : pendingSignups.length}
+                  </span>
+                )}
+              </button>
+              {signupsOpen && <PendingSignupsPanel onClose={() => setSignupsOpen(false)} />}
             </div>
           )}
 
