@@ -48,7 +48,7 @@ declare module 'shaka-player' {
     static isBrowserSupported(): boolean
     attach(video: HTMLMediaElement): Promise<void>
     load(uri: string): Promise<void>
-    getNetworkingEngine(): { registerRequestFilter(filter: (type: number, request: { allowCrossSiteCredentials: boolean }) => void): void } | null
+    getNetworkingEngine(): { registerRequestFilter(filter: (type: number, request: { uris: string[]; allowCrossSiteCredentials: boolean }) => void): void } | null
     addChaptersTrack(uri: string, language: string, mimeType?: string): Promise<TextTrack>
     addThumbnailsTrack(uri: string, mimeType?: string): Promise<TextTrack>
     getImageTracks(): ImageTrack[]

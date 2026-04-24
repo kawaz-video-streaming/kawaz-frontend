@@ -179,6 +179,13 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
         player = new shaka.Player()
         await player.attach(video)
 
+        player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
+          const url = new URL(request.uris[0])
+          if (url.hostname !== window.location.hostname) {
+            request.allowCrossSiteCredentials = false
+          }
+        })
+
         const configurablePlayer = player as import('shaka-player').Player & {
           configure?: (config: object) => void
           retryStreaming?: () => boolean
