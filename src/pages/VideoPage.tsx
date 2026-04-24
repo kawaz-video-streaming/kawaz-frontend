@@ -1,16 +1,16 @@
-import { Captions, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
-import { MEDIA_TAGS } from '../constants/tags'
-import type { Coordinates } from '../types/api'
-import { useVideo } from '../hooks/useVideo'
-import { useUpdateMedia } from '../hooks/useUpdateMedia'
-import { useDeleteMedia } from '../hooks/useDeleteMedia'
-import { useCollections } from '../hooks/useCollections'
-import { useAuth } from '../auth/useAuth'
-import { VideoPlayer } from '../components/VideoPlayer'
-import { getFocalCropArea } from '../lib/focalPoints'
-import { buildTopographicList } from '../lib/collections'
+import { Captions, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router';
+import { MEDIA_TAGS } from '../constants/tags';
+import type { Coordinates } from '../types/api';
+import { useVideo } from '../hooks/useVideo';
+import { useUpdateMedia } from '../hooks/useUpdateMedia';
+import { useDeleteMedia } from '../hooks/useDeleteMedia';
+import { useCollections } from '../hooks/useCollections';
+import { useAuth } from '../auth/useAuth';
+import { VideoPlayer } from '../components/VideoPlayer';
+import { getFocalCropArea } from '../lib/focalPoints';
+import { buildTopographicList } from '../lib/collections';
 
 const FocalPointPicker = ({
   src,
@@ -18,26 +18,26 @@ const FocalPointPicker = ({
   onChange,
   aspectRatio = 2 / 3,
 }: {
-  src: string
-  value: Coordinates
-  onChange: (focal: Coordinates) => void
-  aspectRatio?: number
+  src: string;
+  value: Coordinates;
+  onChange: (focal: Coordinates) => void;
+  aspectRatio?: number;
 }) => {
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number; } | null>(null);
 
   const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
-  }
+    setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
+  };
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
+    const rect = e.currentTarget.getBoundingClientRect();
     onChange({
       x: Math.round(((e.clientX - rect.left) / rect.width) * 100) / 100,
       y: Math.round(((e.clientY - rect.top) / rect.height) * 100) / 100,
-    })
-  }
+    });
+  };
 
-  const crop = naturalSize ? getFocalCropArea(naturalSize, value, aspectRatio) : null
+  const crop = naturalSize ? getFocalCropArea(naturalSize, value, aspectRatio) : null;
 
   return (
     <div className="flex flex-col gap-2">
@@ -57,69 +57,69 @@ const FocalPointPicker = ({
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
 export const VideoPage = () => {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const { isAdmin } = useAuth()
-  const { data: video, isError, isLoading } = useVideo(id ?? '')
-  const { mutate: update, isPending: isUpdating } = useUpdateMedia(id ?? '')
-  const { mutate: remove, isPending: isDeleting } = useDeleteMedia()
-  const { data: collections } = useCollections()
+  const { id } = useParams<{ id: string; }>();
+  const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+  const { data: video, isError, isLoading } = useVideo(id ?? '');
+  const { mutate: update, isPending: isUpdating } = useUpdateMedia(id ?? '');
+  const { mutate: remove, isPending: isDeleting } = useDeleteMedia();
+  const { data: collections } = useCollections();
 
-  const thumbnailInputRef = useRef<HTMLInputElement>(null)
-  const [editing, setEditing] = useState(false)
-  const [editTitle, setEditTitle] = useState('')
-  const [editDescription, setEditDescription] = useState('')
-  const [editTags, setEditTags] = useState<string[]>([])
-  const [editFocalPoint, setEditFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 })
-  const [editCollectionId, setEditCollectionId] = useState<string>('')
-  const [newThumbnail, setNewThumbnail] = useState<File | null>(null)
-  const [newThumbnailPreview, setNewThumbnailPreview] = useState<string | null>(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editFocalPoint, setEditFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 });
+  const [editCollectionId, setEditCollectionId] = useState<string>('');
+  const [newThumbnail, setNewThumbnail] = useState<File | null>(null);
+  const [newThumbnailPreview, setNewThumbnailPreview] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const openEdit = () => {
-    if (!video) return
-    setEditTitle(video.title)
-    setEditDescription(video.description ?? '')
-    setEditTags(video.tags)
-    setEditFocalPoint(video.thumbnailFocalPoint)
-    setEditCollectionId(video.collectionId ?? '')
-    setNewThumbnail(null)
-    setNewThumbnailPreview(null)
-    setEditing(true)
-  }
+    if (!video) return;
+    setEditTitle(video.title);
+    setEditDescription(video.description ?? '');
+    setEditTags(video.tags);
+    setEditFocalPoint(video.thumbnailFocalPoint);
+    setEditCollectionId(video.collectionId ?? '');
+    setNewThumbnail(null);
+    setNewThumbnailPreview(null);
+    setEditing(true);
+  };
 
   const cancelEdit = () => {
-    setEditing(false)
-    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
-    setNewThumbnail(null)
-    setNewThumbnailPreview(null)
-  }
+    setEditing(false);
+    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview);
+    setNewThumbnail(null);
+    setNewThumbnailPreview(null);
+  };
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null
-    if (!file) return
-    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
-    setNewThumbnail(file)
-    setNewThumbnailPreview(URL.createObjectURL(file))
-    setEditFocalPoint({ x: 0.5, y: 0.5 })
-  }
+    const file = e.target.files?.[0] ?? null;
+    if (!file) return;
+    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview);
+    setNewThumbnail(file);
+    setNewThumbnailPreview(URL.createObjectURL(file));
+    setEditFocalPoint({ x: 0.5, y: 0.5 });
+  };
 
   const removeNewThumbnail = () => {
-    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
-    setNewThumbnail(null)
-    setNewThumbnailPreview(null)
-    setEditFocalPoint(video?.thumbnailFocalPoint ?? { x: 0.5, y: 0.5 })
-    if (thumbnailInputRef.current) thumbnailInputRef.current.value = ''
-  }
+    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview);
+    setNewThumbnail(null);
+    setNewThumbnailPreview(null);
+    setEditFocalPoint(video?.thumbnailFocalPoint ?? { x: 0.5, y: 0.5 });
+    if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
+  };
 
   const submitEdit = () => {
-    if (!editTitle.trim()) return
-    const collectionId = editCollectionId === '' ? null : editCollectionId
-    const originalCollectionId = video?.collectionId ?? null
+    if (!editTitle.trim()) return;
+    const collectionId = editCollectionId === '' ? null : editCollectionId;
+    const originalCollectionId = video?.collectionId ?? null;
     update(
       {
         title: editTitle.trim(),
@@ -131,36 +131,36 @@ export const VideoPage = () => {
       },
       {
         onSuccess: () => {
-          setEditing(false)
-          if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
-          setNewThumbnail(null)
-          setNewThumbnailPreview(null)
+          setEditing(false);
+          if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview);
+          setNewThumbnail(null);
+          setNewThumbnailPreview(null);
         },
       },
-    )
-  }
+    );
+  };
 
   useEffect(() => {
-    if (!isDeleting) return
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [isDeleting])
+    if (!isDeleting) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDeleting]);
 
   const toggleEditTag = (tag: string) =>
-    setEditTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
+    setEditTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
 
   const handleDelete = () => {
-    if (!id) return
-    remove(id, { onSuccess: () => void navigate('/') })
-  }
+    if (!id) return;
+    remove(id, { onSuccess: () => void navigate('/') });
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-32 text-muted-foreground">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-red-500" />
       </div>
-    )
+    );
   }
 
   if (isError || !video) {
@@ -171,11 +171,11 @@ export const VideoPage = () => {
           This video may still be processing or the ID is incorrect.
         </p>
       </div>
-    )
+    );
   }
 
-  const thumbnailSrc = `/api/media/${video._id}/thumbnail`
-  const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3
+  const thumbnailSrc = `/api/media/${video._id}/thumbnail`;
+  const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3;
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -210,7 +210,7 @@ export const VideoPage = () => {
               <label className="text-sm font-medium">Tags</label>
               <div className="flex flex-wrap gap-2">
                 {MEDIA_TAGS.map((tag) => {
-                  const selected = editTags.includes(tag)
+                  const selected = editTags.includes(tag);
                   return (
                     <button
                       key={tag}
@@ -225,7 +225,7 @@ export const VideoPage = () => {
                     >
                       {tag}
                     </button>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -395,5 +395,5 @@ export const VideoPage = () => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};
