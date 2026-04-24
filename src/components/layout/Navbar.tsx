@@ -1,74 +1,75 @@
-import { useState, useRef, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router'
-import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus } from 'lucide-react'
-import { useAuth } from '../../auth/useAuth'
-import { useTheme } from '../../theme/ThemeContext'
-import { avatarImageUrl } from '../../api/avatar'
-import { usePendingMedia } from '../../hooks/usePendingMedia'
-import { usePendingUsers } from '../../hooks/usePendingUsers'
-import { MediaProcessingPanel } from '../MediaProcessingPanel'
-import { PendingSignupsPanel } from '../PendingSignupsPanel'
-import { NavSearch } from '../NavSearch'
+import { useState, useRef, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search } from 'lucide-react';
+import { useAuth } from '../../auth/useAuth';
+import { useTheme } from '../../theme/ThemeContext';
+import { avatarImageUrl } from '../../api/avatar';
+import { usePendingMedia } from '../../hooks/usePendingMedia';
+import { usePendingUsers } from '../../hooks/usePendingUsers';
+import { MediaProcessingPanel } from '../MediaProcessingPanel';
+import { PendingSignupsPanel } from '../PendingSignupsPanel';
+import { NavSearch } from '../NavSearch';
 
 export const Navbar = () => {
-  const { logout, isAdmin, username, selectedProfile } = useAuth()
-  const { theme, toggleTheme } = useTheme()
-  const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [processingOpen, setProcessingOpen] = useState(false)
-  const [signupsOpen, setSignupsOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const processingRef = useRef<HTMLDivElement>(null)
-  const signupsRef = useRef<HTMLDivElement>(null)
-  const { data: pendingItems } = usePendingMedia(isAdmin, processingOpen)
-  const { data: pendingSignups } = usePendingUsers(isAdmin, signupsOpen)
+  const { logout, isAdmin, username, selectedProfile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [processingOpen, setProcessingOpen] = useState(false);
+  const [signupsOpen, setSignupsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const processingRef = useRef<HTMLDivElement>(null);
+  const signupsRef = useRef<HTMLDivElement>(null);
+  const { data: pendingItems } = usePendingMedia(isAdmin, processingOpen);
+  const { data: pendingSignups } = usePendingUsers(isAdmin, signupsOpen);
 
   // Close avatar menu on outside click
   useEffect(() => {
-    if (!menuOpen) return
+    if (!menuOpen) return;
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
+        setMenuOpen(false);
       }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [menuOpen])
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
 
   // Close processing panel on outside click
   useEffect(() => {
-    if (!processingOpen) return
+    if (!processingOpen) return;
     const handler = (e: MouseEvent) => {
       if (processingRef.current && !processingRef.current.contains(e.target as Node)) {
-        setProcessingOpen(false)
+        setProcessingOpen(false);
       }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [processingOpen])
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [processingOpen]);
 
   // Close signups panel on outside click
   useEffect(() => {
-    if (!signupsOpen) return
+    if (!signupsOpen) return;
     const handler = (e: MouseEvent) => {
       if (signupsRef.current && !signupsRef.current.contains(e.target as Node)) {
-        setSignupsOpen(false)
+        setSignupsOpen(false);
       }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [signupsOpen])
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [signupsOpen]);
 
   const handleLogout = () => {
-    setMenuOpen(false)
-    logout()
-    void navigate('/login')
-  }
+    setMenuOpen(false);
+    logout();
+    void navigate('/login');
+  };
 
   const handleChangeProfile = () => {
-    setMenuOpen(false)
-    void navigate('/profiles')
-  }
+    setMenuOpen(false);
+    void navigate('/profiles');
+  };
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
@@ -148,7 +149,20 @@ export const Navbar = () => {
             </div>
           )}
 
-          <NavSearch />
+          <button
+            onClick={() => {
+              setSearchOpen(true);
+              setMenuOpen(false);
+              setProcessingOpen(false);
+              setSignupsOpen(false);
+            }}
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label="Open search"
+          >
+            <Search size={16} />
+          </button>
+
+          <NavSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
 
           {/* Avatar button + dropdown */}
           <div ref={menuRef} className="relative">
@@ -187,5 +201,5 @@ export const Navbar = () => {
         </div>
       </div>
     </nav>
-  )
-}
+  );
+};
