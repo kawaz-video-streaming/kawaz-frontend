@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { apiRequest } from '../api/client'
+import { apiRequest, AuthError } from '../api/client'
 
 const AUTH_KEY = 'kawaz_authed'
 const PROFILE_KEY = 'kawaz_profile'
@@ -48,9 +48,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setRole(data.role ?? null)
         setUsername(data.username ?? null)
       })
-      .catch(() => {
-        localStorage.removeItem(AUTH_KEY)
-        setIsAuthenticated(false)
+      .catch((err) => {
+        if (err instanceof AuthError) {
+          localStorage.removeItem(AUTH_KEY)
+          setIsAuthenticated(false)
+        }
       })
   }, [isAuthenticated])
 

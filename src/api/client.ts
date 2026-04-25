@@ -1,6 +1,8 @@
+export class AuthError extends Error {}
+
 const handleResponse = async <T>(response: Response): Promise<T> => {
   if (response.status === 401) {
-    throw new Error('Unauthorized')
+    throw new AuthError('Unauthorized')
   }
   if (!response.ok) {
     const body = await response.text()

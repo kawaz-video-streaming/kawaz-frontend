@@ -2,6 +2,35 @@ import 'shaka-player/dist/controls.css'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../lib/utils'
 
+const prefetchFirstSegments = async (manifestUrl: string) => {
+  try {
+    const res = await fetch(manifestUrl, { credentials: 'include' })
+    if (!res.ok) return
+    const text = await res.text()
+    const base = manifestUrl.slice(0, manifestUrl.lastIndexOf('/') + 1)
+
+    const initTemplate = text.match(/initialization="([^"]+)"/)?.[1]
+    const mediaTemplate = text.match(/media="([^"]+)"/)?.[1]
+    const startNum = parseInt(text.match(/startNumber="(\d+)"/)?.[1] ?? '1')
+    const repIds = [...text.matchAll(/<Representation\b[^>]*\s+id="(\d+)"/g)].map(m => m[1])
+
+    if (!initTemplate || !mediaTemplate || repIds.length === 0) return
+
+    const urls: string[] = []
+    for (const id of repIds) {
+      urls.push(base + initTemplate.replace(/\$RepresentationID\$/g, id))
+      const firstSeg = mediaTemplate
+        .replace(/\$RepresentationID\$/g, id)
+        .replace(/\$Number%0(\d+)d\$/, (_, w) => String(startNum).padStart(Number(w), '0'))
+      urls.push(base + firstSeg)
+    }
+
+    await Promise.all(urls.map(u => fetch(u, { credentials: 'include' })))
+  } catch {
+    // best-effort
+  }
+}
+
 interface VideoPlayerProps {
   manifestUrl: string
   chaptersUrl?: string
@@ -154,6 +183,8 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
       setIsLoadingPlayer(true)
       setPlayerError(null)
 
+      void prefetchFirstSegments(manifestUrl)
+
       await destroyPromiseRef.current
       if (isDisposed) return undefined
 
@@ -180,8 +211,9 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
         await player.attach(video)
 
         player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
-          const url = new URL(request.uris[0])
-          if (url.hostname !== window.location.hostname) {
+          const uri = request.uris[0]
+          const isExternal = !uri.startsWith('/') && !uri.startsWith(window.location.origin)
+          if (isExternal) {
             request.allowCrossSiteCredentials = false
           }
         })
@@ -196,7 +228,9 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
             lowLatencyMode: false,
             stallEnabled: true,
             stallThreshold: 1,
-            gapDetectionThreshold: 0.1,
+            gapDetectionThreshold: 0.5,
+            bufferingGoal: 30,
+            rebufferingGoal: 2,
           },
         })
 
@@ -204,9 +238,10 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
         const handleTracksChanged = () => scheduleChapterMarkersRender()
         const handleDurationChange = () => scheduleChapterMarkersRender()
         const handlePlayerError = (event: Event) => {
-          const detail = (event as Event & { detail?: { code?: number; message?: string; data?: unknown[] } }).detail
+          const detail = (event as Event & { detail?: { code?: number; category?: number; message?: string; data?: unknown[] } }).detail
           console.error('Shaka runtime error', detail)
-          setPlayerError('Could not play this video stream.')
+          const code = detail?.code != null ? ` (${detail.category}:${detail.code})` : ''
+          setPlayerError(`Could not play this video stream.${code}`)
         }
         const handleVideoError = () => {
           const message = formatVideoError()
@@ -341,8 +376,8 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
   }, [manifestUrl, chaptersUrl, thumbnailsUrl])
 
   return (
-    <div className={cn('kawaz-video-player', className)}>
-      <div ref={containerRef} className="relative w-full overflow-hidden rounded-lg bg-black">
+    <div className={cn('kawaz-video-player overflow-hidden rounded-lg', className)}>
+      <div ref={containerRef} className="relative w-full bg-black">
         <video ref={videoRef} className="w-full" />
       </div>
       {isLoadingPlayer && (

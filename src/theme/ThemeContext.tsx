@@ -13,7 +13,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode; }) => {
   const [theme, setTheme] = useState<Theme>(() => {
     const stored = localStorage.getItem('kawaz_theme');
     if (stored === 'light' || stored === 'dark') return stored;
-    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    return 'dark';
   });
 
   useEffect(() => {
