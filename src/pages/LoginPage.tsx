@@ -73,7 +73,7 @@ export const LoginPage = () => {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-zinc-950 px-4">
+    <div className="dark relative flex min-h-screen items-center justify-center bg-zinc-950 px-4">
       <div className="absolute inset-0 bg-linear-to-br from-zinc-900 via-zinc-950 to-black" />
 
       <div className="relative w-full max-w-sm">
