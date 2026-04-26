@@ -183,7 +183,7 @@ export const VideoPage = () => {
         manifestUrl={`/api/media/stream/${video.playUrl}`}
         chaptersUrl={video.chaptersUrl ? `/api/media/stream/${video.chaptersUrl}` : undefined}
         thumbnailsUrl={video.thumbnailsUrl ? `/api/media/stream/${video.thumbnailsUrl}` : undefined}
-        className="mb-6 overflow-hidden rounded-xl"
+        className="mb-6 rounded-xl"
       />
 
       <div className="mt-4">
