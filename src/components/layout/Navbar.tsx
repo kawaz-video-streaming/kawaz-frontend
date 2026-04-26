@@ -111,9 +111,9 @@ export const Navbar = () => {
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          {/* Processing panel (admin only) */}
+          {/* Processing panel (admin only) — hidden on mobile, BottomNav handles it there */}
           {isAdmin && (
-            <div ref={processingRef} className="relative">
+            <div ref={processingRef} className="relative hidden lg:block">
               <button
                 onClick={() => setProcessingOpen((o) => !o)}
                 className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -130,9 +130,9 @@ export const Navbar = () => {
             </div>
           )}
 
-          {/* Pending signups panel (admin only) */}
+          {/* Pending signups panel (admin only) — hidden on mobile, BottomNav handles it there */}
           {isAdmin && (
-            <div ref={signupsRef} className="relative">
+            <div ref={signupsRef} className="relative hidden lg:block">
               <button
                 onClick={() => setSignupsOpen((o) => !o)}
                 className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

@@ -66,7 +66,7 @@ const CircularProgress = ({ percentage, status }: { percentage: number; status: 
   )
 }
 
-export const MediaProcessingPanel = ({ onClose }: { onClose: () => void }) => {
+export const MediaProcessingPanel = ({ onClose, positionClass }: { onClose: () => void; positionClass?: string }) => {
   const { data: items, isLoading } = usePendingMedia(true, true)
   const { mutate: remove, isPending: isDeleting } = useDeleteMedia()
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -80,7 +80,7 @@ export const MediaProcessingPanel = ({ onClose }: { onClose: () => void }) => {
   }
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-card shadow-xl">
+    <div className={`${positionClass ?? 'absolute right-0 top-full mt-2 w-80'} rounded-xl border border-border bg-card shadow-xl`}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <h3 className="text-sm font-semibold">Media Processing</h3>

@@ -4,7 +4,7 @@ import { usePendingUsers } from '../hooks/usePendingUsers'
 import { useApproveUser } from '../hooks/useApproveUser'
 import { useDenyUser } from '../hooks/useDenyUser'
 
-export const PendingSignupsPanel = ({ onClose }: { onClose: () => void }) => {
+export const PendingSignupsPanel = ({ onClose, positionClass }: { onClose: () => void; positionClass?: string }) => {
   const { data: users, isLoading } = usePendingUsers(true, true)
   const { mutate: approve, isPending: approving } = useApproveUser()
   const { mutate: deny, isPending: denying } = useDenyUser()
@@ -12,7 +12,7 @@ export const PendingSignupsPanel = ({ onClose }: { onClose: () => void }) => {
   const busy = approving || denying
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-card shadow-xl">
+    <div className={`${positionClass ?? 'absolute right-0 top-full mt-2 w-80'} rounded-xl border border-border bg-card shadow-xl`}>
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <h3 className="text-sm font-semibold">Pending Signups</h3>
         <button
