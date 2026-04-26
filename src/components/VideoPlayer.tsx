@@ -269,6 +269,9 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
 
         if (isDisposed) return undefined
 
+        await player.load(manifestUrl)
+        if (isDisposed) return
+
         uiOverlay = new shaka.ui.Overlay(player, container, video)
 
         uiOverlay.configure({
@@ -278,9 +281,6 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
           ],
           seekBarColors: { chapters: 'rgb(220 38 38)' },
         })
-
-        await player.load(manifestUrl)
-        if (isDisposed) return
 
         if (chaptersUrl) {
           try {
@@ -376,8 +376,8 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
   }, [manifestUrl, chaptersUrl, thumbnailsUrl])
 
   return (
-    <div className={cn('kawaz-video-player overflow-hidden rounded-lg', className)}>
-      <div ref={containerRef} className="relative w-full bg-black">
+    <div className={cn('kawaz-video-player rounded-lg', className)}>
+      <div ref={containerRef} className="relative w-full">
         <video ref={videoRef} className="w-full" />
       </div>
       {isLoadingPlayer && (
