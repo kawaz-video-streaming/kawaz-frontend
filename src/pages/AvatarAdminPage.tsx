@@ -135,10 +135,10 @@ const UploadForm = ({ onClose }: { onClose: () => void }) => {
 
 const AvatarCard = ({ avatar, onDelete }: { avatar: Avatar; onDelete: (id: string) => void }) => (
   <div className="relative flex flex-col items-center gap-2 p-2">
-    <div className="h-48 w-48 overflow-hidden rounded-full ring-1 ring-border">
+    <div className="h-24 w-24 sm:h-36 sm:w-36 lg:h-48 lg:w-48 overflow-hidden rounded-full ring-1 ring-border">
       <img src={avatarImageUrl(avatar._id)} alt={avatar.name} className="h-full w-full object-cover" />
     </div>
-    <span className="max-w-48 truncate text-xs font-medium">{avatar.name}</span>
+    <span className="w-24 sm:w-36 lg:w-48 truncate text-center text-xs font-medium">{avatar.name}</span>
     <button
       onClick={() => onDelete(avatar._id)}
       className="absolute right-0 top-0 rounded-full bg-background p-1.5 text-muted-foreground shadow ring-1 ring-border transition-colors hover:text-red-500"
@@ -169,17 +169,18 @@ export const AvatarAdminPage = () => {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Avatars</h1>
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Avatars</h1>
           <p className="mt-1 text-sm text-muted-foreground">Manage the avatar catalog</p>
         </div>
         <button
           onClick={() => setShowUpload(true)}
-          className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+          className="flex shrink-0 items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 sm:px-4"
         >
           <Plus size={16} />
-          Upload Avatar
+          <span className="hidden sm:inline">Upload Avatar</span>
+          <span className="sm:hidden">Upload</span>
         </button>
       </div>
 

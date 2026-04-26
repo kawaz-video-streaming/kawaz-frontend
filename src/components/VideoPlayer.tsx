@@ -75,6 +75,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
     let uiOverlay: { configure(config: object): void; destroy(): Promise<void>; } | null = null;
     let markerRenderRetryTimer: number | null = null;
     let stallRecoveryTimer: number | null = null;
+    let resizeObserver: ResizeObserver | null = null;
 
     const removeChapterMarkers = () => {
       const seekBarContainer = containerRef.current?.querySelector<HTMLElement>('.shaka-seek-bar-container');
@@ -290,13 +291,23 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
 
         uiOverlay = new shaka.ui.Overlay(player, container, video);
 
-        uiOverlay.configure({
-          controlPanelElements: [
-            'play_pause', 'time_and_duration', 'mute', 'volume', 'spacer',
-            'captions', 'language', 'chapter', 'overflow_menu', 'fullscreen',
-          ],
-          seekBarColors: { chapters: 'rgb(220 38 38)' },
-        });
+        let currentCompact: boolean | null = null;
+        const reconfigureUI = () => {
+          if (!uiOverlay) return;
+          const compact = container.clientWidth < 640;
+          if (compact === currentCompact) return;
+          currentCompact = compact;
+          uiOverlay.configure({
+            controlPanelElements: compact
+              ? ['play_pause', 'time_and_duration', 'mute', 'spacer', 'overflow_menu', 'fullscreen']
+              : ['play_pause', 'time_and_duration', 'mute', 'volume', 'spacer', 'captions', 'language', 'chapter', 'overflow_menu', 'fullscreen'],
+            seekBarColors: { chapters: 'rgb(220 38 38)' },
+          });
+          requestAnimationFrame(() => (player as unknown as EventTarget)?.dispatchEvent(new Event('variantchanged')));
+        };
+        reconfigureUI();
+        resizeObserver = new ResizeObserver(reconfigureUI);
+        resizeObserver.observe(container);
 
         if (chaptersUrl) {
           try {
@@ -318,6 +329,8 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
         }
 
         return () => {
+          resizeObserver?.disconnect();
+          resizeObserver = null;
           clearStallRecoveryTimer();
           player?.removeEventListener('trackschanged', handleTracksChanged);
           player?.removeEventListener('error', handlePlayerError);
@@ -345,6 +358,8 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
 
     return () => {
       isDisposed = true;
+      resizeObserver?.disconnect();
+      resizeObserver = null;
       cleanupPlayerListeners?.();
       clearStallRecoveryTimer();
       if (markerRenderRetryTimer !== null) window.clearTimeout(markerRenderRetryTimer);

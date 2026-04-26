@@ -64,6 +64,8 @@ const SectionCarousel = ({
   const viewportRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const animationTimeoutRef = useRef<number | null>(null)
+  const touchStartXRef = useRef(0)
+  const touchStartYRef = useRef(0)
   const [hasOverflow, setHasOverflow] = useState(false)
   const [orderedItems, setOrderedItems] = useState(items)
   const [translateX, setTranslateX] = useState(0)
@@ -161,7 +163,19 @@ const SectionCarousel = ({
 
   return (
     <div className="relative">
-      <div ref={viewportRef} className="overflow-hidden">
+      <div
+        ref={viewportRef}
+        className="overflow-hidden"
+        onTouchStart={(e) => {
+          touchStartXRef.current = e.touches[0].clientX
+          touchStartYRef.current = e.touches[0].clientY
+        }}
+        onTouchEnd={(e) => {
+          const dx = touchStartXRef.current - e.changedTouches[0].clientX
+          const dy = Math.abs(touchStartYRef.current - e.changedTouches[0].clientY)
+          if (Math.abs(dx) > 50 && Math.abs(dx) > dy) rotateItems(dx > 0 ? 'right' : 'left')
+        }}
+      >
         <div
           ref={trackRef}
           className={[
