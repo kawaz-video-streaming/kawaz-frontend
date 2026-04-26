@@ -236,6 +236,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
             stallEnabled: true,
             stallThreshold: 1,
             gapDetectionThreshold: 0.5,
+            smallGapLimit: 0.5,
             bufferingGoal: 15,
             rebufferingGoal: 2,
           },
