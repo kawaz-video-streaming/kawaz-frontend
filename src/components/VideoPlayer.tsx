@@ -382,8 +382,8 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
 
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
-      <div ref={containerRef} className="relative w-full">
-        <video ref={videoRef} className="w-full" />
+      <div ref={containerRef} className="relative w-full aspect-video">
+        <video ref={videoRef} className="absolute inset-0 w-full h-full object-contain" />
       </div>
       {isLoadingPlayer && (
         <p className="mt-2 text-sm text-muted-foreground">Loading player...</p>
