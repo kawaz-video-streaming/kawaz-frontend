@@ -18,12 +18,17 @@ const initiateUploadResponseSchema = z.object({
   thumbnailUploadUrl: z.string(),
 });
 
-const putToStorage = async (url: string, file: File): Promise<void> => {
-  const res = await fetch(url, { method: 'PUT', body: file });
-  if (!res.ok) {
-    throw new Error(`Storage upload failed: ${res.status} ${res.statusText}`);
-  }
-};
+const putToStorage = (url: string, file: File): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Storage upload failed: ${xhr.status} ${xhr.statusText}`));
+    };
+    xhr.onerror = () => reject(new Error('Storage upload failed: network error'));
+    xhr.send(file);
+  });
 
 export const uploadMedia = async ({ file, title, description, tags, thumbnail, thumbnailFocalPoint, collectionId }: UploadMediaParams): Promise<{ message: string; }> => {
   const raw = await apiRequest<unknown>('/media/upload/initiate', {
