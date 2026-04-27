@@ -6,11 +6,13 @@ React and Vite frontend for the Kawaz+ video streaming platform.
 
 - Cookie-based authentication backed by `kawaz-token` HttpOnly cookie
 - Netflix-style profile picker (per-user profiles with avatar selection)
-- Home page with tag-filtered carousels and navbar search
+- Home page with tag-filtered carousels and full-screen search overlay
 - Video playback via Shaka Player with audio language and caption track switching
 - Collections — nested media groupings with topographic tree picker
 - Admin: media upload, collection creation, avatar catalog management
 - Live media processing panel (admin) — polls in-flight uploads with circular progress bars
+- Pending signup queue (admin) — approve or deny new user registrations
+- Mobile-first bottom navigation bar for admin actions (upload, collections, avatars, processing, signups)
 
 ## Tech Stack
 
@@ -91,7 +93,7 @@ All requests go through `VITE_BACKEND_URL`:
 
 **Auth**
 - `POST /auth/login` — login, sets `kawaz-token` HttpOnly cookie
-- `POST /auth/signup` — register
+- `POST /auth/signup` — register (creates a pending user if signup approval is required)
 - `GET /user/me` — returns `{ username, role }` for the current session
 
 **Media**
@@ -120,6 +122,11 @@ All requests go through `VITE_BACKEND_URL`:
 - `GET /avatar/:id/image` — avatar image (302 → presigned S3)
 - `POST /avatar` — upload avatar (admin)
 - `DELETE /avatar/:id` — delete avatar (admin)
+
+**Admin**
+- `GET /admin/pending` — list pending user signups (admin)
+- `POST /admin/pending/:username/approve` — approve a pending signup (admin)
+- `POST /admin/pending/:username/deny` — deny a pending signup (admin)
 
 ## Repository
 
