@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev       # Start dev server at http://localhost:3000
+npm run dev       # Start dev server (node with increased header size limit)
 npm run build     # Type-check then build for production (tsc -b && vite build)
-npm run preview   # Preview production build
+npm run preview   # Build then preview production build
 npm run clean     # Delete dist/
 ```
 
@@ -30,6 +30,7 @@ VITE_BACKEND_URL=http://localhost:8080  # Main backend API
 - **`src/api/mediaCollection.ts`** — Collection CRUD.
 - **`src/api/avatar.ts`** — Avatar catalog: list, image URL helper, upload (admin), delete (admin).
 - **`src/api/user.ts`** — User profile CRUD: get, create, update (change avatar), delete.
+- **`src/api/admin.ts`** — Admin user approval: `getPendingUsers()`, `approveUser(username)`, `denyUser(username)`.
 
 ### Auth
 
@@ -37,7 +38,17 @@ VITE_BACKEND_URL=http://localhost:8080  # Main backend API
 
 ### Data Fetching
 
-TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`. `useVideo(id)` fetches video metadata from `/media/videos/:id` and validates the response shape with Zod. `useVideos()` fetches the full video list from `/media/videos`. Profile and avatar hooks follow the same pattern.
+TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`.
+
+**Query hooks:**
+- `useVideo(id)` — fetches single video metadata from `/media/videos/:id`, validates with Zod
+- `useVideos()` — fetches full video list from `/media/videos`
+- `useCollection(id)` / `useCollections()` — collection data
+- `useProfiles()` / `useAvatars()` — profile and avatar data
+- `usePendingMedia(enabled, panelOpen)` — polls in-flight uploads; refetches every 3s when panel is open, 10s when closed
+- `usePendingUsers(enabled, panelOpen)` — polls pending signup queue; refetches every 10s when panel is open, 30s when closed
+
+**Mutation hooks:** `useUploadMedia`, `useUpdateMedia`, `useDeleteMedia`, `useCreateProfile`, `useUpdateProfile`, `useDeleteProfile`, `useCreateCollection`, `useUpdateCollection`, `useDeleteCollection`, `useUploadAvatar`, `useDeleteAvatar`, `useApproveUser`, `useDenyUser`.
 
 ### Video Player
 
@@ -67,13 +78,24 @@ After login, users land on `/profiles`. Selecting a profile stores it in `AuthCo
 
 - **ProfilesPage** — Netflix-style profile picker. No navbar. Users select a profile to enter the app. Supports creating (name + avatar picker dialog) and deleting profiles. The avatar picker dialog is a separate modal showing only images grouped by category.
 - **AvatarAdminPage** — Admin-only. Shows all avatar categories (always, even if empty) with fixed-height rows. Supports uploading new avatars (name, category from fixed enum, image) and deleting existing ones with a confirmation dialog.
-- **Navbar** — Logo/welcome message is absolutely centered on screen (`absolute left-1/2 -translate-x-1/2`) so it stays centered regardless of content on either side. Right section contains: `NavSearch`, theme toggle, admin processing panel, avatar menu. Admin nav links (Upload, New Collection, Avatars) shown only for admins on the left.
-- **NavSearch** (`src/components/NavSearch.tsx`) — Search input in the Navbar right section. Calls `useVideos()` and `useCollections()` directly (TanStack Query serves cached data, no extra requests). Filters top-level items (no `collectionId`) by title and description substring match. Results appear in a dropdown anchored `right-0` (stays on screen) with portrait thumbnails. Closes on outside click or Escape.
-- **MediaProcessingPanel** (`src/components/MediaProcessingPanel.tsx`) — Dropdown panel listing all non-ready media with SVG circular progress bars (floored %). Color-coded by status: yellow=pending, blue=processing, red=failed. Closes on outside click.
+- **Navbar** (`src/components/layout/Navbar.tsx`) — Sticky top bar. Left: admin nav links (Upload, New Collection, Avatars) shown only for admins on `lg+` screens. Center: Kawaz+ logo and welcome message. Right: theme toggle, admin processing panel (`hidden lg:block`), admin pending signups panel (`hidden lg:block`), search icon, avatar menu. The admin panels are hidden on mobile — `BottomNav` handles them there.
+- **BottomNav** (`src/components/layout/BottomNav.tsx`) — Mobile-only (`lg:hidden`), admin-only fixed bottom bar. Contains links to Upload, Collection, Avatars and toggle buttons for the MediaProcessingPanel and PendingSignupsPanel (both rendered as `fixed inset-x-4 bottom-20` overlays). Shows badge counts on the panel buttons. Uses `env(safe-area-inset-bottom)` for notch padding.
+- **NavSearch** (`src/components/NavSearch.tsx`) — Full-screen search overlay, opened by the search icon button in the Navbar. Calls `useVideos()` and `useCollections()` directly (TanStack Query serves cached data, no extra requests). Filters top-level items (no `collectionId`) by title and description substring match. Results appear with portrait thumbnails. Closes on outside click or Escape.
+- **MediaProcessingPanel** (`src/components/MediaProcessingPanel.tsx`) — Dropdown/overlay panel listing all non-ready media with SVG circular progress bars (floored %). Color-coded by status: yellow=pending, blue=processing, red=failed. Supports deleting failed items. Closes on outside click.
+- **PendingSignupsPanel** (`src/components/PendingSignupsPanel.tsx`) — Admin-only dropdown/overlay listing pending user signups (name + email). Approve button acts immediately; Deny requires a second confirmation click. Powered by `usePendingUsers`, `useApproveUser`, `useDenyUser`.
 
 ### Avatar Categories (fixed enum)
 
 `France` | `Israel` | `Japan` | `United Kingdom` | `United States`
+
+### Theme
+
+`ThemeContext` (`src/theme/ThemeContext.tsx`) provides `theme` and `toggleTheme()`, persisted to `localStorage`. Consumed via `useTheme()`.
+
+### Constants & Utilities
+
+- **`src/constants/tags.ts`** — `MEDIA_TAGS` array (Action, Fantasy, Adventure, Superhero, Anime, Animation, Comedy, Parody, Crime, Documentary, Drama, Education, Horror, Kids, Music, News, Romance, Sci-Fi, Sport, Thriller). Used for tag filtering on the home page and upload form.
+- **`src/lib/focalPoints.ts`** — `getFocalCropArea()` and `getObjectPositionFromFocalPoint()` for focal-point-aware thumbnail cropping.
 
 ### UI Components
 
