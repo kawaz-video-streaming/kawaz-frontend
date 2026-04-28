@@ -34,6 +34,7 @@ export const App = () => (
           <Route index element={<HomePage />} />
           <Route path="upload" element={<UploadPage />} />
           <Route path="videos/:id" element={<VideoPage />} />
+          <Route path="collections/:collectionId/videos/:id" element={<VideoPage />} />
           <Route path="collections/:id" element={<CollectionPage />} />
           <Route path="collections/new" element={<CreateCollectionPage />} />
           <Route path="admin/avatars" element={<AvatarAdminPage />} />

@@ -406,6 +406,28 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
     };
   }, [manifestUrl, chaptersUrl, thumbnailsUrl]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const video = videoRef.current;
+      if (!video) return;
+      const active = document.activeElement;
+      const playerFocused =
+        active === document.body ||
+        active === document.documentElement ||
+        !!containerRef.current?.contains(active);
+      if (!playerFocused) return;
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        video.volume = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        video.volume = Math.max(0, Math.round((video.volume - 0.1) * 10) / 10);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
       <div ref={containerRef} className="relative w-full">

@@ -419,7 +419,7 @@ export const CollectionPage = () => {
             ) : (
               <button
                 key={item.data._id}
-                onClick={() => void navigate(`/videos/${item.data._id}`)}
+                onClick={() => void navigate(`/collections/${id}/videos/${item.data._id}`)}
                 className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
               >
                 <div className="relative w-full pt-[56.25%]">
