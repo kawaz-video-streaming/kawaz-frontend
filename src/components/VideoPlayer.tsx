@@ -50,6 +50,8 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
   const destroyPromiseRef = useRef<Promise<void>>(Promise.resolve());
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
+  const [volumeDisplay, setVolumeDisplay] = useState<number | null>(null);
+  const volumeHideTimer = useRef<number | null>(null);
 
   const formatVideoError = () => {
     const error = videoRef.current?.error;
@@ -407,6 +409,12 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
   }, [manifestUrl, chaptersUrl, thumbnailsUrl]);
 
   useEffect(() => {
+    const showVolume = (vol: number) => {
+      setVolumeDisplay(Math.round(vol * 100));
+      if (volumeHideTimer.current !== null) window.clearTimeout(volumeHideTimer.current);
+      volumeHideTimer.current = window.setTimeout(() => setVolumeDisplay(null), 1500);
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const video = videoRef.current;
       if (!video) return;
@@ -418,20 +426,32 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
       if (!playerFocused) return;
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        video.volume = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
+        const next = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
+        video.volume = next;
+        showVolume(next);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        video.volume = Math.max(0, Math.round((video.volume - 0.1) * 10) / 10);
+        const next = Math.max(0, Math.round((video.volume - 0.1) * 10) / 10);
+        video.volume = next;
+        showVolume(next);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (volumeHideTimer.current !== null) window.clearTimeout(volumeHideTimer.current);
+    };
   }, []);
 
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
       <div ref={containerRef} className="relative w-full">
         <video ref={videoRef} className="w-full" />
+        {volumeDisplay !== null && (
+          <div className="pointer-events-none absolute left-1/2 top-6 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm">
+            {volumeDisplay === 0 ? 'Muted' : `Volume ${volumeDisplay}%`}
+          </div>
+        )}
       </div>
       {isLoadingPlayer && (
         <p className="mt-2 text-sm text-muted-foreground">Loading player...</p>
