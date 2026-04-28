@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { Input } from '../components/ui/input'
 import { useAuth } from '../auth/useAuth'
 
-type Mode = 'login' | 'signup'
+type Mode = 'login' | 'signup' | 'forgot'
 
 const validateUsername = (v: string) => v.length >= 3
 const validatePassword = (v: string) => v.length >= 12
@@ -26,7 +26,10 @@ export const LoginPage = () => {
   const usernameValid = validateUsername(username)
   const passwordValid = validatePassword(password)
   const emailValid = validateEmail(email)
-  const canSubmit = usernameValid && passwordValid && (mode === 'login' || emailValid)
+  const canSubmit =
+    mode === 'forgot'
+      ? emailValid
+      : usernameValid && passwordValid && (mode === 'login' || emailValid)
 
   const switchMode = (next: Mode) => {
     setMode(next)
@@ -39,6 +42,23 @@ export const LoginPage = () => {
 
     setLoading(true)
     setInlineMessage(null)
+
+    if (mode === 'forgot') {
+      try {
+        await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        })
+        setInlineMessage({ type: 'success', text: 'If that email is registered, a reset link has been sent.' })
+      } catch {
+        setInlineMessage({ type: 'success', text: 'If that email is registered, a reset link has been sent.' })
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     try {
       const path = mode === 'login' ? '/auth/login' : '/auth/signup'
       const body = mode === 'login'
@@ -82,30 +102,13 @@ export const LoginPage = () => {
             Kawaz<span className="text-red-500">+</span>
           </h1>
           <p className="mt-3 text-sm text-zinc-400">
-            {mode === 'login' ? 'Sign in to continue watching' : 'Create your account'}
+            {mode === 'login' ? 'Sign in to continue watching' : mode === 'signup' ? 'Create your account' : 'Reset your password'}
           </p>
         </div>
 
         <div className="rounded-2xl bg-zinc-900/80 p-8 shadow-2xl ring-1 ring-white/10 backdrop-blur-sm">
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            <div className="flex flex-col gap-1.5">
-              <Input
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                onBlur={() => setUsernameTouched(true)}
-                className={[
-                  'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
-                  usernameTouched && !usernameValid ? 'bg-red-950/60 border-red-700' : '',
-                ].join(' ')}
-              />
-              {usernameTouched && !usernameValid && (
-                <p className="text-xs text-red-400">Username must be at least 3 characters</p>
-              )}
-            </div>
-
-            {mode === 'signup' && (
+            {mode === 'forgot' ? (
               <div className="flex flex-col gap-1.5">
                 <Input
                   type="email"
@@ -122,24 +125,62 @@ export const LoginPage = () => {
                   <p className="text-xs text-red-400">Enter a valid email address</p>
                 )}
               </div>
-            )}
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Input
+                    type="text"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    onBlur={() => setUsernameTouched(true)}
+                    className={[
+                      'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
+                      usernameTouched && !usernameValid ? 'bg-red-950/60 border-red-700' : '',
+                    ].join(' ')}
+                  />
+                  {usernameTouched && !usernameValid && (
+                    <p className="text-xs text-red-400">Username must be at least 3 characters</p>
+                  )}
+                </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onBlur={() => setPasswordTouched(true)}
-                className={[
-                  'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
-                  passwordTouched && !passwordValid ? 'bg-red-950/60 border-red-700' : '',
-                ].join(' ')}
-              />
-              {passwordTouched && !passwordValid && (
-                <p className="text-xs text-red-400">Password must be at least 12 characters</p>
-              )}
-            </div>
+                {mode === 'signup' && (
+                  <div className="flex flex-col gap-1.5">
+                    <Input
+                      type="email"
+                      placeholder="Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      onBlur={() => setEmailTouched(true)}
+                      className={[
+                        'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
+                        emailTouched && !emailValid ? 'bg-red-950/60 border-red-700' : '',
+                      ].join(' ')}
+                    />
+                    {emailTouched && !emailValid && (
+                      <p className="text-xs text-red-400">Enter a valid email address</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <Input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onBlur={() => setPasswordTouched(true)}
+                    className={[
+                      'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
+                      passwordTouched && !passwordValid ? 'bg-red-950/60 border-red-700' : '',
+                    ].join(' ')}
+                  />
+                  {passwordTouched && !passwordValid && (
+                    <p className="text-xs text-red-400">Password must be at least 12 characters</p>
+                  )}
+                </div>
+              </>
+            )}
 
             {inlineMessage && (
               <p className={[
@@ -158,16 +199,30 @@ export const LoginPage = () => {
               className="mt-1 w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {loading
-                ? mode === 'login' ? 'Signing in...' : 'Creating account...'
-                : mode === 'login' ? 'Sign in' : 'Sign up'}
+                ? mode === 'login' ? 'Signing in...' : mode === 'signup' ? 'Creating account...' : 'Sending...'
+                : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Sign up' : 'Send reset link'}
             </button>
+
+            {mode === 'login' && (
+              <button
+                type="button"
+                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors -mt-2"
+                onClick={() => switchMode('forgot')}
+              >
+                Forgot password?
+              </button>
+            )}
 
             <button
               type="button"
               className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
-              onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}
+              onClick={() => switchMode(mode === 'forgot' ? 'login' : mode === 'login' ? 'signup' : 'login')}
             >
-              {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              {mode === 'login'
+                ? "Don't have an account? Sign up"
+                : mode === 'signup'
+                  ? 'Already have an account? Sign in'
+                  : 'Back to sign in'}
             </button>
           </form>
         </div>
