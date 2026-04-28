@@ -1,9 +1,10 @@
-import { Captions, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { MEDIA_TAGS } from '../constants/tags';
 import type { Coordinates } from '../types/api';
 import { useVideo } from '../hooks/useVideo';
+import { useVideos } from '../hooks/useVideos';
 import { useUpdateMedia } from '../hooks/useUpdateMedia';
 import { useDeleteMedia } from '../hooks/useDeleteMedia';
 import { useCollections } from '../hooks/useCollections';
@@ -61,13 +62,14 @@ const FocalPointPicker = ({
 };
 
 export const VideoPage = () => {
-  const { id } = useParams<{ id: string; }>();
+  const { id, collectionId: routeCollectionId } = useParams<{ id: string; collectionId?: string }>();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { data: video, isError, isLoading } = useVideo(id ?? '');
   const { mutate: update, isPending: isUpdating } = useUpdateMedia(id ?? '');
   const { mutate: remove, isPending: isDeleting } = useDeleteMedia();
   const { data: collections } = useCollections();
+  const { data: allVideos } = useVideos();
 
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
@@ -152,8 +154,17 @@ export const VideoPage = () => {
 
   const handleDelete = () => {
     if (!id) return;
-    remove(id, { onSuccess: () => void navigate('/') });
+    remove(id, {
+      onSuccess: () => void navigate(routeCollectionId ? `/collections/${routeCollectionId}` : '/'),
+    });
   };
+
+  const siblings = allVideos
+    ?.filter((v) => v.collectionId === routeCollectionId)
+    .sort((a, b) => a.title.localeCompare(b.title)) ?? [];
+  const currentIndex = siblings.findIndex((v) => v._id === id);
+  const prevVideo = currentIndex > 0 ? siblings[currentIndex - 1] : null;
+  const nextVideo = currentIndex < siblings.length - 1 ? siblings[currentIndex + 1] : null;
 
   if (isLoading) {
     return (
@@ -179,12 +190,66 @@ export const VideoPage = () => {
 
   return (
     <div className="mx-auto max-w-6xl">
+      {routeCollectionId && collections && (() => {
+        const chain: { _id: string; title: string }[] = []
+        let currentId: string | undefined = routeCollectionId
+        while (currentId) {
+          const col = collections.find((c) => c._id === currentId)
+          if (!col) break
+          chain.unshift(col)
+          currentId = col.collectionId
+        }
+        if (chain.length === 0) return null
+        return (
+          <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Link to="/" className="transition-colors hover:text-foreground">Home</Link>
+            {chain.map((col) => (
+              <>
+                <ChevronRight key={`sep-${col._id}`} size={14} />
+                <Link key={col._id} to={`/collections/${col._id}`} className="transition-colors hover:text-foreground">
+                  {col.title}
+                </Link>
+              </>
+            ))}
+            <ChevronRight size={14} />
+            <span className="text-foreground">{video.title}</span>
+          </nav>
+        )
+      })()}
+
       <VideoPlayer
         manifestUrl={`/api/media/stream/${video.playUrl}`}
         chaptersUrl={video.chaptersUrl ? `/api/media/stream/${video.chaptersUrl}` : undefined}
         thumbnailsUrl={video.thumbnailsUrl ? `/api/media/stream/${video.thumbnailsUrl}` : undefined}
         className="mb-6 rounded-xl"
       />
+
+      {routeCollectionId && (prevVideo || nextVideo) && (
+        <div className="mb-4 flex items-center justify-between gap-2">
+          {prevVideo ? (
+            <Link
+              to={`/collections/${routeCollectionId}/videos/${prevVideo._id}`}
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-red-500 hover:text-foreground"
+            >
+              <ChevronLeft size={16} />
+              <span className="max-w-[180px] truncate">{prevVideo.title}</span>
+            </Link>
+          ) : (
+            <div />
+          )}
+          {nextVideo ? (
+            <Link
+              to={`/collections/${routeCollectionId}/videos/${nextVideo._id}`}
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-red-500 hover:text-foreground"
+            >
+              <span className="max-w-[180px] truncate">{nextVideo.title}</span>
+              <ChevronRight size={16} />
+            </Link>
+          ) : (
+            <div />
+          )}
+        </div>
+      )}
 
       <div className="mt-4">
         {editing ? (
