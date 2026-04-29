@@ -1,21 +1,21 @@
-import { CheckCircle, FileVideo, Image, Loader2, UploadCloud, X } from 'lucide-react'
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type SyntheticEvent } from 'react'
-import { useNavigate } from 'react-router'
-import { toast } from 'sonner'
-import type { Coordinates, MediaKind } from '../types/api'
-import { useUploadMedia } from '../hooks/useUploadMedia'
-import { useCollections } from '../hooks/useCollections'
-import { useGenres } from '../hooks/useGenres'
-import { getFocalCropArea } from '../lib/focalPoints'
-import { buildTopographicList } from '../lib/collections'
+import { CheckCircle, FileVideo, Image, Loader2, UploadCloud, X } from 'lucide-react';
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type SyntheticEvent } from 'react';
+import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
+import type { Coordinates, MediaKind } from '../types/api';
+import { useUploadMedia } from '../hooks/useUploadMedia';
+import { useCollections } from '../hooks/useCollections';
+import { useGenres } from '../hooks/useGenres';
+import { getFocalCropArea } from '../lib/focalPoints';
+import { buildTopographicList } from '../lib/collections';
 
-const MAX_SIZE = 10 * 1024 ** 3 // 10 GB
+const MAX_SIZE = 10 * 1024 ** 3; // 10 GB
 
 const formatSize = (bytes: number) => {
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`
-  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(2)} MB`
-  return `${(bytes / 1024).toFixed(2)} KB`
-}
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(2)} MB`;
+  return `${(bytes / 1024).toFixed(2)} KB`;
+};
 
 const ThumbnailFocalPointPicker = ({
   previewUrl,
@@ -23,29 +23,29 @@ const ThumbnailFocalPointPicker = ({
   onChange,
   aspectRatio = 2 / 3,
 }: {
-  previewUrl: string
-  value: Coordinates
-  onChange: (focal: Coordinates) => void
-  aspectRatio?: number
+  previewUrl: string;
+  value: Coordinates;
+  onChange: (focal: Coordinates) => void;
+  aspectRatio?: number;
 }) => {
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number; } | null>(null);
 
   const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
-  }
+    setNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
+  };
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
+    const rect = e.currentTarget.getBoundingClientRect();
     onChange({
       x: Math.round(((e.clientX - rect.left) / rect.width) * 100) / 100,
       y: Math.round(((e.clientY - rect.top) / rect.height) * 100) / 100,
-    })
-  }
+    });
+  };
 
-  const crop = naturalSize ? getFocalCropArea(naturalSize, value, aspectRatio) : null
+  const crop = naturalSize ? getFocalCropArea(naturalSize, value, aspectRatio) : null;
 
   return (
-    <div className="relative w-full cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
+    <div className="relative mx-auto max-w-[300px] cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
       <img src={previewUrl} alt="Thumbnail preview" className="block w-full" draggable={false} onLoad={handleLoad} />
       {crop && (
         <div
@@ -59,114 +59,189 @@ const ThumbnailFocalPointPicker = ({
         />
       )}
     </div>
-  )
-}
+  );
+};
 
 export const UploadPage = () => {
-  const navigate = useNavigate()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const thumbnailInputRef = useRef<HTMLInputElement>(null)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [genres, setGenres] = useState<string[]>([])
-  const [kind, setKind] = useState<MediaKind>('movie')
-  const [episodeNumber, setEpisodeNumber] = useState<string>('')
-  const [thumbnail, setThumbnail] = useState<File | null>(null)
-  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
-  const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 })
-  const [collectionId, setCollectionId] = useState<string>('')
-  const { mutate: upload, isPending, isSuccess, reset } = useUploadMedia()
-  const { data: collections } = useCollections()
-  const { data: genreOptions } = useGenres()
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [genres, setGenres] = useState<string[]>([]);
+  const [kind, setKind] = useState<MediaKind>('movie');
+  const [episodeNumber, setEpisodeNumber] = useState<string>('');
+  const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 });
+  const [collectionId, setCollectionId] = useState<string>('');
+  const { mutate: upload, isPending, isSuccess, reset } = useUploadMedia();
+  const { data: collections } = useCollections();
+  const { data: genreOptions } = useGenres();
+
+  const collectionOptions = kind === 'episode'
+    ? (collections ?? []).filter((collection) => collection.kind === 'season')
+    : buildTopographicList(collections ?? [])
+      .map(({ item }) => item)
+      .filter((collection) => collection.kind === 'collection');
+
+  const seasonGroups = (() => {
+    const allCollections = collections ?? [];
+    const titleById = new Map(allCollections.map((collection) => [collection._id, collection.title]));
+    const groups = new Map<string, { label: string; seasons: typeof collectionOptions; }>();
+
+    allCollections
+      .filter((collection) => collection.kind === 'season')
+      .forEach((season) => {
+        const groupKey = season.collectionId ?? '__ungrouped__';
+        const groupLabel = season.collectionId
+          ? (titleById.get(season.collectionId) ?? 'Unknown Show')
+          : 'Unnested Seasons';
+
+        if (!groups.has(groupKey)) {
+          groups.set(groupKey, { label: groupLabel, seasons: [] });
+        }
+
+        groups.get(groupKey)?.seasons.push(season);
+      });
+
+    return [...groups.entries()]
+      .map(([key, value]) => ({
+        key,
+        label: value.label,
+        seasons: [...value.seasons].sort((a, b) => a.title.localeCompare(b.title)),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  })();
 
   useEffect(() => {
-    if (!isPending) return
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [isPending])
+    if (!collectionId) return;
+    const selectedCollection = (collections ?? []).find((collection) => collection._id === collectionId);
+    const isValidSelection = kind === 'episode'
+      ? selectedCollection?.kind === 'season'
+      : selectedCollection?.kind === 'collection';
+    if (!isValidSelection) {
+      setCollectionId('');
+    }
+  }, [kind, collectionId, collections]);
+
+  useEffect(() => {
+    if (!isPending) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isPending]);
 
   const applyFile = (file: File | null) => {
     if (file && !file.type.startsWith('video/')) {
       toast.error('Only video files are supported', {
         style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
-      })
-      return
+      });
+      return;
     }
     if (file && file.size > MAX_SIZE) {
       toast.error('File exceeds the 10 GB limit', {
         style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
-      })
-      return
+      });
+      return;
     }
-    setSelectedFile(file)
+    setSelectedFile(file);
     if (!file) {
-      setTitle('')
-      setDescription('')
-      setGenres([])
-      setKind('movie')
-      setEpisodeNumber('')
-      setCollectionId('')
-      removeThumbnail()
+      setTitle('');
+      setDescription('');
+      setGenres([]);
+      setKind('movie');
+      setEpisodeNumber('');
+      setCollectionId('');
+      removeThumbnail();
     }
-    reset()
-  }
+    reset();
+  };
 
   const removeThumbnail = () => {
-    setThumbnail(null)
-    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview)
-    setThumbnailPreview(null)
-    setThumbnailFocalPoint({ x: 0.5, y: 0.5 })
-    if (thumbnailInputRef.current) thumbnailInputRef.current.value = ''
-  }
+    setThumbnail(null);
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setThumbnailPreview(null);
+    setThumbnailFocalPoint({ x: 0.5, y: 0.5 });
+    if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
+  };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    applyFile(e.target.files?.[0] ?? null)
-  }
+    applyFile(e.target.files?.[0] ?? null);
+  };
 
   const handleThumbnailChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null
-    if (!file) return
+    const file = e.target.files?.[0] ?? null;
+    if (!file) return;
     if (!file.type.startsWith('image/')) {
       toast.error('Only image files are supported for thumbnails', {
         style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
-      })
-      return
+      });
+      return;
     }
-    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview)
-    setThumbnail(file)
-    setThumbnailPreview(URL.createObjectURL(file))
-    setThumbnailFocalPoint({ x: 0.5, y: 0.5 })
-  }
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setThumbnail(file);
+    setThumbnailPreview(URL.createObjectURL(file));
+    setThumbnailFocalPoint({ x: 0.5, y: 0.5 });
+  };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setIsDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) applyFile(file)
-  }
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) applyFile(file);
+  };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
+    e.preventDefault();
+    setIsDragging(true);
+  };
 
-  const handleDragLeave = () => setIsDragging(false)
+  const handleDragLeave = () => setIsDragging(false);
 
   const toggleGenre = (id: string) =>
-    setGenres((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id])
+    setGenres((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]);
+
+  const parseEpisodeNumber = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    if (!Number.isInteger(parsed) || parsed < 1) return null;
+    return parsed;
+  };
 
   const handleSubmit = (e: SyntheticEvent) => {
-    e.preventDefault()
-    if (!selectedFile || !title.trim() || !thumbnail) return
-    const epNum = kind === 'episode' && episodeNumber.trim() ? parseInt(episodeNumber, 10) : undefined
+    e.preventDefault();
+    if (!selectedFile || !title.trim() || !thumbnail) return;
+    if (kind === 'episode' && !collectionId) {
+      toast.error('An episode must belong to a season', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      });
+      return;
+    }
+    if (kind === 'movie' && collectionId) {
+      const selectedCollection = (collections ?? []).find((collection) => collection._id === collectionId);
+      if (!selectedCollection || selectedCollection.kind !== 'collection') {
+        toast.error('A movie can only belong to a general collection', {
+          style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+        });
+        return;
+      }
+    }
+    const parsedEpisodeNumber = kind === 'episode' ? parseEpisodeNumber(episodeNumber) : undefined;
+    if (parsedEpisodeNumber === null) {
+      toast.error('Episode number must be a whole number greater than 0', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      });
+      return;
+    }
     upload(
-      { file: selectedFile, title: title.trim(), description: description.trim(), genres, kind, episodeNumber: epNum, thumbnail, thumbnailFocalPoint, collectionId: collectionId || undefined },
+      { file: selectedFile, title: title.trim(), description: description.trim(), genres, kind, episodeNumber: parsedEpisodeNumber, thumbnail, thumbnailFocalPoint, collectionId: collectionId || undefined },
       { onSuccess: () => void navigate('/') },
-    )
-  }
+    );
+  };
 
   return (
     <div className="mx-auto max-w-lg">
@@ -207,7 +282,7 @@ export const UploadPage = () => {
                   <>
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); applyFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                      onClick={(e) => { e.stopPropagation(); applyFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
                       className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       aria-label="Remove file"
                     >
@@ -290,8 +365,10 @@ export const UploadPage = () => {
                         id="episode-number"
                         type="number"
                         min={1}
+                        step={1}
                         value={episodeNumber}
                         onChange={(e) => setEpisodeNumber(e.target.value)}
+                        onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
                         placeholder="e.g. 1"
                         className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                       />
@@ -302,7 +379,7 @@ export const UploadPage = () => {
                     <label className="text-sm font-medium">Genres</label>
                     <div className="flex flex-wrap gap-2">
                       {(genreOptions ?? []).map((genre) => {
-                        const selected = genres.includes(genre.name)
+                        const selected = genres.includes(genre.name);
                         return (
                           <button
                             key={genre._id}
@@ -317,28 +394,39 @@ export const UploadPage = () => {
                           >
                             {genre.name}
                           </button>
-                        )
+                        );
                       })}
                     </div>
                   </div>
 
-                  {collections && collections.length > 0 && (
+                  {collectionOptions.length > 0 && (
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium" htmlFor="upload-collection">
-                        Collection
+                        {kind === 'episode' ? 'Containing season' : 'Containing collection'}
                       </label>
                       <select
                         id="upload-collection"
                         value={collectionId}
                         onChange={(e) => setCollectionId(e.target.value)}
                         className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        required={kind === 'episode'}
                       >
-                        <option value="">— None —</option>
-                        {buildTopographicList(collections).map(({ item, depth }) => (
-                          <option key={item._id} value={item._id}>
-                            {'\u00a0\u00a0'.repeat(depth * 2)}{depth > 0 ? '↳ ' : ''}{item.title}
-                          </option>
-                        ))}
+                        <option value="">{kind === 'episode' ? '— Select a season —' : '— None (top level movie) —'}</option>
+                        {kind === 'episode'
+                          ? seasonGroups.map((group) => (
+                            <optgroup key={group.key} label={group.label}>
+                              {group.seasons.map((item) => (
+                                <option key={item._id} value={item._id}>
+                                  {group.label === 'Unnested Seasons' ? item.title : `${group.label} — ${item.title}`}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))
+                          : collectionOptions.map((item) => (
+                            <option key={item._id} value={item._id}>
+                              {item.title}
+                            </option>
+                          ))}
                       </select>
                     </div>
                   )}
@@ -405,5 +493,5 @@ export const UploadPage = () => {
         </form>
       </div>
     </div>
-  )
-}
+  );
+};

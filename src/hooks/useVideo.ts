@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
-import z from 'zod'
-import { apiRequest } from '../api/client'
-import type { Video } from '../types/api'
+import { useQuery } from '@tanstack/react-query';
+import z from 'zod';
+import { apiRequest } from '../api/client';
+import type { Video } from '../types/api';
 
 const mediaSchema = z.object({
   _id: z.string(),
@@ -26,16 +26,16 @@ const mediaSchema = z.object({
     audioStreams: z.array(z.object({ language: z.string(), title: z.string(), durationInMs: z.number() })),
     subtitleStreams: z.array(z.object({ language: z.string(), title: z.string(), durationInMs: z.number() })),
   }),
-}).loose()
+}).loose();
 
 export const useVideo = (id: string) =>
   useQuery<Video>({
     queryKey: ['videos', id],
     queryFn: async () => {
-      const raw = await apiRequest<unknown>(`/media/${id}`)
-      const { _id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, collectionId, metadata } = mediaSchema.parse(raw)
-      return { _id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, collectionId, ...metadata }
+      const raw = await apiRequest<unknown>(`/media/${id}`);
+      const { _id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, collectionId, metadata } = mediaSchema.parse(raw);
+      return { _id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, collectionId, ...metadata };
     },
     retry: false,
     enabled: id.length > 0,
-  })
+  });

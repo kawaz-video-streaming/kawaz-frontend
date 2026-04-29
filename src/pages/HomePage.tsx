@@ -1,20 +1,20 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router'
-import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react'
-import { useVideos } from '../hooks/useVideos'
-import { useCollections } from '../hooks/useCollections'
-import { ORIENTATION_CONFIG } from '../hooks/useThumbnailOrientation'
-import { getObjectPositionFromFocalPoint } from '../lib/focalPoints'
-import type { CollectionListItem, VideoListItem, Coordinates } from '../types/api'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
+import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
+import { useVideos } from '../hooks/useVideos';
+import { useCollections } from '../hooks/useCollections';
+import { ORIENTATION_CONFIG } from '../hooks/useThumbnailOrientation';
+import { getObjectPositionFromFocalPoint } from '../lib/focalPoints';
+import type { CollectionListItem, VideoListItem, Coordinates } from '../types/api';
 
 const formatDuration = (ms: number) => {
-  const totalSeconds = Math.floor(ms / 1000)
-  const h = Math.floor(totalSeconds / 3600)
-  const m = Math.floor((totalSeconds % 3600) / 60)
-  const s = totalSeconds % 60
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  return `${m}:${String(s).padStart(2, '0')}`
-}
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
 
 const ItemThumbnail = ({
   src,
@@ -22,12 +22,12 @@ const ItemThumbnail = ({
   focalPoint,
   aspectRatio,
 }: {
-  src: string
-  title: string
-  focalPoint: Coordinates
-  aspectRatio: number
+  src: string;
+  title: string;
+  focalPoint: Coordinates;
+  aspectRatio: number;
 }) => {
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number; } | null>(null);
   return (
     <img
       src={src}
@@ -41,124 +41,124 @@ const ItemThumbnail = ({
           : `${focalPoint.x * 100}% ${focalPoint.y * 100}%`,
       }}
     />
-  )
-}
+  );
+};
 
 type PageItem =
-  | { type: 'video'; data: VideoListItem }
-  | { type: 'collection'; data: CollectionListItem }
+  | { type: 'video'; data: VideoListItem; }
+  | { type: 'collection'; data: CollectionListItem; };
 
-const CAROUSEL_GAP_PX = 12
-const CAROUSEL_ANIMATION_MS = 280
+const CAROUSEL_GAP_PX = 12;
+const CAROUSEL_ANIMATION_MS = 280;
 
 const SectionCarousel = ({
   sectionKey,
   items,
   renderItemCard,
 }: {
-  sectionKey: string
-  items: PageItem[]
-  renderItemCard: (item: PageItem) => ReactNode
+  sectionKey: string;
+  items: PageItem[];
+  renderItemCard: (item: PageItem) => ReactNode;
 }) => {
-  const viewportRef = useRef<HTMLDivElement>(null)
-  const trackRef = useRef<HTMLDivElement>(null)
-  const animationTimeoutRef = useRef<number | null>(null)
-  const touchStartXRef = useRef(0)
-  const touchStartYRef = useRef(0)
-  const [hasOverflow, setHasOverflow] = useState(false)
-  const [orderedItems, setOrderedItems] = useState(items)
-  const [translateX, setTranslateX] = useState(0)
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [transitionEnabled, setTransitionEnabled] = useState(false)
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const animationTimeoutRef = useRef<number | null>(null);
+  const touchStartXRef = useRef(0);
+  const touchStartYRef = useRef(0);
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const [orderedItems, setOrderedItems] = useState(items);
+  const [translateX, setTranslateX] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [transitionEnabled, setTransitionEnabled] = useState(false);
 
   useEffect(() => {
-    setOrderedItems(items)
-    setTranslateX(0)
-    setTransitionEnabled(false)
-    setIsAnimating(false)
-  }, [items])
+    setOrderedItems(items);
+    setTranslateX(0);
+    setTransitionEnabled(false);
+    setIsAnimating(false);
+  }, [items]);
 
   useEffect(() => {
     const updateOverflow = () => {
-      const viewport = viewportRef.current
-      const track = trackRef.current
-      if (!viewport || !track) return
-      setHasOverflow(track.scrollWidth > viewport.clientWidth + 1)
-    }
+      const viewport = viewportRef.current;
+      const track = trackRef.current;
+      if (!viewport || !track) return;
+      setHasOverflow(track.scrollWidth > viewport.clientWidth + 1);
+    };
 
-    updateOverflow()
-    window.addEventListener('resize', updateOverflow)
+    updateOverflow();
+    window.addEventListener('resize', updateOverflow);
 
     return () => {
-      window.removeEventListener('resize', updateOverflow)
-    }
-  }, [])
+      window.removeEventListener('resize', updateOverflow);
+    };
+  }, []);
 
   useEffect(() => {
-    const viewport = viewportRef.current
-    const track = trackRef.current
-    if (!viewport || !track) return
+    const viewport = viewportRef.current;
+    const track = trackRef.current;
+    if (!viewport || !track) return;
 
     const frame = window.requestAnimationFrame(() => {
-      setHasOverflow(track.scrollWidth > viewport.clientWidth + 1)
-    })
+      setHasOverflow(track.scrollWidth > viewport.clientWidth + 1);
+    });
 
-    return () => window.cancelAnimationFrame(frame)
-  }, [orderedItems])
+    return () => window.cancelAnimationFrame(frame);
+  }, [orderedItems]);
 
   useEffect(() => {
     return () => {
       if (animationTimeoutRef.current !== null) {
-        window.clearTimeout(animationTimeoutRef.current)
+        window.clearTimeout(animationTimeoutRef.current);
       }
-    }
-  }, [])
+    };
+  }, []);
 
   const getStep = () => {
-    const firstCard = trackRef.current?.querySelector<HTMLElement>('[data-carousel-item="true"]')
-    return firstCard ? firstCard.offsetWidth + CAROUSEL_GAP_PX : 240
-  }
+    const firstCard = trackRef.current?.querySelector<HTMLElement>('[data-carousel-item="true"]');
+    return firstCard ? firstCard.offsetWidth + CAROUSEL_GAP_PX : 240;
+  };
 
   const rotateItems = (direction: 'left' | 'right') => {
-    if (isAnimating || !hasOverflow || orderedItems.length <= 1) return
+    if (isAnimating || !hasOverflow || orderedItems.length <= 1) return;
 
-    const step = getStep()
+    const step = getStep();
 
     if (animationTimeoutRef.current !== null) {
-      window.clearTimeout(animationTimeoutRef.current)
+      window.clearTimeout(animationTimeoutRef.current);
     }
 
     if (direction === 'right') {
-      setIsAnimating(true)
-      setTransitionEnabled(true)
-      setTranslateX(-step)
+      setIsAnimating(true);
+      setTransitionEnabled(true);
+      setTranslateX(-step);
 
       animationTimeoutRef.current = window.setTimeout(() => {
-        setTransitionEnabled(false)
-        setOrderedItems((prev) => (prev.length > 1 ? [...prev.slice(1), prev[0]] : prev))
-        setTranslateX(0)
-        setIsAnimating(false)
-      }, CAROUSEL_ANIMATION_MS)
+        setTransitionEnabled(false);
+        setOrderedItems((prev) => (prev.length > 1 ? [...prev.slice(1), prev[0]] : prev));
+        setTranslateX(0);
+        setIsAnimating(false);
+      }, CAROUSEL_ANIMATION_MS);
 
-      return
+      return;
     }
 
-    setIsAnimating(true)
-    setTransitionEnabled(false)
-    setOrderedItems((prev) => (prev.length > 1 ? [prev[prev.length - 1], ...prev.slice(0, -1)] : prev))
-    setTranslateX(-step)
+    setIsAnimating(true);
+    setTransitionEnabled(false);
+    setOrderedItems((prev) => (prev.length > 1 ? [prev[prev.length - 1], ...prev.slice(0, -1)] : prev));
+    setTranslateX(-step);
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        setTransitionEnabled(true)
-        setTranslateX(0)
-      })
-    })
+        setTransitionEnabled(true);
+        setTranslateX(0);
+      });
+    });
 
     animationTimeoutRef.current = window.setTimeout(() => {
-      setIsAnimating(false)
-    }, CAROUSEL_ANIMATION_MS)
-  }
+      setIsAnimating(false);
+    }, CAROUSEL_ANIMATION_MS);
+  };
 
   return (
     <div className="relative">
@@ -166,13 +166,13 @@ const SectionCarousel = ({
         ref={viewportRef}
         className="overflow-hidden"
         onTouchStart={(e) => {
-          touchStartXRef.current = e.touches[0].clientX
-          touchStartYRef.current = e.touches[0].clientY
+          touchStartXRef.current = e.touches[0].clientX;
+          touchStartYRef.current = e.touches[0].clientY;
         }}
         onTouchEnd={(e) => {
-          const dx = touchStartXRef.current - e.changedTouches[0].clientX
-          const dy = Math.abs(touchStartYRef.current - e.changedTouches[0].clientY)
-          if (Math.abs(dx) > 50 && Math.abs(dx) > dy) rotateItems(dx > 0 ? 'right' : 'left')
+          const dx = touchStartXRef.current - e.changedTouches[0].clientX;
+          const dy = Math.abs(touchStartYRef.current - e.changedTouches[0].clientY);
+          if (Math.abs(dx) > 50 && Math.abs(dx) > dy) rotateItems(dx > 0 ? 'right' : 'left');
         }}
       >
         <div
@@ -226,48 +226,86 @@ const SectionCarousel = ({
         </button>
       )}
     </div>
-  )
-}
+  );
+};
 
 export const HomePage = () => {
-  const navigate = useNavigate()
-  const { data: videos, isLoading, isError } = useVideos()
-  const { data: collections } = useCollections()
-  const [selectedTabs, setSelectedTabs] = useState<string[]>([])
+  const navigate = useNavigate();
+  const { data: videos, isLoading, isError } = useVideos();
+  const { data: collections } = useCollections();
+  const [selectedKind, setSelectedKind] = useState<string>('All');
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
-  const config = ORIENTATION_CONFIG.vertical
+  const config = ORIENTATION_CONFIG.vertical;
 
-  const topLevelCollections = collections?.filter((c) => !c.collectionId) ?? []
-  const topLevelVideos = videos?.filter((v) => !v.collectionId) ?? []
-  const topLevelItemsRaw: PageItem[] = [
+  const topLevelCollections = collections?.filter((c) => !c.collectionId) ?? [];
+  const topLevelVideos = videos?.filter((v) => !v.collectionId) ?? [];
+
+  const movies = topLevelVideos.filter((video) => video.kind !== 'episode');
+  const tvShows = topLevelCollections.filter((collection) => collection.kind === 'show');
+  const generalCollections = topLevelCollections.filter((collection) => collection.kind !== 'show');
+
+  const allItems: PageItem[] = useMemo(() => [
+    ...movies.map((video): PageItem => ({ type: 'video', data: video })),
     ...topLevelCollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
-    ...topLevelVideos.map((video): PageItem => ({ type: 'video', data: video })),
-  ]
-  const newestItems = [...topLevelItemsRaw].slice(-10).reverse()
-  const topLevelItems = [...topLevelItemsRaw].sort((a, b) => a.data.title.localeCompare(b.data.title))
+  ], [movies, topLevelCollections]);
 
-  const getDisplayGenre = (item: PageItem) => item.data.genres[0] ?? 'Other'
+  const getItemKind = (item: PageItem) => {
+    if (item.type === 'video') return 'Movies';
+    return item.data.kind === 'show' ? 'TV Shows' : 'Collections';
+  };
 
-  const usedGenreNames = [...new Set(topLevelItems.map(getDisplayGenre).filter((g) => g !== 'Other'))]
-  const hasOtherItems = topLevelItems.some((item) => getDisplayGenre(item) === 'Other')
-  const availableTabs = hasOtherItems ? [...usedGenreNames, 'Other'] : usedGenreNames
+  const topLevelItemsRaw: PageItem[] = useMemo(() => [
+    ...topLevelCollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
+    ...movies.map((video): PageItem => ({ type: 'video', data: video })),
+  ], [topLevelCollections, movies]);
+  const newestItems = useMemo(() => [...topLevelItemsRaw].slice(-10).reverse(), [topLevelItemsRaw]);
 
-  const sections: Array<{ key: string; items: PageItem[] }> = [
-    ...(newestItems.length > 0 ? [{ key: 'Newest Releases', items: newestItems }] : []),
-    ...availableTabs
-      .map((tab) => ({
-        key: tab,
-        items: topLevelItems.filter((item) => getDisplayGenre(item) === tab),
-      }))
-      .filter((section) => section.items.length > 0),
-  ]
+  const kindTabs = useMemo(() => [
+    ...(movies.length > 0 ? ['Movies'] : []),
+    ...(tvShows.length > 0 ? ['TV Shows'] : []),
+    ...(generalCollections.length > 0 ? ['Collections'] : []),
+  ], [movies.length, tvShows.length, generalCollections.length]);
 
-  const visibleSections = selectedTabs.length > 0
-    ? sections.filter((section) => selectedTabs.includes(section.key))
-    : sections
+  const kindFilteredItems = useMemo(() => selectedKind === 'All'
+    ? allItems
+    : allItems.filter((item) => getItemKind(item) === selectedKind), [selectedKind, allItems]);
 
-  const toggleTab = (tab: string) =>
-    setSelectedTabs((prev) => prev.includes(tab) ? prev.filter((t) => t !== tab) : [...prev, tab])
+  const getItemGenres = (item: PageItem) => {
+    const validGenres = item.data.genres.filter((genre) => genre.trim().length > 0);
+    return validGenres.length > 0 ? [validGenres[0]] : ['Other'];
+  };
+
+  const availableGenres = useMemo(() => [...new Set(
+    kindFilteredItems
+      .flatMap((item) => getItemGenres(item)),
+  )].sort((a, b) => a.localeCompare(b)), [kindFilteredItems]);
+
+  useEffect(() => {
+    setSelectedGenres((prev) => {
+      const next = prev.filter((genre) => availableGenres.includes(genre));
+      return next.length === prev.length && next.every((genre, index) => genre === prev[index])
+        ? prev
+        : next;
+    });
+  }, [selectedKind, availableGenres]);
+
+  const genreSections: Array<{ key: string; items: PageItem[]; }> = useMemo(() => (selectedGenres.length > 0 ? selectedGenres : availableGenres)
+    .map((genre) => ({
+      key: genre,
+      items: kindFilteredItems.filter((item) => getItemGenres(item).includes(genre)),
+    }))
+    .filter((section) => section.items.length > 0), [selectedGenres, availableGenres, kindFilteredItems]);
+
+  const showNewest = selectedKind === 'All' && selectedGenres.length === 0;
+
+  const visibleSections: Array<{ key: string; items: PageItem[]; }> = useMemo(() => [
+    ...(showNewest && newestItems.length > 0 ? [{ key: 'Newest Releases', items: newestItems }] : []),
+    ...genreSections,
+  ], [showNewest, newestItems, genreSections]);
+
+  const toggleGenre = (genre: string) =>
+    setSelectedGenres((prev) => prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]);
 
   const renderItemCard = (item: PageItem) =>
     item.type === 'collection' ? (
@@ -326,7 +364,7 @@ export const HomePage = () => {
           )}
         </div>
       </button>
-    )
+    );
 
   return (
     <div className="flex h-full flex-col">
@@ -339,36 +377,70 @@ export const HomePage = () => {
         <p className="relative mt-1.5 text-sm text-muted-foreground">Browse and stream your library.</p>
       </div>
 
-      {/* Genre tabs — always visible */}
+      {/* Kind tabs and genre filters — always visible */}
       {(topLevelVideos.length > 0 || topLevelCollections.length > 0) && (
-        <div className="mb-6 shrink-0 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setSelectedTabs([])}
-            className={[
-              'rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:px-4 sm:py-1.5 sm:text-sm',
-              selectedTabs.length === 0
-                ? 'border-red-500 bg-red-500/10 text-red-500'
-                : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
-            ].join(' ')}
-          >
-            All
-          </button>
-          {sections.map((section) => (
+        <div className="mb-6 shrink-0 space-y-2">
+          <div className="flex flex-wrap gap-2">
             <button
-              key={section.key}
               type="button"
-              onClick={() => toggleTab(section.key)}
+              onClick={() => setSelectedKind('All')}
               className={[
                 'rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:px-4 sm:py-1.5 sm:text-sm',
-                selectedTabs.includes(section.key)
+                selectedKind === 'All'
                   ? 'border-red-500 bg-red-500/10 text-red-500'
                   : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
               ].join(' ')}
             >
-              {section.key}
+              All Kinds
             </button>
-          ))}
+            {kindTabs.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setSelectedKind(tab)}
+                className={[
+                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:px-4 sm:py-1.5 sm:text-sm',
+                  selectedKind === tab
+                    ? 'border-red-500 bg-red-500/10 text-red-500'
+                    : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
+                ].join(' ')}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          {availableGenres.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedGenres([])}
+                className={[
+                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                  selectedGenres.length === 0
+                    ? 'border-red-500 bg-red-500/10 text-red-500'
+                    : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
+                ].join(' ')}
+              >
+                All Genres
+              </button>
+              {availableGenres.map((genre) => (
+                <button
+                  key={genre}
+                  type="button"
+                  onClick={() => toggleGenre(genre)}
+                  className={[
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    selectedGenres.includes(genre)
+                      ? 'border-red-500 bg-red-500/10 text-red-500'
+                      : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
+                  ].join(' ')}
+                >
+                  {genre}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -386,7 +458,9 @@ export const HomePage = () => {
         )}
         {!isLoading && visibleSections.length === 0 && (
           <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
-            {selectedTabs.length > 0 ? 'No items in the selected sections.' : 'No content yet.'}
+            {selectedKind !== 'All' || selectedGenres.length > 0
+              ? 'No items match the selected filters.'
+              : 'No content yet.'}
           </div>
         )}
 
@@ -408,5 +482,5 @@ export const HomePage = () => {
         )}
       </div>
     </div>
-  )
-}
+  );
+};
