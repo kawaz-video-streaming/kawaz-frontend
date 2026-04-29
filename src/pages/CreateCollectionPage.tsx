@@ -203,12 +203,12 @@ export const CreateCollectionPage = () => {
             <label className="text-sm font-medium">Genres</label>
             <div className="flex flex-wrap gap-2">
               {(genreOptions ?? []).map((genre) => {
-                const selected = genres.includes(genre._id)
+                const selected = genres.includes(genre.name)
                 return (
                   <button
                     key={genre._id}
                     type="button"
-                    onClick={() => toggleGenre(genre._id)}
+                    onClick={() => toggleGenre(genre.name)}
                     className={[
                       'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                       selected

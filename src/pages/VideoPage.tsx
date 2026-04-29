@@ -314,12 +314,12 @@ export const VideoPage = () => {
               <label className="text-sm font-medium">Genres</label>
               <div className="flex flex-wrap gap-2">
                 {(genreOptions ?? []).map((genre) => {
-                  const selected = editGenres.includes(genre._id);
+                  const selected = editGenres.includes(genre.name);
                   return (
                     <button
                       key={genre._id}
                       type="button"
-                      onClick={() => toggleEditGenre(genre._id)}
+                      onClick={() => toggleEditGenre(genre.name)}
                       className={[
                         'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                         selected
@@ -439,11 +439,11 @@ export const VideoPage = () => {
               <p className="mt-3 text-sm text-muted-foreground">{video.description}</p>
             )}
 
-            {video.genres.length > 0 && genreOptions && (
+            {video.genres.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {video.genres.map((id) => (
-                  <span key={id} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
-                    {genreOptions.find((g) => g._id === id)?.name ?? id}
+                {video.genres.map((name) => (
+                  <span key={name} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
+                    {name}
                   </span>
                 ))}
               </div>
