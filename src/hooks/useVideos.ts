@@ -7,7 +7,8 @@ const mediaListItemSchema = z.object({
   _id: z.string(),
   title: z.string(),
   description: z.string().optional(),
-  tags: z.array(z.string()).default([]),
+  genres: z.array(z.string()).default([]),
+  kind: z.enum(['movie', 'episode']).optional(),
   thumbnailFocalPoint: z.object({ x: z.number(), y: z.number() }).default({ x: 0.5, y: 0.5 }),
   collectionId: z.string().optional(),
   metadata: z.object({
@@ -21,8 +22,8 @@ export const useVideos = () =>
     queryFn: async () => {
       const raw = await apiRequest<unknown[]>('/media')
       return raw.map(item => {
-        const { _id, title, description, tags, thumbnailFocalPoint, collectionId, metadata } = mediaListItemSchema.parse(item)
-        return { _id, title, description, tags, thumbnailFocalPoint, durationInMs: metadata?.durationInMs ?? 0, collectionId }
+        const { _id, title, description, genres, kind, thumbnailFocalPoint, collectionId, metadata } = mediaListItemSchema.parse(item)
+        return { _id, title, description, genres, kind, thumbnailFocalPoint, durationInMs: metadata?.durationInMs ?? 0, collectionId }
       })
     },
     retry: false,

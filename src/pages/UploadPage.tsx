@@ -2,10 +2,10 @@ import { CheckCircle, FileVideo, Image, Loader2, UploadCloud, X } from 'lucide-r
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type SyntheticEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { MEDIA_TAGS } from '../constants/tags'
-import type { Coordinates } from '../types/api'
+import type { Coordinates, MediaKind } from '../types/api'
 import { useUploadMedia } from '../hooks/useUploadMedia'
 import { useCollections } from '../hooks/useCollections'
+import { useGenres } from '../hooks/useGenres'
 import { getFocalCropArea } from '../lib/focalPoints'
 import { buildTopographicList } from '../lib/collections'
 
@@ -70,13 +70,16 @@ export const UploadPage = () => {
   const [isDragging, setIsDragging] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [tags, setTags] = useState<string[]>([])
+  const [genres, setGenres] = useState<string[]>([])
+  const [kind, setKind] = useState<MediaKind>('movie')
+  const [episodeNumber, setEpisodeNumber] = useState<string>('')
   const [thumbnail, setThumbnail] = useState<File | null>(null)
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
   const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 })
   const [collectionId, setCollectionId] = useState<string>('')
   const { mutate: upload, isPending, isSuccess, reset } = useUploadMedia()
   const { data: collections } = useCollections()
+  const { data: genreOptions } = useGenres()
 
   useEffect(() => {
     if (!isPending) return
@@ -102,7 +105,9 @@ export const UploadPage = () => {
     if (!file) {
       setTitle('')
       setDescription('')
-      setTags([])
+      setGenres([])
+      setKind('movie')
+      setEpisodeNumber('')
       setCollectionId('')
       removeThumbnail()
     }
@@ -150,14 +155,15 @@ export const UploadPage = () => {
 
   const handleDragLeave = () => setIsDragging(false)
 
-  const toggleTag = (tag: string) =>
-    setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
+  const toggleGenre = (id: string) =>
+    setGenres((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id])
 
   const handleSubmit = (e: SyntheticEvent) => {
     e.preventDefault()
     if (!selectedFile || !title.trim() || !thumbnail) return
+    const epNum = kind === 'episode' && episodeNumber.trim() ? parseInt(episodeNumber, 10) : undefined
     upload(
-      { file: selectedFile, title: title.trim(), description: description.trim(), tags, thumbnail, thumbnailFocalPoint, collectionId: collectionId || undefined },
+      { file: selectedFile, title: title.trim(), description: description.trim(), genres, kind, episodeNumber: epNum, thumbnail, thumbnailFocalPoint, collectionId: collectionId || undefined },
       { onSuccess: () => void navigate('/') },
     )
   }
@@ -259,15 +265,49 @@ export const UploadPage = () => {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium">Tags</label>
+                    <label className="text-sm font-medium">Kind <span className="text-red-500">*</span></label>
+                    <div className="flex gap-3">
+                      {(['movie', 'episode'] as MediaKind[]).map((k) => (
+                        <label key={k} className="flex items-center gap-2 cursor-pointer text-sm">
+                          <input
+                            type="radio"
+                            name="media-kind"
+                            value={k}
+                            checked={kind === k}
+                            onChange={() => setKind(k)}
+                            className="accent-red-500"
+                          />
+                          {k.charAt(0).toUpperCase() + k.slice(1)}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {kind === 'episode' && (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium" htmlFor="episode-number">Episode Number</label>
+                      <input
+                        id="episode-number"
+                        type="number"
+                        min={1}
+                        value={episodeNumber}
+                        onChange={(e) => setEpisodeNumber(e.target.value)}
+                        placeholder="e.g. 1"
+                        className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium">Genres</label>
                     <div className="flex flex-wrap gap-2">
-                      {MEDIA_TAGS.map((tag) => {
-                        const selected = tags.includes(tag)
+                      {(genreOptions ?? []).map((genre) => {
+                        const selected = genres.includes(genre._id)
                         return (
                           <button
-                            key={tag}
+                            key={genre._id}
                             type="button"
-                            onClick={() => toggleTag(tag)}
+                            onClick={() => toggleGenre(genre._id)}
                             className={[
                               'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                               selected
@@ -275,7 +315,7 @@ export const UploadPage = () => {
                                 : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
                             ].join(' ')}
                           >
-                            {tag}
+                            {genre.name}
                           </button>
                         )
                       })}

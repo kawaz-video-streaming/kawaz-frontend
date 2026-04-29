@@ -7,7 +7,9 @@ const collectionSchema = z.object({
   _id: z.string(),
   title: z.string(),
   description: z.string().optional(),
-  tags: z.array(z.string()).default([]),
+  genres: z.array(z.string()).default([]),
+  kind: z.enum(['show', 'season', 'collection']).optional(),
+  seasonNumber: z.number().optional(),
   thumbnailFocalPoint: z.object({ x: z.number(), y: z.number() }).default({ x: 0.5, y: 0.5 }),
   collectionId: z.string().optional(),
 }).loose()
@@ -18,8 +20,8 @@ export const useCollections = () =>
     queryFn: async () => {
       const raw = await apiRequest<unknown[]>('/mediaCollection')
       return raw.map((item) => {
-        const { _id, title, description, tags, thumbnailFocalPoint, collectionId } = collectionSchema.parse(item)
-        return { _id, title, description, tags, thumbnailFocalPoint, collectionId }
+        const { _id, title, description, genres, kind, seasonNumber, thumbnailFocalPoint, collectionId } = collectionSchema.parse(item)
+        return { _id, title, description, genres, kind, seasonNumber, thumbnailFocalPoint, collectionId }
       })
     },
     retry: false,

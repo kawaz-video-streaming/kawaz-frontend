@@ -2,10 +2,10 @@ import { CheckCircle, Image, X } from 'lucide-react'
 import { useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { MEDIA_TAGS } from '../constants/tags'
-import type { Coordinates } from '../types/api'
+import type { CollectionKind, Coordinates } from '../types/api'
 import { useCreateCollection } from '../hooks/useCreateCollection'
 import { useCollections } from '../hooks/useCollections'
+import { useGenres } from '../hooks/useGenres'
 import { getFocalCropArea } from '../lib/focalPoints'
 import { buildTopographicList } from '../lib/collections'
 
@@ -59,13 +59,16 @@ export const CreateCollectionPage = () => {
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [tags, setTags] = useState<string[]>([])
+  const [genres, setGenres] = useState<string[]>([])
+  const [kind, setKind] = useState<CollectionKind>('show')
+  const [seasonNumber, setSeasonNumber] = useState<string>('')
   const [parentCollectionId, setParentCollectionId] = useState<string>('')
   const [thumbnail, setThumbnail] = useState<File | null>(null)
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
   const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 })
   const { mutate: create, isPending, isSuccess, reset } = useCreateCollection()
   const { data: collections } = useCollections()
+  const { data: genreOptions } = useGenres()
 
   const removeThumbnail = () => {
     setThumbnail(null)
@@ -90,17 +93,20 @@ export const CreateCollectionPage = () => {
     setThumbnailFocalPoint({ x: 0.5, y: 0.5 })
   }
 
-  const toggleTag = (tag: string) =>
-    setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
+  const toggleGenre = (id: string) =>
+    setGenres((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id])
 
   const handleSubmit = (e: SyntheticEvent) => {
     e.preventDefault()
     if (!title.trim() || !thumbnail) return
+    const sNum = kind === 'season' && seasonNumber.trim() ? parseInt(seasonNumber, 10) : undefined
     create(
       {
         title: title.trim(),
         description: description.trim(),
-        tags,
+        genres,
+        kind,
+        seasonNumber: sNum,
         thumbnail,
         thumbnailFocalPoint,
         collectionId: parentCollectionId || undefined,
@@ -109,7 +115,9 @@ export const CreateCollectionPage = () => {
         onSuccess: () => {
           setTitle('')
           setDescription('')
-          setTags([])
+          setGenres([])
+          setKind('show')
+          setSeasonNumber('')
           setParentCollectionId('')
           removeThumbnail()
           reset()
@@ -158,15 +166,49 @@ export const CreateCollectionPage = () => {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium">Tags</label>
+            <label className="text-sm font-medium">Kind <span className="text-red-500">*</span></label>
+            <div className="flex gap-3 flex-wrap">
+              {(['show', 'season', 'collection'] as CollectionKind[]).map((k) => (
+                <label key={k} className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input
+                    type="radio"
+                    name="col-kind"
+                    value={k}
+                    checked={kind === k}
+                    onChange={() => setKind(k)}
+                    className="accent-red-500"
+                  />
+                  {k.charAt(0).toUpperCase() + k.slice(1)}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {kind === 'season' && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium" htmlFor="col-season-number">Season Number</label>
+              <input
+                id="col-season-number"
+                type="number"
+                min={1}
+                value={seasonNumber}
+                onChange={(e) => setSeasonNumber(e.target.value)}
+                placeholder="e.g. 1"
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              />
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">Genres</label>
             <div className="flex flex-wrap gap-2">
-              {MEDIA_TAGS.map((tag) => {
-                const selected = tags.includes(tag)
+              {(genreOptions ?? []).map((genre) => {
+                const selected = genres.includes(genre._id)
                 return (
                   <button
-                    key={tag}
+                    key={genre._id}
                     type="button"
-                    onClick={() => toggleTag(tag)}
+                    onClick={() => toggleGenre(genre._id)}
                     className={[
                       'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                       selected
@@ -174,7 +216,7 @@ export const CreateCollectionPage = () => {
                         : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
                     ].join(' ')}
                   >
-                    {tag}
+                    {genre.name}
                   </button>
                 )
               })}

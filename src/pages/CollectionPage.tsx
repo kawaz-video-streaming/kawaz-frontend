@@ -1,13 +1,13 @@
 import { Check, ChevronRight, FolderOpen, Image, Pencil, Trash2, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router'
-import { MEDIA_TAGS } from '../constants/tags'
-import type { CollectionListItem, Coordinates, VideoListItem } from '../types/api'
+import type { CollectionKind, CollectionListItem, Coordinates, VideoListItem } from '../types/api'
 import { useCollection } from '../hooks/useCollection'
 import { useCollections } from '../hooks/useCollections'
 import { useUpdateCollection } from '../hooks/useUpdateCollection'
 import { useDeleteCollection } from '../hooks/useDeleteCollection'
 import { useVideos } from '../hooks/useVideos'
+import { useGenres } from '../hooks/useGenres'
 import { useAuth } from '../auth/useAuth'
 import { getFocalCropArea, getObjectPositionFromFocalPoint } from '../lib/focalPoints'
 
@@ -111,12 +111,15 @@ export const CollectionPage = () => {
   const { data: allVideos } = useVideos()
   const { mutate: update, isPending: isUpdating } = useUpdateCollection(id ?? '')
   const { mutate: remove, isPending: isDeleting } = useDeleteCollection()
+  const { data: genreOptions } = useGenres()
 
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
-  const [editTags, setEditTags] = useState<string[]>([])
+  const [editGenres, setEditGenres] = useState<string[]>([])
+  const [editKind, setEditKind] = useState<CollectionKind>('show')
+  const [editSeasonNumber, setEditSeasonNumber] = useState<string>('')
   const [editFocalPoint, setEditFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 })
   const [editParentId, setEditParentId] = useState<string>('')
   const [newThumbnail, setNewThumbnail] = useState<File | null>(null)
@@ -142,7 +145,9 @@ export const CollectionPage = () => {
     if (!collection) return
     setEditTitle(collection.title)
     setEditDescription(collection.description ?? '')
-    setEditTags(collection.tags)
+    setEditGenres(collection.genres)
+    setEditKind(collection.kind ?? 'show')
+    setEditSeasonNumber(collection.seasonNumber !== undefined ? String(collection.seasonNumber) : '')
     setEditFocalPoint(collection.thumbnailFocalPoint)
     setEditParentId(collection.collectionId ?? '')
     setNewThumbnail(null)
@@ -178,11 +183,14 @@ export const CollectionPage = () => {
     if (!editTitle.trim()) return
     const originalParentId = collection?.collectionId ?? null
     const newParentId = editParentId === '' ? null : editParentId
+    const sNum = editKind === 'season' && editSeasonNumber.trim() ? parseInt(editSeasonNumber, 10) : null
     update(
       {
         title: editTitle.trim(),
         description: editDescription.trim(),
-        tags: editTags,
+        genres: editGenres,
+        kind: editKind,
+        seasonNumber: sNum !== null ? sNum : undefined,
         thumbnailFocalPoint: editFocalPoint,
         thumbnail: newThumbnail ?? undefined,
         collectionId: newParentId !== originalParentId ? newParentId : undefined,
@@ -198,8 +206,8 @@ export const CollectionPage = () => {
     )
   }
 
-  const toggleEditTag = (tag: string) =>
-    setEditTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
+  const toggleEditGenre = (id: string) =>
+    setEditGenres((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id])
 
   const handleDelete = () => {
     if (!id) return
@@ -271,15 +279,46 @@ export const CollectionPage = () => {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Tags</label>
+              <label className="text-sm font-medium">Kind</label>
+              <div className="flex gap-3 flex-wrap">
+                {(['show', 'season', 'collection'] as CollectionKind[]).map((k) => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="edit-col-kind"
+                      value={k}
+                      checked={editKind === k}
+                      onChange={() => setEditKind(k)}
+                      className="accent-red-500"
+                    />
+                    {k.charAt(0).toUpperCase() + k.slice(1)}
+                  </label>
+                ))}
+              </div>
+            </div>
+            {editKind === 'season' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Season Number</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={editSeasonNumber}
+                  onChange={(e) => setEditSeasonNumber(e.target.value)}
+                  placeholder="e.g. 1"
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">Genres</label>
               <div className="flex flex-wrap gap-2">
-                {MEDIA_TAGS.map((tag) => {
-                  const selected = editTags.includes(tag)
+                {(genreOptions ?? []).map((genre) => {
+                  const selected = editGenres.includes(genre._id)
                   return (
                     <button
-                      key={tag}
+                      key={genre._id}
                       type="button"
-                      onClick={() => toggleEditTag(tag)}
+                      onClick={() => toggleEditGenre(genre._id)}
                       className={[
                         'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                         selected
@@ -287,7 +326,7 @@ export const CollectionPage = () => {
                           : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
                       ].join(' ')}
                     >
-                      {tag}
+                      {genre.name}
                     </button>
                   )
                 })}
@@ -354,13 +393,16 @@ export const CollectionPage = () => {
                 {collection.description && (
                   <p className="mt-1 text-sm text-muted-foreground">{collection.description}</p>
                 )}
-                {collection.tags.length > 0 && (
+                {collection.genres.length > 0 && genreOptions && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {collection.tags.map((tag) => (
-                      <span key={tag} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
-                        {tag}
-                      </span>
-                    ))}
+                    {collection.genres.map((id) => {
+                      const name = genreOptions.find((g) => g._id === id)?.name ?? id
+                      return (
+                        <span key={id} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
+                          {name}
+                        </span>
+                      )
+                    })}
                   </div>
                 )}
               </div>

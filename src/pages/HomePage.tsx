@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react'
-import { MEDIA_TAGS } from '../constants/tags'
 import { useVideos } from '../hooks/useVideos'
 import { useCollections } from '../hooks/useCollections'
+import { useGenres } from '../hooks/useGenres'
 import { ORIENTATION_CONFIG } from '../hooks/useThumbnailOrientation'
 import { getObjectPositionFromFocalPoint } from '../lib/focalPoints'
 import type { CollectionListItem, VideoListItem, Coordinates } from '../types/api'
@@ -234,6 +234,7 @@ export const HomePage = () => {
   const navigate = useNavigate()
   const { data: videos, isLoading, isError } = useVideos()
   const { data: collections } = useCollections()
+  const { data: genreOptions } = useGenres()
   const [selectedTabs, setSelectedTabs] = useState<string[]>([])
 
   const config = ORIENTATION_CONFIG.vertical
@@ -247,14 +248,18 @@ export const HomePage = () => {
   const newestItems = [...topLevelItemsRaw].slice(-10).reverse()
   const topLevelItems = [...topLevelItemsRaw].sort((a, b) => a.data.title.localeCompare(b.data.title))
 
-  const getDisplayGenre = (item: PageItem) => item.data.tags[0] ?? 'Other'
+  const resolveGenreName = (id: string) =>
+    genreOptions?.find((g) => g._id === id)?.name ?? null
 
-  const genreTabs = MEDIA_TAGS.filter((tag) =>
-    topLevelItems.some((item) => getDisplayGenre(item) === tag),
-  )
+  const getDisplayGenre = (item: PageItem) => {
+    const firstId = item.data.genres[0]
+    if (!firstId) return 'Other'
+    return resolveGenreName(firstId) ?? 'Other'
+  }
 
+  const usedGenreNames = [...new Set(topLevelItems.map(getDisplayGenre).filter((g) => g !== 'Other'))]
   const hasOtherItems = topLevelItems.some((item) => getDisplayGenre(item) === 'Other')
-  const availableTabs = hasOtherItems ? [...genreTabs, 'Other'] : genreTabs
+  const availableTabs = hasOtherItems ? [...usedGenreNames, 'Other'] : usedGenreNames
 
   const sections: Array<{ key: string; items: PageItem[] }> = [
     ...(newestItems.length > 0 ? [{ key: 'Newest Releases', items: newestItems }] : []),

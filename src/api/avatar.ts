@@ -7,10 +7,10 @@ export const getAvatars = () =>
 export const avatarImageUrl = (id: string) =>
   `/api/avatar/${id}/image`
 
-export const uploadAvatar = (name: string, category: string, file: File) => {
+export const uploadAvatar = (name: string, categoryId: string, file: File) => {
   const formData = new FormData()
   formData.append('name', name)
-  formData.append('category', category)
+  formData.append('categoryId', categoryId)
   formData.append('avatar', file)
   return apiUpload<{ message: string }>('/avatar', formData)
 }

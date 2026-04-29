@@ -1,24 +1,28 @@
 import { apiRequest, apiUpload } from './client'
-import type { Coordinates } from '../types/api'
+import type { CollectionKind, Coordinates } from '../types/api'
 
-const appendTags = (formData: FormData, tags: string[]) => {
-  tags.forEach((tag, index) => formData.append(`tags[${index}]`, tag))
+const appendGenres = (formData: FormData, genres: string[]) => {
+  genres.forEach((id, index) => formData.append(`genres[${index}]`, id))
 }
 
 export interface CreateCollectionParams {
   title: string
   description?: string
-  tags: string[]
+  genres: string[]
+  kind: CollectionKind
+  seasonNumber?: number
   thumbnail: File
   thumbnailFocalPoint: Coordinates
   collectionId?: string
 }
 
-export const createCollection = ({ title, description, tags, thumbnail, thumbnailFocalPoint, collectionId }: CreateCollectionParams) => {
+export const createCollection = ({ title, description, genres, kind, seasonNumber, thumbnail, thumbnailFocalPoint, collectionId }: CreateCollectionParams) => {
   const formData = new FormData()
   formData.append('title', title)
   if (description) formData.append('description', description)
-  appendTags(formData, tags)
+  appendGenres(formData, genres)
+  formData.append('kind', kind)
+  if (seasonNumber !== undefined) formData.append('seasonNumber', String(seasonNumber))
   formData.append('thumbnail', thumbnail)
   formData.append('thumbnailFocalPoint[x]', String(thumbnailFocalPoint.x))
   formData.append('thumbnailFocalPoint[y]', String(thumbnailFocalPoint.y))
@@ -30,7 +34,9 @@ export interface UpdateCollectionParams {
   id: string
   title: string
   description?: string
-  tags: string[]
+  genres: string[]
+  kind: CollectionKind
+  seasonNumber?: number | null
   thumbnailFocalPoint: Coordinates
   thumbnail?: File
   collectionId?: string | null  // null = remove parent
@@ -39,19 +45,23 @@ export interface UpdateCollectionParams {
 const buildCollectionUpdateBody = ({
   title,
   description,
-  tags,
+  genres,
+  kind,
+  seasonNumber,
   thumbnailFocalPoint,
   collectionId,
 }: Omit<UpdateCollectionParams, 'id' | 'thumbnail'>) => ({
   title,
   ...(description !== undefined ? { description } : {}),
-  tags,
+  genres,
+  kind,
+  ...(seasonNumber !== undefined ? { seasonNumber } : {}),
   thumbnailFocalPoint,
   ...(collectionId !== undefined ? { collectionId } : {}),
 })
 
-export const updateCollection = async ({ id, title, description, tags, thumbnailFocalPoint, thumbnail, collectionId }: UpdateCollectionParams) => {
-  const body = buildCollectionUpdateBody({ title, description, tags, thumbnailFocalPoint, collectionId })
+export const updateCollection = async ({ id, title, description, genres, kind, seasonNumber, thumbnailFocalPoint, thumbnail, collectionId }: UpdateCollectionParams) => {
+  const body = buildCollectionUpdateBody({ title, description, genres, kind, seasonNumber, thumbnailFocalPoint, collectionId })
 
   if (collectionId === null && !thumbnail) {
     return apiRequest<{ message: string }>(`/mediaCollection/${id}`, {
@@ -64,7 +74,9 @@ export const updateCollection = async ({ id, title, description, tags, thumbnail
   const formData = new FormData()
   formData.append('title', title)
   if (description !== undefined) formData.append('description', description)
-  appendTags(formData, tags)
+  appendGenres(formData, genres)
+  formData.append('kind', kind)
+  if (seasonNumber !== undefined && seasonNumber !== null) formData.append('seasonNumber', String(seasonNumber))
   formData.append('thumbnailFocalPoint[x]', String(thumbnailFocalPoint.x))
   formData.append('thumbnailFocalPoint[y]', String(thumbnailFocalPoint.y))
   if (thumbnail) formData.append('thumbnail', thumbnail)

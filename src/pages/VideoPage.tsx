@@ -1,13 +1,13 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { MEDIA_TAGS } from '../constants/tags';
-import type { Coordinates } from '../types/api';
+import type { Coordinates, MediaKind } from '../types/api';
 import { useVideo } from '../hooks/useVideo';
 import { useVideos } from '../hooks/useVideos';
 import { useUpdateMedia } from '../hooks/useUpdateMedia';
 import { useDeleteMedia } from '../hooks/useDeleteMedia';
 import { useCollections } from '../hooks/useCollections';
+import { useGenres } from '../hooks/useGenres';
 import { useAuth } from '../auth/useAuth';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { getFocalCropArea } from '../lib/focalPoints';
@@ -70,12 +70,15 @@ export const VideoPage = () => {
   const { mutate: remove, isPending: isDeleting } = useDeleteMedia();
   const { data: collections } = useCollections();
   const { data: allVideos } = useVideos();
+  const { data: genreOptions } = useGenres();
 
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editGenres, setEditGenres] = useState<string[]>([]);
+  const [editKind, setEditKind] = useState<MediaKind>('movie');
+  const [editEpisodeNumber, setEditEpisodeNumber] = useState<string>('');
   const [editFocalPoint, setEditFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 });
   const [editCollectionId, setEditCollectionId] = useState<string>('');
   const [newThumbnail, setNewThumbnail] = useState<File | null>(null);
@@ -86,7 +89,9 @@ export const VideoPage = () => {
     if (!video) return;
     setEditTitle(video.title);
     setEditDescription(video.description ?? '');
-    setEditTags(video.tags);
+    setEditGenres(video.genres);
+    setEditKind(video.kind ?? 'movie');
+    setEditEpisodeNumber(video.episodeNumber !== undefined ? String(video.episodeNumber) : '');
     setEditFocalPoint(video.thumbnailFocalPoint);
     setEditCollectionId(video.collectionId ?? '');
     setNewThumbnail(null);
@@ -122,11 +127,14 @@ export const VideoPage = () => {
     if (!editTitle.trim()) return;
     const collectionId = editCollectionId === '' ? null : editCollectionId;
     const originalCollectionId = video?.collectionId ?? null;
+    const epNum = editKind === 'episode' && editEpisodeNumber.trim() ? parseInt(editEpisodeNumber, 10) : null;
     update(
       {
         title: editTitle.trim(),
         description: editDescription.trim(),
-        tags: editTags,
+        genres: editGenres,
+        kind: editKind,
+        episodeNumber: epNum,
         thumbnailFocalPoint: editFocalPoint,
         thumbnail: newThumbnail ?? undefined,
         collectionId: collectionId !== originalCollectionId ? collectionId : undefined,
@@ -149,8 +157,8 @@ export const VideoPage = () => {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDeleting]);
 
-  const toggleEditTag = (tag: string) =>
-    setEditTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
+  const toggleEditGenre = (id: string) =>
+    setEditGenres((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]);
 
   const handleDelete = () => {
     if (!id) return;
@@ -272,15 +280,46 @@ export const VideoPage = () => {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Tags</label>
+              <label className="text-sm font-medium">Kind</label>
+              <div className="flex gap-3">
+                {(['movie', 'episode'] as MediaKind[]).map((k) => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="edit-kind"
+                      value={k}
+                      checked={editKind === k}
+                      onChange={() => setEditKind(k)}
+                      className="accent-red-500"
+                    />
+                    {k.charAt(0).toUpperCase() + k.slice(1)}
+                  </label>
+                ))}
+              </div>
+            </div>
+            {editKind === 'episode' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Episode Number</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={editEpisodeNumber}
+                  onChange={(e) => setEditEpisodeNumber(e.target.value)}
+                  placeholder="e.g. 1"
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">Genres</label>
               <div className="flex flex-wrap gap-2">
-                {MEDIA_TAGS.map((tag) => {
-                  const selected = editTags.includes(tag);
+                {(genreOptions ?? []).map((genre) => {
+                  const selected = editGenres.includes(genre._id);
                   return (
                     <button
-                      key={tag}
+                      key={genre._id}
                       type="button"
-                      onClick={() => toggleEditTag(tag)}
+                      onClick={() => toggleEditGenre(genre._id)}
                       className={[
                         'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                         selected
@@ -288,7 +327,7 @@ export const VideoPage = () => {
                           : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
                       ].join(' ')}
                     >
-                      {tag}
+                      {genre.name}
                     </button>
                   );
                 })}

@@ -1,4 +1,6 @@
 export type MediaStatus = 'pending' | 'processing' | 'completed' | 'failed'
+export type MediaKind = 'movie' | 'episode'
+export type CollectionKind = 'show' | 'season' | 'collection'
 
 export interface VideoStream {
   title: string
@@ -27,7 +29,9 @@ export interface Video {
   _id: string
   title: string
   description?: string
-  tags: string[]
+  genres: string[]
+  kind?: MediaKind
+  episodeNumber?: number
   thumbnailFocalPoint: Coordinates
   collectionId?: string
   durationInMs: number
@@ -50,7 +54,8 @@ export interface VideoListItem {
   title: string
   description?: string
   durationInMs: number
-  tags: string[]
+  genres: string[]
+  kind?: MediaKind
   thumbnailFocalPoint: Coordinates
   collectionId?: string
 }
@@ -59,7 +64,9 @@ export interface CollectionListItem {
   _id: string
   title: string
   description?: string
-  tags: string[]
+  genres: string[]
+  kind?: CollectionKind
+  seasonNumber?: number
   thumbnailFocalPoint: Coordinates
   collectionId?: string
 }
@@ -72,7 +79,17 @@ export interface Profile {
 export interface Avatar {
   _id: string
   name: string
-  category: string
+  categoryId: string
+}
+
+export interface MediaGenre {
+  _id: string
+  name: string
+}
+
+export interface AvatarCategory {
+  _id: string
+  name: string
 }
 
 export interface PendingMediaItem {
