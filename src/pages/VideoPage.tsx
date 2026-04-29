@@ -439,11 +439,11 @@ export const VideoPage = () => {
               <p className="mt-3 text-sm text-muted-foreground">{video.description}</p>
             )}
 
-            {video.tags.length > 0 && (
+            {video.genres.length > 0 && genreOptions && (
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {video.tags.map((tag) => (
-                  <span key={tag} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
-                    {tag}
+                {video.genres.map((id) => (
+                  <span key={id} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
+                    {genreOptions.find((g) => g._id === id)?.name ?? id}
                   </span>
                 ))}
               </div>

@@ -478,11 +478,11 @@ export const CollectionPage = () => {
                   {item.data.description && (
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.data.description}</p>
                   )}
-                  {item.data.tags.length > 0 && (
+                  {item.data.genres.length > 0 && genreOptions && (
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {item.data.tags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-accent px-2 py-0.5 text-xs text-muted-foreground">
-                          {tag}
+                      {item.data.genres.map((id) => (
+                        <span key={id} className="rounded-full bg-accent px-2 py-0.5 text-xs text-muted-foreground">
+                          {genreOptions.find((g) => g._id === id)?.name ?? id}
                         </span>
                       ))}
                     </div>
