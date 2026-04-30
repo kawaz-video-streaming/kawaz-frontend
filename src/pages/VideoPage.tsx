@@ -1,17 +1,19 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { MEDIA_TAGS } from '../constants/tags';
-import type { Coordinates } from '../types/api';
+import type { Coordinates, MediaKind } from '../types/api';
 import { useVideo } from '../hooks/useVideo';
 import { useVideos } from '../hooks/useVideos';
 import { useUpdateMedia } from '../hooks/useUpdateMedia';
 import { useDeleteMedia } from '../hooks/useDeleteMedia';
 import { useCollections } from '../hooks/useCollections';
+import { useGenres } from '../hooks/useGenres';
 import { useAuth } from '../auth/useAuth';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { getFocalCropArea } from '../lib/focalPoints';
-import { buildTopographicList } from '../lib/collections';
+import { buildTopographicList, buildSeasonGroups } from '../lib/collections';
+import { parsePositiveInt } from '../lib/parsePositiveInt';
+import { toast } from 'sonner';
 
 const FocalPointPicker = ({
   src,
@@ -43,7 +45,7 @@ const FocalPointPicker = ({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Click the image to set which part stays visible in thumbnails.</p>
-      <div className="relative w-full cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
+      <div className={`relative mx-auto cursor-crosshair overflow-hidden rounded-lg border border-border ${aspectRatio >= 1 ? 'max-w-[450px]' : 'max-w-[300px]'}`} onClick={handleClick}>
         <img src={src} alt="Thumbnail" className="block w-full" draggable={false} onLoad={handleLoad} />
         {crop && (
           <div
@@ -62,7 +64,7 @@ const FocalPointPicker = ({
 };
 
 export const VideoPage = () => {
-  const { id, collectionId: routeCollectionId } = useParams<{ id: string; collectionId?: string }>();
+  const { id, collectionId: routeCollectionId } = useParams<{ id: string; collectionId?: string; }>();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { data: video, isError, isLoading } = useVideo(id ?? '');
@@ -70,23 +72,58 @@ export const VideoPage = () => {
   const { mutate: remove, isPending: isDeleting } = useDeleteMedia();
   const { data: collections } = useCollections();
   const { data: allVideos } = useVideos();
+  const { data: genreOptions } = useGenres();
 
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editGenres, setEditGenres] = useState<string[]>([]);
+  const [editKind, setEditKind] = useState<MediaKind>('movie');
+  const [editEpisodeNumber, setEditEpisodeNumber] = useState<string>('');
   const [editFocalPoint, setEditFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 });
   const [editCollectionId, setEditCollectionId] = useState<string>('');
   const [newThumbnail, setNewThumbnail] = useState<File | null>(null);
   const [newThumbnailPreview, setNewThumbnailPreview] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const collectionOptions = useMemo(() => editKind === 'episode'
+    ? (collections ?? []).filter((collection) => collection.kind === 'season')
+    : buildTopographicList(collections ?? [])
+      .map(({ item }) => item)
+      .filter((collection) => collection.kind === 'collection'),
+  [editKind, collections]);
+
+  const seasonGroups = useMemo(() => buildSeasonGroups(collections ?? []), [collections]);
+
+  useEffect(() => {
+    if (!editCollectionId) return;
+    const selectedCollection = (collections ?? []).find((collection) => collection._id === editCollectionId);
+    const isValidSelection = editKind === 'episode'
+      ? selectedCollection?.kind === 'season'
+      : selectedCollection?.kind === 'collection';
+    if (!isValidSelection) {
+      setEditCollectionId('');
+    }
+  }, [editKind, editCollectionId, collections]);
+
+  useEffect(() => {
+    setEditing(false);
+    setShowDeleteConfirm(false);
+    if (newThumbnailPreview) {
+      URL.revokeObjectURL(newThumbnailPreview);
+    }
+    setNewThumbnail(null);
+    setNewThumbnailPreview(null);
+  }, [id]);
+
   const openEdit = () => {
     if (!video) return;
     setEditTitle(video.title);
     setEditDescription(video.description ?? '');
-    setEditTags(video.tags);
+    setEditGenres(video.genres);
+    setEditKind(video.kind ?? 'movie');
+    setEditEpisodeNumber(video.episodeNumber !== undefined ? String(video.episodeNumber) : '');
     setEditFocalPoint(video.thumbnailFocalPoint);
     setEditCollectionId(video.collectionId ?? '');
     setNewThumbnail(null);
@@ -120,16 +157,43 @@ export const VideoPage = () => {
 
   const submitEdit = () => {
     if (!editTitle.trim()) return;
-    const collectionId = editCollectionId === '' ? null : editCollectionId;
+    const rawCollectionId = editCollectionId === '' ? null : editCollectionId;
     const originalCollectionId = video?.collectionId ?? null;
+    const collectionId = editKind === 'episode' ? (rawCollectionId ?? originalCollectionId) : rawCollectionId;
+    if (editKind === 'episode' && !collectionId) {
+      toast.error('An episode must belong to a season', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      });
+      return;
+    }
+    if (editKind === 'movie' && collectionId) {
+      const selectedCollection = (collections ?? []).find((collection) => collection._id === collectionId);
+      if (!selectedCollection || selectedCollection.kind !== 'collection') {
+        toast.error('A movie can only belong to a general collection', {
+          style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+        });
+        return;
+      }
+    }
+    const parsedEpisodeNumber = editKind === 'episode' ? parsePositiveInt(editEpisodeNumber) : undefined;
+    if (parsedEpisodeNumber === null) {
+      toast.error('Episode number must be a whole number greater than 0', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      });
+      return;
+    }
     update(
       {
         title: editTitle.trim(),
         description: editDescription.trim(),
-        tags: editTags,
+        genres: editGenres,
+        kind: editKind,
+        episodeNumber: parsedEpisodeNumber,
         thumbnailFocalPoint: editFocalPoint,
         thumbnail: newThumbnail ?? undefined,
-        collectionId: collectionId !== originalCollectionId ? collectionId : undefined,
+        collectionId: editKind === 'episode'
+          ? (collectionId as string)
+          : (collectionId !== originalCollectionId ? collectionId : undefined),
       },
       {
         onSuccess: () => {
@@ -149,8 +213,8 @@ export const VideoPage = () => {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDeleting]);
 
-  const toggleEditTag = (tag: string) =>
-    setEditTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
+  const toggleEditGenre = (name: string) =>
+    setEditGenres((prev) => prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]);
 
   const handleDelete = () => {
     if (!id) return;
@@ -191,15 +255,15 @@ export const VideoPage = () => {
   return (
     <div className="mx-auto max-w-6xl">
       {routeCollectionId && collections && (() => {
-        const chain: { _id: string; title: string }[] = []
-        let currentId: string | undefined = routeCollectionId
+        const chain: { _id: string; title: string; }[] = [];
+        let currentId: string | undefined = routeCollectionId;
         while (currentId) {
-          const col = collections.find((c) => c._id === currentId)
-          if (!col) break
-          chain.unshift(col)
-          currentId = col.collectionId
+          const col = collections.find((c) => c._id === currentId);
+          if (!col) break;
+          chain.unshift(col);
+          currentId = col.collectionId;
         }
-        if (chain.length === 0) return null
+        if (chain.length === 0) return null;
         return (
           <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
             <Link to="/" className="transition-colors hover:text-foreground">Home</Link>
@@ -214,7 +278,7 @@ export const VideoPage = () => {
             <ChevronRight size={14} />
             <span className="text-foreground">{video.title}</span>
           </nav>
-        )
+        );
       })()}
 
       <VideoPlayer
@@ -272,15 +336,48 @@ export const VideoPage = () => {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Tags</label>
+              <label className="text-sm font-medium">Kind</label>
+              <div className="flex gap-3">
+                {(['movie', 'episode'] as MediaKind[]).map((k) => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="edit-kind"
+                      value={k}
+                      checked={editKind === k}
+                      onChange={() => setEditKind(k)}
+                      className="accent-red-500"
+                    />
+                    {k.charAt(0).toUpperCase() + k.slice(1)}
+                  </label>
+                ))}
+              </div>
+            </div>
+            {editKind === 'episode' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Episode Number</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={editEpisodeNumber}
+                  onChange={(e) => setEditEpisodeNumber(e.target.value)}
+                  onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                  placeholder="e.g. 1"
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">Genres</label>
               <div className="flex flex-wrap gap-2">
-                {MEDIA_TAGS.map((tag) => {
-                  const selected = editTags.includes(tag);
+                {(genreOptions ?? []).map((genre) => {
+                  const selected = editGenres.includes(genre.name);
                   return (
                     <button
-                      key={tag}
+                      key={genre._id}
                       type="button"
-                      onClick={() => toggleEditTag(tag)}
+                      onClick={() => toggleEditGenre(genre.name)}
                       className={[
                         'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                         selected
@@ -288,27 +385,38 @@ export const VideoPage = () => {
                           : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
                       ].join(' ')}
                     >
-                      {tag}
+                      {genre.name}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {collections && (
+            {collectionOptions.length > 0 && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Collection</label>
+                <label className="text-sm font-medium">{editKind === 'episode' ? 'Containing season' : 'Containing collection'}</label>
                 <select
                   value={editCollectionId}
                   onChange={(e) => setEditCollectionId(e.target.value)}
                   className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  required={editKind === 'episode'}
                 >
-                  <option value="">— None —</option>
-                  {buildTopographicList(collections).map(({ item, depth }) => (
-                    <option key={item._id} value={item._id}>
-                      {'\u00a0\u00a0'.repeat(depth * 2)}{depth > 0 ? '↳ ' : ''}{item.title}
-                    </option>
-                  ))}
+                  <option value="">{editKind === 'episode' ? '— Select a season —' : '— None (top level movie) —'}</option>
+                  {editKind === 'episode'
+                    ? seasonGroups.map((group) => (
+                      <optgroup key={group.key} label={group.label}>
+                        {group.seasons.map((item) => (
+                          <option key={item._id} value={item._id}>
+                            {group.label === 'Unnested Seasons' ? item.title : `${group.label} — ${item.title}`}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                    : collectionOptions.map((item) => (
+                      <option key={item._id} value={item._id}>
+                        {item.title}
+                      </option>
+                    ))}
                 </select>
               </div>
             )}
@@ -400,11 +508,11 @@ export const VideoPage = () => {
               <p className="mt-3 text-sm text-muted-foreground">{video.description}</p>
             )}
 
-            {video.tags.length > 0 && (
+            {video.genres.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {video.tags.map((tag) => (
-                  <span key={tag} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
-                    {tag}
+                {video.genres.map((name) => (
+                  <span key={name} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
+                    {name}
                   </span>
                 ))}
               </div>

@@ -1,12 +1,14 @@
 import z from 'zod';
 import { apiRequest, apiUpload } from './client';
-import type { Coordinates, PendingMediaItem } from '../types/api';
+import type { Coordinates, MediaKind, PendingMediaItem } from '../types/api';
 
 export interface UploadMediaParams {
   file: File;
   title: string;
   description: string;
-  tags: string[];
+  genres: string[];
+  kind: MediaKind;
+  episodeNumber?: number;
   thumbnail: File;
   thumbnailFocalPoint: Coordinates;
   collectionId?: string;
@@ -30,14 +32,16 @@ const putToStorage = (url: string, file: File): Promise<void> =>
     xhr.send(file);
   });
 
-export const uploadMedia = async ({ file, title, description, tags, thumbnail, thumbnailFocalPoint, collectionId }: UploadMediaParams): Promise<{ message: string; }> => {
+export const uploadMedia = async ({ file, title, description, genres, kind, episodeNumber, thumbnail, thumbnailFocalPoint, collectionId }: UploadMediaParams): Promise<{ message: string; }> => {
   const raw = await apiRequest<unknown>('/media/upload/initiate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       title,
       description,
-      tags,
+      genres,
+      kind,
+      ...(episodeNumber !== undefined ? { episodeNumber } : {}),
       thumbnailFocalPoint,
       ...(collectionId ? { collectionId } : {}),
       fileName: file.name,
@@ -61,31 +65,37 @@ export interface UpdateMediaParams {
   id: string;
   title: string;
   description?: string;
-  tags: string[];
+  genres: string[];
+  kind: MediaKind;
+  episodeNumber?: number | null;
   thumbnailFocalPoint: Coordinates;
   thumbnail?: File;
   collectionId?: string | null;  // null = remove from collection
 }
 
-const appendTags = (formData: FormData, tags: string[]) =>
-  tags.forEach(tag => formData.append('tags[]', tag));
+const appendGenres = (formData: FormData, genres: string[]) =>
+  genres.forEach(id => formData.append('genres[]', id));
 
 const buildMediaUpdateBody = ({
   title,
   description,
-  tags,
+  genres,
+  kind,
+  episodeNumber,
   thumbnailFocalPoint,
   collectionId,
 }: Omit<UpdateMediaParams, 'id' | 'thumbnail'>) => ({
   title,
   ...(description !== undefined ? { description } : {}),
-  tags,
+  genres,
+  kind,
+  ...(episodeNumber !== undefined ? { episodeNumber } : {}),
   thumbnailFocalPoint,
   ...(collectionId !== undefined ? { collectionId } : {}),
 });
 
-export const updateMedia = async ({ id, title, description, tags, thumbnailFocalPoint, thumbnail, collectionId }: UpdateMediaParams) => {
-  const body = buildMediaUpdateBody({ title, description, tags, thumbnailFocalPoint, collectionId });
+export const updateMedia = async ({ id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, thumbnail, collectionId }: UpdateMediaParams) => {
+  const body = buildMediaUpdateBody({ title, description, genres, kind, episodeNumber, thumbnailFocalPoint, collectionId });
 
   if (collectionId === null && !thumbnail) {
     return apiRequest<{ message: string; }>(`/media/${id}`, {
@@ -98,7 +108,9 @@ export const updateMedia = async ({ id, title, description, tags, thumbnailFocal
   const formData = new FormData();
   formData.append('title', title);
   if (description !== undefined) formData.append('description', description);
-  appendTags(formData, tags);
+  appendGenres(formData, genres);
+  formData.append('kind', kind);
+  if (episodeNumber !== undefined && episodeNumber !== null) formData.append('episodeNumber', String(episodeNumber));
   formData.append('thumbnailFocalPoint[x]', String(thumbnailFocalPoint.x));
   formData.append('thumbnailFocalPoint[y]', String(thumbnailFocalPoint.y));
   if (thumbnail) formData.append('thumbnail', thumbnail);

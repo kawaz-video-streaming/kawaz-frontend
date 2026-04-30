@@ -87,6 +87,9 @@ export const Navbar = () => {
               <Link to="/admin/avatars" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
                 Avatars
               </Link>
+              <Link to="/admin/genres" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
+                Genres
+              </Link>
             </>
           )}
         </div>

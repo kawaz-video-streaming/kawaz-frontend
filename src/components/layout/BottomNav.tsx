@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { FolderPlus, Image, Loader2, Upload, UserPlus } from 'lucide-react'
+import { FolderPlus, Image, Loader2, Tag, Upload, UserPlus } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { usePendingMedia } from '../../hooks/usePendingMedia'
 import { usePendingUsers } from '../../hooks/usePendingUsers'
@@ -69,6 +69,11 @@ export const BottomNav = () => {
         <Link to="/admin/avatars" className={linkCls('/admin/avatars')}>
           <Image size={20} />
           <span>Avatars</span>
+        </Link>
+
+        <Link to="/admin/genres" className={linkCls('/admin/genres')}>
+          <Tag size={20} />
+          <span>Genres</span>
         </Link>
 
         <div ref={processingRef}>

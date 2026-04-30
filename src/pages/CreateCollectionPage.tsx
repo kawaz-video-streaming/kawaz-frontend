@@ -1,37 +1,38 @@
-import { CheckCircle, Image, X } from 'lucide-react'
-import { useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react'
-import { useNavigate } from 'react-router'
-import { toast } from 'sonner'
-import { MEDIA_TAGS } from '../constants/tags'
-import type { Coordinates } from '../types/api'
-import { useCreateCollection } from '../hooks/useCreateCollection'
-import { useCollections } from '../hooks/useCollections'
-import { getFocalCropArea } from '../lib/focalPoints'
-import { buildTopographicList } from '../lib/collections'
+import { CheckCircle, Image, X } from 'lucide-react';
+import { useEffect, useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react';
+import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
+import type { CollectionKind, Coordinates } from '../types/api';
+import { useCreateCollection } from '../hooks/useCreateCollection';
+import { useCollections } from '../hooks/useCollections';
+import { useGenres } from '../hooks/useGenres';
+import { getFocalCropArea } from '../lib/focalPoints';
+import { parsePositiveInt } from '../lib/parsePositiveInt';
+import { buildTopographicList } from '../lib/collections';
 
 const ThumbnailFocalPointPicker = ({
   previewUrl,
   value,
   onChange,
 }: {
-  previewUrl: string
-  value: Coordinates
-  onChange: (focal: Coordinates) => void
+  previewUrl: string;
+  value: Coordinates;
+  onChange: (focal: Coordinates) => void;
 }) => {
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number; } | null>(null);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
+    const rect = e.currentTarget.getBoundingClientRect();
     onChange({
       x: Math.round(((e.clientX - rect.left) / rect.width) * 100) / 100,
       y: Math.round(((e.clientY - rect.top) / rect.height) * 100) / 100,
-    })
-  }
+    });
+  };
 
-  const crop = naturalSize ? getFocalCropArea(naturalSize, value, 2 / 3) : null
+  const crop = naturalSize ? getFocalCropArea(naturalSize, value, 2 / 3) : null;
 
   return (
-    <div className="relative w-full cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
+    <div className="relative mx-auto max-w-[300px] cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
       <img
         src={previewUrl}
         alt="Thumbnail preview"
@@ -51,73 +52,127 @@ const ThumbnailFocalPointPicker = ({
         />
       )}
     </div>
-  )
-}
+  );
+};
 
 export const CreateCollectionPage = () => {
-  const navigate = useNavigate()
-  const thumbnailInputRef = useRef<HTMLInputElement>(null)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [tags, setTags] = useState<string[]>([])
-  const [parentCollectionId, setParentCollectionId] = useState<string>('')
-  const [thumbnail, setThumbnail] = useState<File | null>(null)
-  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
-  const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 })
-  const { mutate: create, isPending, isSuccess, reset } = useCreateCollection()
-  const { data: collections } = useCollections()
+  const navigate = useNavigate();
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [genres, setGenres] = useState<string[]>([]);
+  const [kind, setKind] = useState<CollectionKind>('show');
+  const [seasonNumber, setSeasonNumber] = useState<string>('');
+  const [parentCollectionId, setParentCollectionId] = useState<string>('');
+  const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 });
+  const { mutate: create, isPending, isSuccess, reset } = useCreateCollection();
+  const { data: collections } = useCollections();
+  const { data: genreOptions } = useGenres();
+
+  const parentOptions = kind === 'season'
+    ? (collections ?? []).filter((collection) => collection.kind === 'show')
+    : kind === 'collection'
+      ? buildTopographicList(collections ?? [])
+        .map(({ item }) => item)
+        .filter((collection) => collection.kind === 'collection')
+      : [];
+
+  useEffect(() => {
+    if (kind === 'show' && parentCollectionId) {
+      setParentCollectionId('');
+      return;
+    }
+    if (!parentCollectionId) return;
+    const selectedParent = (collections ?? []).find((collection) => collection._id === parentCollectionId);
+    const isValidParent = kind === 'season'
+      ? selectedParent?.kind === 'show'
+      : kind === 'collection'
+        ? selectedParent?.kind === 'collection'
+        : !selectedParent;
+    if (!isValidParent) {
+      setParentCollectionId('');
+    }
+  }, [kind, parentCollectionId, collections]);
 
   const removeThumbnail = () => {
-    setThumbnail(null)
-    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview)
-    setThumbnailPreview(null)
-    setThumbnailFocalPoint({ x: 0.5, y: 0.5 })
-    if (thumbnailInputRef.current) thumbnailInputRef.current.value = ''
-  }
+    setThumbnail(null);
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setThumbnailPreview(null);
+    setThumbnailFocalPoint({ x: 0.5, y: 0.5 });
+    if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
+  };
 
   const handleThumbnailChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null
-    if (!file) return
+    const file = e.target.files?.[0] ?? null;
+    if (!file) return;
     if (!file.type.startsWith('image/')) {
       toast.error('Only image files are supported for thumbnails', {
         style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
-      })
-      return
+      });
+      return;
     }
-    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview)
-    setThumbnail(file)
-    setThumbnailPreview(URL.createObjectURL(file))
-    setThumbnailFocalPoint({ x: 0.5, y: 0.5 })
-  }
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setThumbnail(file);
+    setThumbnailPreview(URL.createObjectURL(file));
+    setThumbnailFocalPoint({ x: 0.5, y: 0.5 });
+  };
 
-  const toggleTag = (tag: string) =>
-    setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
+  const toggleGenre = (name: string) =>
+    setGenres((prev) => prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]);
 
   const handleSubmit = (e: SyntheticEvent) => {
-    e.preventDefault()
-    if (!title.trim() || !thumbnail) return
+    e.preventDefault();
+    if (!title.trim() || !thumbnail) return;
+    if (kind === 'season' && !parentCollectionId) {
+      toast.error('A season must be nested inside a show', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      });
+      return;
+    }
+    if (kind === 'collection' && parentCollectionId) {
+      const selectedParent = (collections ?? []).find((collection) => collection._id === parentCollectionId);
+      if (!selectedParent || selectedParent.kind !== 'collection') {
+        toast.error('A general collection can only be nested inside another general collection', {
+          style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+        });
+        return;
+      }
+    }
+    const parsedSeasonNumber = kind === 'season' ? parsePositiveInt(seasonNumber) : undefined;
+    if (parsedSeasonNumber === null) {
+      toast.error('Season number must be a whole number greater than 0', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      });
+      return;
+    }
     create(
       {
         title: title.trim(),
         description: description.trim(),
-        tags,
+        genres,
+        kind,
+        seasonNumber: parsedSeasonNumber,
         thumbnail,
         thumbnailFocalPoint,
-        collectionId: parentCollectionId || undefined,
+        collectionId: kind === 'show' ? undefined : (parentCollectionId || undefined),
       },
       {
         onSuccess: () => {
-          setTitle('')
-          setDescription('')
-          setTags([])
-          setParentCollectionId('')
-          removeThumbnail()
-          reset()
-          void navigate('/')
+          setTitle('');
+          setDescription('');
+          setGenres([]);
+          setKind('show');
+          setSeasonNumber('');
+          setParentCollectionId('');
+          removeThumbnail();
+          reset();
+          void navigate('/');
         },
       },
-    )
-  }
+    );
+  };
 
   return (
     <div className="mx-auto max-w-lg">
@@ -158,15 +213,51 @@ export const CreateCollectionPage = () => {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium">Tags</label>
+            <label className="text-sm font-medium">Kind <span className="text-red-500">*</span></label>
+            <div className="flex gap-3 flex-wrap">
+              {(['show', 'season', 'collection'] as CollectionKind[]).map((k) => (
+                <label key={k} className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input
+                    type="radio"
+                    name="col-kind"
+                    value={k}
+                    checked={kind === k}
+                    onChange={() => setKind(k)}
+                    className="accent-red-500"
+                  />
+                  {k.charAt(0).toUpperCase() + k.slice(1)}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {kind === 'season' && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium" htmlFor="col-season-number">Season Number</label>
+              <input
+                id="col-season-number"
+                type="number"
+                min={1}
+                step={1}
+                value={seasonNumber}
+                onChange={(e) => setSeasonNumber(e.target.value)}
+                onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                placeholder="e.g. 1"
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              />
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">Genres</label>
             <div className="flex flex-wrap gap-2">
-              {MEDIA_TAGS.map((tag) => {
-                const selected = tags.includes(tag)
+              {(genreOptions ?? []).map((genre) => {
+                const selected = genres.includes(genre.name);
                 return (
                   <button
-                    key={tag}
+                    key={genre._id}
                     type="button"
-                    onClick={() => toggleTag(tag)}
+                    onClick={() => toggleGenre(genre.name)}
                     className={[
                       'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                       selected
@@ -174,28 +265,29 @@ export const CreateCollectionPage = () => {
                         : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
                     ].join(' ')}
                   >
-                    {tag}
+                    {genre.name}
                   </button>
-                )
+                );
               })}
             </div>
           </div>
 
-          {collections && collections.length > 0 && (
+          {kind !== 'show' && (
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium" htmlFor="col-parent">
-                Parent collection
+                {kind === 'season' ? 'Containing show' : 'Containing collection'}
               </label>
               <select
                 id="col-parent"
                 value={parentCollectionId}
                 onChange={(e) => setParentCollectionId(e.target.value)}
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                required={kind === 'season'}
               >
-                <option value="">— None (top level) —</option>
-                {buildTopographicList(collections).map(({ item, depth }) => (
+                <option value="">{kind === 'season' ? '— Select a show —' : '— None (top level collection) —'}</option>
+                {parentOptions.map((item) => (
                   <option key={item._id} value={item._id}>
-                    {'\u00a0\u00a0'.repeat(depth * 2)}{depth > 0 ? '↳ ' : ''}{item.title}
+                    {item.title}
                   </option>
                 ))}
               </select>
@@ -260,5 +352,5 @@ export const CreateCollectionPage = () => {
         </form>
       </div>
     </div>
-  )
-}
+  );
+};

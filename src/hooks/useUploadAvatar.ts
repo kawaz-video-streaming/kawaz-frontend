@@ -5,8 +5,8 @@ import { uploadAvatar } from '../api/avatar'
 export const useUploadAvatar = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ name, category, file }: { name: string; category: string; file: File }) =>
-      uploadAvatar(name, category, file),
+    mutationFn: ({ name, categoryId, file }: { name: string; categoryId: string; file: File }) =>
+      uploadAvatar(name, categoryId, file),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['avatars'] })
     },
