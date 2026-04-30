@@ -25,3 +25,33 @@ export const buildTopographicList = (collections: CollectionListItem[]): Collect
   walk(undefined, 0)
   return result
 }
+
+export interface SeasonGroup {
+  key: string
+  label: string
+  seasons: CollectionListItem[]
+}
+
+export const buildSeasonGroups = (collections: CollectionListItem[]): SeasonGroup[] => {
+  const titleById = new Map(collections.map((c) => [c._id, c.title]))
+  const groups = new Map<string, { label: string; seasons: CollectionListItem[] }>()
+
+  collections
+    .filter((c) => c.kind === 'season')
+    .forEach((season) => {
+      const groupKey = season.collectionId ?? '__ungrouped__'
+      const groupLabel = season.collectionId
+        ? (titleById.get(season.collectionId) ?? 'Unknown Show')
+        : 'Unnested Seasons'
+      if (!groups.has(groupKey)) groups.set(groupKey, { label: groupLabel, seasons: [] })
+      groups.get(groupKey)!.seasons.push(season)
+    })
+
+  return [...groups.entries()]
+    .map(([key, { label, seasons }]) => ({
+      key,
+      label,
+      seasons: [...seasons].sort((a, b) => a.title.localeCompare(b.title)),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}

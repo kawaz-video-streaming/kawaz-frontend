@@ -1,15 +1,17 @@
-import { Check, ChevronRight, FolderOpen, Image, Pencil, Trash2, X } from 'lucide-react'
-import { useRef, useState } from 'react'
-import { useNavigate, useParams, Link } from 'react-router'
-import { MEDIA_TAGS } from '../constants/tags'
-import type { CollectionListItem, Coordinates, VideoListItem } from '../types/api'
-import { useCollection } from '../hooks/useCollection'
-import { useCollections } from '../hooks/useCollections'
-import { useUpdateCollection } from '../hooks/useUpdateCollection'
-import { useDeleteCollection } from '../hooks/useDeleteCollection'
-import { useVideos } from '../hooks/useVideos'
-import { useAuth } from '../auth/useAuth'
-import { getFocalCropArea, getObjectPositionFromFocalPoint } from '../lib/focalPoints'
+import { Check, ChevronRight, FolderOpen, Image, Pencil, Trash2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams, Link } from 'react-router';
+import type { CollectionKind, CollectionListItem, Coordinates, VideoListItem } from '../types/api';
+import { useCollection } from '../hooks/useCollection';
+import { useCollections } from '../hooks/useCollections';
+import { useUpdateCollection } from '../hooks/useUpdateCollection';
+import { useDeleteCollection } from '../hooks/useDeleteCollection';
+import { useVideos } from '../hooks/useVideos';
+import { useGenres } from '../hooks/useGenres';
+import { useAuth } from '../auth/useAuth';
+import { getFocalCropArea, getObjectPositionFromFocalPoint } from '../lib/focalPoints';
+import { parsePositiveInt } from '../lib/parsePositiveInt';
+import { toast } from 'sonner';
 
 const FocalPointPicker = ({
   src,
@@ -17,27 +19,27 @@ const FocalPointPicker = ({
   onChange,
   aspectRatio = 2 / 3,
 }: {
-  src: string
-  value: Coordinates
-  onChange: (focal: Coordinates) => void
-  aspectRatio?: number
+  src: string;
+  value: Coordinates;
+  onChange: (focal: Coordinates) => void;
+  aspectRatio?: number;
 }) => {
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number; } | null>(null);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
+    const rect = e.currentTarget.getBoundingClientRect();
     onChange({
       x: Math.round(((e.clientX - rect.left) / rect.width) * 100) / 100,
       y: Math.round(((e.clientY - rect.top) / rect.height) * 100) / 100,
-    })
-  }
+    });
+  };
 
-  const crop = naturalSize ? getFocalCropArea(naturalSize, value, aspectRatio) : null
+  const crop = naturalSize ? getFocalCropArea(naturalSize, value, aspectRatio) : null;
 
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Click the image to set which part stays visible in thumbnails.</p>
-      <div className="relative w-full cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
+      <div className={`relative mx-auto cursor-crosshair overflow-hidden rounded-lg border border-border ${aspectRatio >= 1 ? 'max-w-[450px]' : 'max-w-[300px]'}`} onClick={handleClick}>
         <img
           src={src}
           alt="Thumbnail"
@@ -58,8 +60,8 @@ const FocalPointPicker = ({
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
 const ItemThumbnail = ({
   src,
@@ -67,12 +69,12 @@ const ItemThumbnail = ({
   focalPoint,
   aspectRatio,
 }: {
-  src: string
-  title: string
-  focalPoint: Coordinates
-  aspectRatio: number
+  src: string;
+  title: string;
+  focalPoint: Coordinates;
+  aspectRatio: number;
 }) => {
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number; } | null>(null);
   return (
     <img
       src={src}
@@ -86,140 +88,239 @@ const ItemThumbnail = ({
           : `${focalPoint.x * 100}% ${focalPoint.y * 100}%`,
       }}
     />
-  )
-}
+  );
+};
 
 type PageItem =
-  | { type: 'collection'; data: CollectionListItem }
-  | { type: 'video'; data: VideoListItem }
+  | { type: 'collection'; data: CollectionListItem; }
+  | { type: 'video'; data: VideoListItem; };
 
 const formatDuration = (ms: number) => {
-  const totalSeconds = Math.floor(ms / 1000)
-  const h = Math.floor(totalSeconds / 3600)
-  const m = Math.floor((totalSeconds % 3600) / 60)
-  const s = totalSeconds % 60
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  return `${m}:${String(s).padStart(2, '0')}`
-}
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
 
 export const CollectionPage = () => {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const { isAdmin } = useAuth()
-  const { data: collection, isLoading, isError } = useCollection(id ?? '')
-  const { data: allCollections } = useCollections()
-  const { data: allVideos } = useVideos()
-  const { mutate: update, isPending: isUpdating } = useUpdateCollection(id ?? '')
-  const { mutate: remove, isPending: isDeleting } = useDeleteCollection()
+  const { id } = useParams<{ id: string; }>();
+  const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+  const { data: collection, isLoading, isError } = useCollection(id ?? '');
+  const { data: allCollections } = useCollections();
+  const { data: allVideos } = useVideos();
+  const { mutate: update, isPending: isUpdating } = useUpdateCollection(id ?? '');
+  const { mutate: remove, isPending: isDeleting } = useDeleteCollection();
+  const { data: genreOptions } = useGenres();
 
-  const thumbnailInputRef = useRef<HTMLInputElement>(null)
-  const [editing, setEditing] = useState(false)
-  const [editTitle, setEditTitle] = useState('')
-  const [editDescription, setEditDescription] = useState('')
-  const [editTags, setEditTags] = useState<string[]>([])
-  const [editFocalPoint, setEditFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 })
-  const [editParentId, setEditParentId] = useState<string>('')
-  const [newThumbnail, setNewThumbnail] = useState<File | null>(null)
-  const [newThumbnailPreview, setNewThumbnailPreview] = useState<string | null>(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editGenres, setEditGenres] = useState<string[]>([]);
+  const [editKind, setEditKind] = useState<CollectionKind>('show');
+  const [editSeasonNumber, setEditSeasonNumber] = useState<string>('');
+  const [editFocalPoint, setEditFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 });
+  const [editParentId, setEditParentId] = useState<string>('');
+  const [newThumbnail, setNewThumbnail] = useState<File | null>(null);
+  const [newThumbnailPreview, setNewThumbnailPreview] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const subcollections = allCollections?.filter((c) => c.collectionId === id) ?? []
-  const videos = allVideos?.filter((v) => v.collectionId === id) ?? []
+  const descendantIds = (() => {
+    if (!id) return new Set<string>();
+    const byParent = new Map<string, string[]>();
+    for (const collectionItem of allCollections ?? []) {
+      if (!collectionItem.collectionId) continue;
+      const siblings = byParent.get(collectionItem.collectionId) ?? [];
+      siblings.push(collectionItem._id);
+      byParent.set(collectionItem.collectionId, siblings);
+    }
+
+    const visited = new Set<string>();
+    const stack = [...(byParent.get(id) ?? [])];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || visited.has(current)) continue;
+      visited.add(current);
+      for (const childId of byParent.get(current) ?? []) {
+        if (!visited.has(childId)) stack.push(childId);
+      }
+    }
+
+    return visited;
+  })();
+
+  const subcollections = allCollections?.filter((c) => c.collectionId === id) ?? [];
+  const videos = allVideos?.filter((v) => v.collectionId === id) ?? [];
   const items: PageItem[] = [
     ...subcollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
     ...videos.map((video): PageItem => ({ type: 'video', data: video })),
-  ].sort((a, b) => a.data.title.localeCompare(b.data.title))
+  ].sort((a, b) => a.data.title.localeCompare(b.data.title));
 
   // Parent collection for breadcrumb
   const parentCollection = collection?.collectionId
     ? allCollections?.find((c) => c._id === collection.collectionId)
-    : null
+    : null;
 
-  // Collections that can be selected as parent (excluding self and own descendants)
-  const availableParents = allCollections?.filter((c) => c._id !== id) ?? []
+  // Collections that can be selected as parent.
+  const availableParents = (allCollections?.filter((c) => c._id !== id && !descendantIds.has(c._id)) ?? []).filter((collectionItem) =>
+    editKind === 'season'
+      ? collectionItem.kind === 'show'
+      : editKind === 'collection'
+        ? collectionItem.kind === 'collection'
+        : false,
+  );
+
+  useEffect(() => {
+    if (editKind === 'show' && editParentId) {
+      setEditParentId('');
+      return;
+    }
+    if (!editParentId) return;
+    const selectedParent = (allCollections ?? []).find((collectionItem) => collectionItem._id === editParentId);
+    const isValidParent = editKind === 'season'
+      ? selectedParent?.kind === 'show'
+      : editKind === 'collection'
+        ? selectedParent?.kind === 'collection'
+        : !selectedParent;
+    if (!isValidParent) {
+      setEditParentId('');
+    }
+  }, [editKind, editParentId, allCollections]);
+
+  useEffect(() => {
+    setEditing(false);
+    setShowDeleteConfirm(false);
+    if (newThumbnailPreview) {
+      URL.revokeObjectURL(newThumbnailPreview);
+    }
+    setNewThumbnail(null);
+    setNewThumbnailPreview(null);
+  }, [id]);
 
   const openEdit = () => {
-    if (!collection) return
-    setEditTitle(collection.title)
-    setEditDescription(collection.description ?? '')
-    setEditTags(collection.tags)
-    setEditFocalPoint(collection.thumbnailFocalPoint)
-    setEditParentId(collection.collectionId ?? '')
-    setNewThumbnail(null)
-    setNewThumbnailPreview(null)
-    setEditing(true)
-  }
+    if (!collection) return;
+    setEditTitle(collection.title);
+    setEditDescription(collection.description ?? '');
+    setEditGenres(collection.genres);
+    setEditKind(collection.kind ?? 'show');
+    setEditSeasonNumber(collection.seasonNumber !== undefined ? String(collection.seasonNumber) : '');
+    setEditFocalPoint(collection.thumbnailFocalPoint);
+    setEditParentId(collection.collectionId ?? '');
+    setNewThumbnail(null);
+    setNewThumbnailPreview(null);
+    setEditing(true);
+  };
 
   const cancelEdit = () => {
-    setEditing(false)
-    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
-    setNewThumbnail(null)
-    setNewThumbnailPreview(null)
-  }
+    setEditing(false);
+    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview);
+    setNewThumbnail(null);
+    setNewThumbnailPreview(null);
+  };
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null
-    if (!file) return
-    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
-    setNewThumbnail(file)
-    setNewThumbnailPreview(URL.createObjectURL(file))
-    setEditFocalPoint({ x: 0.5, y: 0.5 })
-  }
+    const file = e.target.files?.[0] ?? null;
+    if (!file) return;
+    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview);
+    setNewThumbnail(file);
+    setNewThumbnailPreview(URL.createObjectURL(file));
+    setEditFocalPoint({ x: 0.5, y: 0.5 });
+  };
 
   const removeNewThumbnail = () => {
-    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
-    setNewThumbnail(null)
-    setNewThumbnailPreview(null)
-    setEditFocalPoint(collection?.thumbnailFocalPoint ?? { x: 0.5, y: 0.5 })
-    if (thumbnailInputRef.current) thumbnailInputRef.current.value = ''
-  }
+    if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview);
+    setNewThumbnail(null);
+    setNewThumbnailPreview(null);
+    setEditFocalPoint(collection?.thumbnailFocalPoint ?? { x: 0.5, y: 0.5 });
+    if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
+  };
 
   const submitEdit = () => {
-    if (!editTitle.trim()) return
-    const originalParentId = collection?.collectionId ?? null
-    const newParentId = editParentId === '' ? null : editParentId
+    if (!editTitle.trim()) return;
+    const originalParentId = collection?.collectionId ?? null;
+    const rawParentId = editParentId === '' ? null : editParentId;
+    if (editKind === 'season' && !(rawParentId ?? originalParentId)) {
+      toast.error('A season must be nested inside a show', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      });
+      return;
+    }
+    if (editKind === 'collection' && rawParentId) {
+      if (descendantIds.has(rawParentId)) {
+        toast.error('A collection cannot be nested inside one of its descendants', {
+          style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+        });
+        return;
+      }
+      const selectedParent = (allCollections ?? []).find((collectionItem) => collectionItem._id === rawParentId);
+      if (!selectedParent || selectedParent.kind !== 'collection') {
+        toast.error('A general collection can only be nested inside another general collection', {
+          style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+        });
+        return;
+      }
+    }
+    const parsedSeasonNumber = editKind === 'season' ? parsePositiveInt(editSeasonNumber) : undefined;
+    if (parsedSeasonNumber === null) {
+      toast.error('Season number must be a whole number greater than 0', {
+        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+      });
+      return;
+    }
+
+    const collectionIdForUpdate = editKind === 'season'
+      ? (rawParentId ?? originalParentId)!
+      : editKind === 'show'
+        ? (originalParentId !== null ? null : undefined)
+        : (rawParentId !== originalParentId ? rawParentId : undefined);
+
     update(
       {
         title: editTitle.trim(),
         description: editDescription.trim(),
-        tags: editTags,
+        genres: editGenres,
+        kind: editKind,
+        seasonNumber: parsedSeasonNumber,
         thumbnailFocalPoint: editFocalPoint,
         thumbnail: newThumbnail ?? undefined,
-        collectionId: newParentId !== originalParentId ? newParentId : undefined,
+        collectionId: collectionIdForUpdate,
       },
       {
         onSuccess: () => {
-          setEditing(false)
-          if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview)
-          setNewThumbnail(null)
-          setNewThumbnailPreview(null)
+          setEditing(false);
+          if (newThumbnailPreview) URL.revokeObjectURL(newThumbnailPreview);
+          setNewThumbnail(null);
+          setNewThumbnailPreview(null);
         },
       },
-    )
-  }
+    );
+  };
 
-  const toggleEditTag = (tag: string) =>
-    setEditTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
+  const toggleEditGenre = (name: string) =>
+    setEditGenres((prev) => prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]);
 
   const handleDelete = () => {
-    if (!id) return
+    if (!id) return;
     remove(id, {
       onSuccess: () => {
         if (collection?.collectionId) {
-          void navigate(`/collections/${collection.collectionId}`)
+          void navigate(`/collections/${collection.collectionId}`);
         } else {
-          void navigate('/')
+          void navigate('/');
         }
       },
-    })
-  }
+    });
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-32 text-muted-foreground">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-red-500" />
       </div>
-    )
+    );
   }
 
   if (isError || !collection) {
@@ -227,10 +328,10 @@ export const CollectionPage = () => {
       <div className="flex flex-col items-center justify-center py-32 text-center">
         <p className="text-lg font-semibold">Collection not found</p>
       </div>
-    )
+    );
   }
 
-  const thumbnailSrc = `/api/mediaCollection/${collection._id}/thumbnail`
+  const thumbnailSrc = `/api/mediaCollection/${collection._id}/thumbnail`;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -271,15 +372,48 @@ export const CollectionPage = () => {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Tags</label>
+              <label className="text-sm font-medium">Kind</label>
+              <div className="flex gap-3 flex-wrap">
+                {(['show', 'season', 'collection'] as CollectionKind[]).map((k) => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="edit-col-kind"
+                      value={k}
+                      checked={editKind === k}
+                      onChange={() => setEditKind(k)}
+                      className="accent-red-500"
+                    />
+                    {k.charAt(0).toUpperCase() + k.slice(1)}
+                  </label>
+                ))}
+              </div>
+            </div>
+            {editKind === 'season' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Season Number</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={editSeasonNumber}
+                  onChange={(e) => setEditSeasonNumber(e.target.value)}
+                  onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                  placeholder="e.g. 1"
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">Genres</label>
               <div className="flex flex-wrap gap-2">
-                {MEDIA_TAGS.map((tag) => {
-                  const selected = editTags.includes(tag)
+                {(genreOptions ?? []).map((genre) => {
+                  const selected = editGenres.includes(genre.name);
                   return (
                     <button
-                      key={tag}
+                      key={genre._id}
                       type="button"
-                      onClick={() => toggleEditTag(tag)}
+                      onClick={() => toggleEditGenre(genre.name)}
                       className={[
                         'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                         selected
@@ -287,21 +421,22 @@ export const CollectionPage = () => {
                           : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
                       ].join(' ')}
                     >
-                      {tag}
+                      {genre.name}
                     </button>
-                  )
+                  );
                 })}
               </div>
             </div>
-            {availableParents.length > 0 && (
+            {editKind !== 'show' && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Parent collection</label>
+                <label className="text-sm font-medium">{editKind === 'season' ? 'Containing show' : 'Containing collection'}</label>
                 <select
                   value={editParentId}
                   onChange={(e) => setEditParentId(e.target.value)}
                   className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  required={editKind === 'season'}
                 >
-                  <option value="">— None (top level) —</option>
+                  <option value="">{editKind === 'season' ? '— Select a show —' : '— None (top level collection) —'}</option>
                   {availableParents.map((col) => (
                     <option key={col._id} value={col._id}>{col.title}</option>
                   ))}
@@ -354,11 +489,11 @@ export const CollectionPage = () => {
                 {collection.description && (
                   <p className="mt-1 text-sm text-muted-foreground">{collection.description}</p>
                 )}
-                {collection.tags.length > 0 && (
+                {collection.genres.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {collection.tags.map((tag) => (
-                      <span key={tag} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
-                        {tag}
+                    {collection.genres.map((name) => (
+                      <span key={name} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
+                        {name}
                       </span>
                     ))}
                   </div>
@@ -436,11 +571,11 @@ export const CollectionPage = () => {
                   {item.data.description && (
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.data.description}</p>
                   )}
-                  {item.data.tags.length > 0 && (
+                  {item.data.genres.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {item.data.tags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-accent px-2 py-0.5 text-xs text-muted-foreground">
-                          {tag}
+                      {item.data.genres.map((name) => (
+                        <span key={name} className="rounded-full bg-accent px-2 py-0.5 text-xs text-muted-foreground">
+                          {name}
                         </span>
                       ))}
                     </div>
@@ -484,5 +619,5 @@ export const CollectionPage = () => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};

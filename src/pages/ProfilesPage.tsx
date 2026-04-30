@@ -6,24 +6,27 @@ import { useCreateProfile } from '../hooks/useCreateProfile'
 import { useUpdateProfile } from '../hooks/useUpdateProfile'
 import { useDeleteProfile } from '../hooks/useDeleteProfile'
 import { useAvatars } from '../hooks/useAvatars'
+import { useAvatarCategories } from '../hooks/useAvatarCategories'
 import { useAuth } from '../auth/useAuth'
 import { avatarImageUrl } from '../api/avatar'
-import type { Avatar } from '../types/api'
+import type { Avatar, AvatarCategory } from '../types/api'
 
 const AvatarPickerDialog = ({
   avatars,
+  categories,
   onSelect,
   onClose,
 }: {
   avatars: Avatar[]
+  categories: AvatarCategory[]
   onSelect: (avatar: Avatar) => void
   onClose: () => void
 }) => {
   const byCategory = avatars.reduce<Record<string, Avatar[]>>((acc, a) => {
-    ;(acc[a.category] ??= []).push(a)
+    ; (acc[a.categoryId] ??= []).push(a)
     return acc
   }, {})
-  const categories = Object.keys(byCategory).sort()
+  const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name))
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -36,11 +39,11 @@ const AvatarPickerDialog = ({
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground">
           <div className="flex flex-col gap-6">
-            {categories.map((cat) => (
-              <div key={cat}>
-                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">{cat}</p>
+            {sortedCategories.map((cat) => (
+              <div key={cat._id}>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">{cat.name}</p>
                 <div className="flex flex-wrap gap-3">
-                  {byCategory[cat].map((avatar) => (
+                  {(byCategory[cat._id] ?? []).map((avatar) => (
                     <button
                       key={avatar._id}
                       type="button"
@@ -68,6 +71,7 @@ export const ProfilesPage = () => {
   const { selectProfile } = useAuth()
   const { data: profiles, isLoading: profilesLoading } = useProfiles()
   const { data: avatars } = useAvatars()
+  const { data: categories } = useAvatarCategories()
   const { mutate: createProfile, isPending: creating } = useCreateProfile()
   const { mutate: deleteProfile, isPending: deleting } = useDeleteProfile()
 
@@ -238,6 +242,7 @@ export const ProfilesPage = () => {
       {pickingAvatar && avatars && (
         <AvatarPickerDialog
           avatars={avatars}
+          categories={categories ?? []}
           onSelect={setSelectedAvatar}
           onClose={() => setPickingAvatar(false)}
         />
@@ -247,6 +252,7 @@ export const ProfilesPage = () => {
       {editingProfileName && avatars && (
         <AvatarPickerDialog
           avatars={avatars}
+          categories={categories ?? []}
           onSelect={(avatar) => updateProfile({ profileName: editingProfileName, avatarId: avatar._id })}
           onClose={() => setEditingProfileName(null)}
         />
