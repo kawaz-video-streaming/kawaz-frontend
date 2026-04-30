@@ -48,6 +48,21 @@ type PageItem =
   | { type: 'video'; data: VideoListItem; }
   | { type: 'collection'; data: CollectionListItem; };
 
+const getItemKind = (item: PageItem): string => {
+  if (item.type === 'video') return 'Movies';
+  return item.data.kind === 'show' ? 'TV Shows' : 'Collections';
+};
+
+const getItemAllGenres = (item: PageItem): string[] => {
+  const valid = item.data.genres.filter((genre) => genre.trim().length > 0);
+  return valid.length > 0 ? valid : ['Other'];
+};
+
+const getItemPrimaryGenre = (item: PageItem): string => {
+  const valid = item.data.genres.filter((genre) => genre.trim().length > 0);
+  return valid[0] ?? 'Other';
+};
+
 const CAROUSEL_GAP_PX = 12;
 const CAROUSEL_ANIMATION_MS = 280;
 
@@ -238,47 +253,49 @@ export const HomePage = () => {
 
   const config = ORIENTATION_CONFIG.vertical;
 
-  const topLevelCollections = collections?.filter((c) => !c.collectionId) ?? [];
-  const topLevelVideos = videos?.filter((v) => !v.collectionId) ?? [];
-
-  const movies = topLevelVideos.filter((video) => video.kind !== 'episode');
-  const tvShows = topLevelCollections.filter((collection) => collection.kind === 'show');
-  const generalCollections = topLevelCollections.filter((collection) => collection.kind !== 'show');
+  const topLevelCollections = useMemo(
+    () => collections?.filter((c) => !c.collectionId) ?? [],
+    [collections],
+  );
+  const topLevelVideos = useMemo(
+    () => videos?.filter((v) => !v.collectionId) ?? [],
+    [videos],
+  );
+  const movies = useMemo(
+    () => topLevelVideos.filter((video) => video.kind !== 'episode'),
+    [topLevelVideos],
+  );
+  const tvShows = useMemo(
+    () => topLevelCollections.filter((collection) => collection.kind === 'show'),
+    [topLevelCollections],
+  );
+  const generalCollections = useMemo(
+    () => topLevelCollections.filter((collection) => collection.kind !== 'show'),
+    [topLevelCollections],
+  );
 
   const allItems: PageItem[] = useMemo(() => [
     ...movies.map((video): PageItem => ({ type: 'video', data: video })),
     ...topLevelCollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
   ], [movies, topLevelCollections]);
 
-  const getItemKind = (item: PageItem) => {
-    if (item.type === 'video') return 'Movies';
-    return item.data.kind === 'show' ? 'TV Shows' : 'Collections';
-  };
-
-  const topLevelItemsRaw: PageItem[] = useMemo(() => [
+  const newestItems = useMemo(() => [
     ...topLevelCollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
     ...movies.map((video): PageItem => ({ type: 'video', data: video })),
-  ], [topLevelCollections, movies]);
-  const newestItems = useMemo(() => [...topLevelItemsRaw].slice(-10).reverse(), [topLevelItemsRaw]);
+  ].slice(-10).reverse(), [topLevelCollections, movies]);
 
   const kindTabs = useMemo(() => [
     ...(movies.length > 0 ? ['Movies'] : []),
     ...(tvShows.length > 0 ? ['TV Shows'] : []),
     ...(generalCollections.length > 0 ? ['Collections'] : []),
-  ], [movies.length, tvShows.length, generalCollections.length]);
+  ], [movies, tvShows, generalCollections]);
 
   const kindFilteredItems = useMemo(() => selectedKind === 'All'
     ? allItems
     : allItems.filter((item) => getItemKind(item) === selectedKind), [selectedKind, allItems]);
 
-  const getItemGenres = (item: PageItem) => {
-    const validGenres = item.data.genres.filter((genre) => genre.trim().length > 0);
-    return validGenres.length > 0 ? [validGenres[0]] : ['Other'];
-  };
-
   const availableGenres = useMemo(() => [...new Set(
-    kindFilteredItems
-      .flatMap((item) => getItemGenres(item)),
+    kindFilteredItems.flatMap((item) => getItemAllGenres(item)),
   )].sort((a, b) => a.localeCompare(b)), [kindFilteredItems]);
 
   useEffect(() => {
@@ -288,12 +305,16 @@ export const HomePage = () => {
         ? prev
         : next;
     });
-  }, [selectedKind, availableGenres]);
+  }, [availableGenres]);
 
   const genreSections: Array<{ key: string; items: PageItem[]; }> = useMemo(() => (selectedGenres.length > 0 ? selectedGenres : availableGenres)
     .map((genre) => ({
       key: genre,
-      items: kindFilteredItems.filter((item) => getItemGenres(item).includes(genre)),
+      items: kindFilteredItems.filter((item) =>
+        selectedGenres.length > 0
+          ? getItemAllGenres(item).includes(genre)
+          : getItemPrimaryGenre(item) === genre,
+      ),
     }))
     .filter((section) => section.items.length > 0), [selectedGenres, availableGenres, kindFilteredItems]);
 

@@ -7,6 +7,7 @@ import { useCreateCollection } from '../hooks/useCreateCollection';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
 import { getFocalCropArea } from '../lib/focalPoints';
+import { parsePositiveInt } from '../lib/parsePositiveInt';
 import { buildTopographicList } from '../lib/collections';
 
 const ThumbnailFocalPointPicker = ({
@@ -118,16 +119,8 @@ export const CreateCollectionPage = () => {
     setThumbnailFocalPoint({ x: 0.5, y: 0.5 });
   };
 
-  const toggleGenre = (id: string) =>
-    setGenres((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]);
-
-  const parseSeasonNumber = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return undefined;
-    const parsed = Number(trimmed);
-    if (!Number.isInteger(parsed) || parsed < 1) return null;
-    return parsed;
-  };
+  const toggleGenre = (name: string) =>
+    setGenres((prev) => prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]);
 
   const handleSubmit = (e: SyntheticEvent) => {
     e.preventDefault();
@@ -147,7 +140,7 @@ export const CreateCollectionPage = () => {
         return;
       }
     }
-    const parsedSeasonNumber = kind === 'season' ? parseSeasonNumber(seasonNumber) : undefined;
+    const parsedSeasonNumber = kind === 'season' ? parsePositiveInt(seasonNumber) : undefined;
     if (parsedSeasonNumber === null) {
       toast.error('Season number must be a whole number greater than 0', {
         style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },

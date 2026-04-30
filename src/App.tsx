@@ -4,6 +4,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { ThemeProvider } from './theme/ThemeContext'
 import { Layout } from './components/layout/Layout'
 import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute'
+import { AdminRoute } from './components/AdminRoute'
 import { LoginPage } from './pages/LoginPage'
 import { ProfilesPage } from './pages/ProfilesPage'
 import { HomePage } from './pages/HomePage'
@@ -33,13 +34,13 @@ export const App = () => (
             }
           >
             <Route index element={<HomePage />} />
-            <Route path="upload" element={<UploadPage />} />
+            <Route path="upload" element={<AdminRoute><UploadPage /></AdminRoute>} />
             <Route path="videos/:id" element={<VideoPage />} />
             <Route path="collections/:collectionId/videos/:id" element={<VideoPage />} />
             <Route path="collections/:id" element={<CollectionPage />} />
-            <Route path="collections/new" element={<CreateCollectionPage />} />
-            <Route path="admin/avatars" element={<AvatarAdminPage />} />
-            <Route path="admin/genres" element={<GenreAdminPage />} />
+            <Route path="collections/new" element={<AdminRoute><CreateCollectionPage /></AdminRoute>} />
+            <Route path="admin/avatars" element={<AdminRoute><AvatarAdminPage /></AdminRoute>} />
+            <Route path="admin/genres" element={<AdminRoute><GenreAdminPage /></AdminRoute>} />
           </Route>
         </Routes>
       </BrowserRouter>

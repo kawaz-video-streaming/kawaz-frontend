@@ -1,5 +1,5 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import type { Coordinates, MediaKind } from '../types/api';
 import { useVideo } from '../hooks/useVideo';
@@ -11,7 +11,8 @@ import { useGenres } from '../hooks/useGenres';
 import { useAuth } from '../auth/useAuth';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { getFocalCropArea } from '../lib/focalPoints';
-import { buildTopographicList } from '../lib/collections';
+import { buildTopographicList, buildSeasonGroups } from '../lib/collections';
+import { parsePositiveInt } from '../lib/parsePositiveInt';
 import { toast } from 'sonner';
 
 const FocalPointPicker = ({
@@ -86,40 +87,14 @@ export const VideoPage = () => {
   const [newThumbnailPreview, setNewThumbnailPreview] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const collectionOptions = editKind === 'episode'
+  const collectionOptions = useMemo(() => editKind === 'episode'
     ? (collections ?? []).filter((collection) => collection.kind === 'season')
     : buildTopographicList(collections ?? [])
       .map(({ item }) => item)
-      .filter((collection) => collection.kind === 'collection');
+      .filter((collection) => collection.kind === 'collection'),
+  [editKind, collections]);
 
-  const seasonGroups = (() => {
-    const allCollections = collections ?? [];
-    const titleById = new Map(allCollections.map((collection) => [collection._id, collection.title]));
-    const groups = new Map<string, { label: string; seasons: typeof collectionOptions; }>();
-
-    allCollections
-      .filter((collection) => collection.kind === 'season')
-      .forEach((season) => {
-        const groupKey = season.collectionId ?? '__ungrouped__';
-        const groupLabel = season.collectionId
-          ? (titleById.get(season.collectionId) ?? 'Unknown Show')
-          : 'Unnested Seasons';
-
-        if (!groups.has(groupKey)) {
-          groups.set(groupKey, { label: groupLabel, seasons: [] });
-        }
-
-        groups.get(groupKey)?.seasons.push(season);
-      });
-
-    return [...groups.entries()]
-      .map(([key, value]) => ({
-        key,
-        label: value.label,
-        seasons: [...value.seasons].sort((a, b) => a.title.localeCompare(b.title)),
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  })();
+  const seasonGroups = useMemo(() => buildSeasonGroups(collections ?? []), [collections]);
 
   useEffect(() => {
     if (!editCollectionId) return;
@@ -180,14 +155,6 @@ export const VideoPage = () => {
     if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
   };
 
-  const parseEpisodeNumber = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return undefined;
-    const parsed = Number(trimmed);
-    if (!Number.isInteger(parsed) || parsed < 1) return null;
-    return parsed;
-  };
-
   const submitEdit = () => {
     if (!editTitle.trim()) return;
     const rawCollectionId = editCollectionId === '' ? null : editCollectionId;
@@ -208,7 +175,7 @@ export const VideoPage = () => {
         return;
       }
     }
-    const parsedEpisodeNumber = editKind === 'episode' ? parseEpisodeNumber(editEpisodeNumber) : undefined;
+    const parsedEpisodeNumber = editKind === 'episode' ? parsePositiveInt(editEpisodeNumber) : undefined;
     if (parsedEpisodeNumber === null) {
       toast.error('Episode number must be a whole number greater than 0', {
         style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
@@ -246,8 +213,8 @@ export const VideoPage = () => {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDeleting]);
 
-  const toggleEditGenre = (id: string) =>
-    setEditGenres((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]);
+  const toggleEditGenre = (name: string) =>
+    setEditGenres((prev) => prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]);
 
   const handleDelete = () => {
     if (!id) return;

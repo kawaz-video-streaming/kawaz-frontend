@@ -1,5 +1,5 @@
 import { CheckCircle, FileVideo, Image, Loader2, UploadCloud, X } from 'lucide-react';
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type SyntheticEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import type { Coordinates, MediaKind } from '../types/api';
@@ -7,7 +7,8 @@ import { useUploadMedia } from '../hooks/useUploadMedia';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
 import { getFocalCropArea } from '../lib/focalPoints';
-import { buildTopographicList } from '../lib/collections';
+import { buildTopographicList, buildSeasonGroups } from '../lib/collections';
+import { parsePositiveInt } from '../lib/parsePositiveInt';
 
 const MAX_SIZE = 10 * 1024 ** 3; // 10 GB
 
@@ -81,40 +82,14 @@ export const UploadPage = () => {
   const { data: collections } = useCollections();
   const { data: genreOptions } = useGenres();
 
-  const collectionOptions = kind === 'episode'
+  const collectionOptions = useMemo(() => kind === 'episode'
     ? (collections ?? []).filter((collection) => collection.kind === 'season')
     : buildTopographicList(collections ?? [])
       .map(({ item }) => item)
-      .filter((collection) => collection.kind === 'collection');
+      .filter((collection) => collection.kind === 'collection'),
+  [kind, collections]);
 
-  const seasonGroups = (() => {
-    const allCollections = collections ?? [];
-    const titleById = new Map(allCollections.map((collection) => [collection._id, collection.title]));
-    const groups = new Map<string, { label: string; seasons: typeof collectionOptions; }>();
-
-    allCollections
-      .filter((collection) => collection.kind === 'season')
-      .forEach((season) => {
-        const groupKey = season.collectionId ?? '__ungrouped__';
-        const groupLabel = season.collectionId
-          ? (titleById.get(season.collectionId) ?? 'Unknown Show')
-          : 'Unnested Seasons';
-
-        if (!groups.has(groupKey)) {
-          groups.set(groupKey, { label: groupLabel, seasons: [] });
-        }
-
-        groups.get(groupKey)?.seasons.push(season);
-      });
-
-    return [...groups.entries()]
-      .map(([key, value]) => ({
-        key,
-        label: value.label,
-        seasons: [...value.seasons].sort((a, b) => a.title.localeCompare(b.title)),
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  })();
+  const seasonGroups = useMemo(() => buildSeasonGroups(collections ?? []), [collections]);
 
   useEffect(() => {
     if (!collectionId) return;
@@ -201,16 +176,8 @@ export const UploadPage = () => {
 
   const handleDragLeave = () => setIsDragging(false);
 
-  const toggleGenre = (id: string) =>
-    setGenres((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]);
-
-  const parseEpisodeNumber = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return undefined;
-    const parsed = Number(trimmed);
-    if (!Number.isInteger(parsed) || parsed < 1) return null;
-    return parsed;
-  };
+  const toggleGenre = (name: string) =>
+    setGenres((prev) => prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]);
 
   const handleSubmit = (e: SyntheticEvent) => {
     e.preventDefault();
@@ -230,7 +197,7 @@ export const UploadPage = () => {
         return;
       }
     }
-    const parsedEpisodeNumber = kind === 'episode' ? parseEpisodeNumber(episodeNumber) : undefined;
+    const parsedEpisodeNumber = kind === 'episode' ? parsePositiveInt(episodeNumber) : undefined;
     if (parsedEpisodeNumber === null) {
       toast.error('Episode number must be a whole number greater than 0', {
         style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },

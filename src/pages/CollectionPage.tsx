@@ -10,6 +10,7 @@ import { useVideos } from '../hooks/useVideos';
 import { useGenres } from '../hooks/useGenres';
 import { useAuth } from '../auth/useAuth';
 import { getFocalCropArea, getObjectPositionFromFocalPoint } from '../lib/focalPoints';
+import { parsePositiveInt } from '../lib/parsePositiveInt';
 import { toast } from 'sonner';
 
 const FocalPointPicker = ({
@@ -237,14 +238,6 @@ export const CollectionPage = () => {
     if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
   };
 
-  const parseSeasonNumber = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return undefined;
-    const parsed = Number(trimmed);
-    if (!Number.isInteger(parsed) || parsed < 1) return null;
-    return parsed;
-  };
-
   const submitEdit = () => {
     if (!editTitle.trim()) return;
     const originalParentId = collection?.collectionId ?? null;
@@ -270,7 +263,7 @@ export const CollectionPage = () => {
         return;
       }
     }
-    const parsedSeasonNumber = editKind === 'season' ? parseSeasonNumber(editSeasonNumber) : undefined;
+    const parsedSeasonNumber = editKind === 'season' ? parsePositiveInt(editSeasonNumber) : undefined;
     if (parsedSeasonNumber === null) {
       toast.error('Season number must be a whole number greater than 0', {
         style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
@@ -278,9 +271,8 @@ export const CollectionPage = () => {
       return;
     }
 
-    const resolvedSeasonParentId = rawParentId ?? originalParentId;
     const collectionIdForUpdate = editKind === 'season'
-      ? (resolvedSeasonParentId as string)
+      ? (rawParentId ?? originalParentId)!
       : editKind === 'show'
         ? (originalParentId !== null ? null : undefined)
         : (rawParentId !== originalParentId ? rawParentId : undefined);
@@ -307,8 +299,8 @@ export const CollectionPage = () => {
     );
   };
 
-  const toggleEditGenre = (id: string) =>
-    setEditGenres((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]);
+  const toggleEditGenre = (name: string) =>
+    setEditGenres((prev) => prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]);
 
   const handleDelete = () => {
     if (!id) return;
