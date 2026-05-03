@@ -1,5 +1,5 @@
-import { useState, type SyntheticEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { useState, useEffect, type SyntheticEvent } from 'react'
+import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Input } from '../components/ui/input'
 import { useAuth } from '../auth/useAuth'
@@ -22,6 +22,13 @@ export const LoginPage = () => {
   const [inlineMessage, setInlineMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('pending') === 'true') {
+      setInlineMessage({ type: 'success', text: 'Your account is pending admin approval.' })
+    }
+  }, [searchParams])
 
   const usernameValid = validateUsername(username)
   const passwordValid = validatePassword(password)
