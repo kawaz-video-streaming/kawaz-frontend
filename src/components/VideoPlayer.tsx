@@ -137,16 +137,18 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
       const hoverTargetsContainer = document.createElement('div');
       hoverTargetsContainer.className = 'kawaz-chapter-hover-targets';
 
-      const gradient = ['to right'];
       for (const chapter of deduped) {
-        const start = `${(chapter.startTime / duration) * 100}%`;
-        const end = `calc(${start} + 2px)`;
-        gradient.push(`transparent ${start}`, `rgb(220 38 38) ${start}`, `rgb(220 38 38) ${end}`, `transparent ${end}`);
+        const leftPct = `${(chapter.startTime / duration) * 100}%`;
+
+        const mark = document.createElement('div');
+        mark.className = 'kawaz-chapter-mark';
+        mark.style.left = leftPct;
+        markerContainer.appendChild(mark);
 
         const hoverTarget = document.createElement('button');
         hoverTarget.type = 'button';
         hoverTarget.className = 'kawaz-chapter-hover-target';
-        hoverTarget.style.left = start;
+        hoverTarget.style.left = leftPct;
         hoverTarget.setAttribute('data-title', chapter.title);
         hoverTarget.setAttribute('aria-label', `Chapter: ${chapter.title}`);
         hoverTarget.addEventListener('click', event => {
@@ -157,7 +159,6 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
         hoverTargetsContainer.appendChild(hoverTarget);
       }
 
-      markerContainer.style.background = `linear-gradient(${gradient.join(',')})`;
       seekBarContainer.classList.add('kawaz-chapter-seekbar');
       seekBarContainer.insertBefore(markerContainer, seekBarContainer.firstChild);
       seekBarContainer.appendChild(hoverTargetsContainer);
