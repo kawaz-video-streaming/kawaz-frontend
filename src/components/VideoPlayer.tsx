@@ -118,26 +118,35 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
       removeChapterMarkers();
       if (chapters.length === 0) return;
 
+      // Sort then deduplicate chapters within 1s of each other.
+      // Some videos have chapter data from both the DASH manifest and the external
+      // VTT file; Shaka's getChaptersAsync combines all matching TextTracks, so the
+      // same chapter can appear twice with slightly different timestamps.
+      const sorted = chapters
+        .filter(c => c.startTime >= 0 && c.startTime < duration)
+        .sort((a, b) => a.startTime - b.startTime);
+      const deduped: import('shaka-player').Chapter[] = [];
+      for (const chapter of sorted) {
+        const last = deduped[deduped.length - 1];
+        if (!last || chapter.startTime - last.startTime > 1) deduped.push(chapter);
+      }
+      if (deduped.length === 0) return;
+
       const markerContainer = document.createElement('div');
       markerContainer.className = 'kawaz-chapter-markers';
       const hoverTargetsContainer = document.createElement('div');
       hoverTargetsContainer.className = 'kawaz-chapter-hover-targets';
 
-      const points = new Set<number>();
-      for (const chapter of chapters) {
-        if (chapter.startTime >= 0 && chapter.startTime < duration) points.add(chapter.startTime);
-      }
-      if (points.size === 0) return;
-
       const gradient = ['to right'];
-      const sortedPoints = Array.from(points).sort((a, b) => a - b);
+      for (const chapter of deduped) {
+        const start = `${(chapter.startTime / duration) * 100}%`;
+        const end = `calc(${start} + 2px)`;
+        gradient.push(`transparent ${start}`, `rgb(220 38 38) ${start}`, `rgb(220 38 38) ${end}`, `transparent ${end}`);
 
-      for (const chapter of chapters) {
-        if (chapter.startTime < 0 || chapter.startTime >= duration) continue;
         const hoverTarget = document.createElement('button');
         hoverTarget.type = 'button';
         hoverTarget.className = 'kawaz-chapter-hover-target';
-        hoverTarget.style.left = `${(chapter.startTime / duration) * 100}%`;
+        hoverTarget.style.left = start;
         hoverTarget.setAttribute('data-title', chapter.title);
         hoverTarget.setAttribute('aria-label', `Chapter: ${chapter.title}`);
         hoverTarget.addEventListener('click', event => {
@@ -146,12 +155,6 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
           if (videoRef.current) videoRef.current.currentTime = chapter.startTime;
         });
         hoverTargetsContainer.appendChild(hoverTarget);
-      }
-
-      for (const point of sortedPoints) {
-        const start = `${(point / duration) * 100}%`;
-        const end = `calc(${start} + 2px)`;
-        gradient.push(`transparent ${start}`, `rgb(220 38 38) ${start}`, `rgb(220 38 38) ${end}`, `transparent ${end}`);
       }
 
       markerContainer.style.background = `linear-gradient(${gradient.join(',')})`;
