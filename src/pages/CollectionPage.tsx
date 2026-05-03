@@ -157,7 +157,18 @@ export const CollectionPage = () => {
   const items: PageItem[] = [
     ...subcollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
     ...videos.map((video): PageItem => ({ type: 'video', data: video })),
-  ].sort((a, b) => a.data.title.localeCompare(b.data.title));
+  ].sort((a, b) => {
+    if (collection?.kind === 'show' && a.type === 'collection' && b.type === 'collection') {
+      const aNum = a.data.seasonNumber ?? Infinity;
+      const bNum = b.data.seasonNumber ?? Infinity;
+      if (aNum !== bNum) return aNum - bNum;
+    } else if (collection?.kind === 'season' && a.type === 'video' && b.type === 'video') {
+      const aNum = a.data.episodeNumber ?? Infinity;
+      const bNum = b.data.episodeNumber ?? Infinity;
+      if (aNum !== bNum) return aNum - bNum;
+    }
+    return a.data.title.localeCompare(b.data.title);
+  });
 
   // Parent collection for breadcrumb
   const parentCollection = collection?.collectionId

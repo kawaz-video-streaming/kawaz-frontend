@@ -45,10 +45,10 @@ export const BottomNav = () => {
   const active = (path: string) => location.pathname === path
 
   const linkCls = (path: string) =>
-    `flex flex-col items-center gap-0.5 px-3 py-2 text-xs transition-colors ${active(path) ? 'text-red-500' : 'text-muted-foreground'}`
+    `flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] transition-colors ${active(path) ? 'text-red-500' : 'text-muted-foreground'}`
 
   const btnCls = (on: boolean) =>
-    `relative flex flex-col items-center gap-0.5 px-3 py-2 text-xs transition-colors ${on ? 'text-red-500' : 'text-muted-foreground'}`
+    `relative flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] transition-colors ${on ? 'text-red-500' : 'text-muted-foreground'}`
 
   return (
     <div
@@ -57,22 +57,22 @@ export const BottomNav = () => {
     >
       <div className="flex items-center justify-around">
         <Link to="/upload" className={linkCls('/upload')}>
-          <Upload size={20} />
+          <Upload size={18} />
           <span>Upload</span>
         </Link>
 
         <Link to="/collections/new" className={linkCls('/collections/new')}>
-          <FolderPlus size={20} />
+          <FolderPlus size={18} />
           <span>Collection</span>
         </Link>
 
         <Link to="/admin/avatars" className={linkCls('/admin/avatars')}>
-          <Image size={20} />
+          <Image size={18} />
           <span>Avatars</span>
         </Link>
 
         <Link to="/admin/genres" className={linkCls('/admin/genres')}>
-          <Tag size={20} />
+          <Tag size={18} />
           <span>Genres</span>
         </Link>
 
@@ -84,7 +84,7 @@ export const BottomNav = () => {
           >
             <span className="relative">
               <Loader2
-                size={20}
+                size={18}
                 className={pendingItems && pendingItems.length > 0 ? 'animate-spin text-blue-500' : ''}
               />
               {pendingItems && pendingItems.length > 0 && (
@@ -107,7 +107,7 @@ export const BottomNav = () => {
             aria-label="Pending signups"
           >
             <span className="relative">
-              <UserPlus size={20} />
+              <UserPlus size={18} />
               {pendingSignups && pendingSignups.length > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
                   {pendingSignups.length > 9 ? '9+' : pendingSignups.length}
