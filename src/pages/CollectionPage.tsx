@@ -154,17 +154,22 @@ export const CollectionPage = () => {
 
   const subcollections = allCollections?.filter((c) => c.collectionId === id) ?? [];
   const videos = allVideos?.filter((v) => v.collectionId === id) ?? [];
+  const leadingNumber = (title: string) => {
+    const m = title.match(/\d+/);
+    return m ? parseInt(m[0], 10) : Infinity;
+  };
+
   const items: PageItem[] = [
     ...subcollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
     ...videos.map((video): PageItem => ({ type: 'video', data: video })),
   ].sort((a, b) => {
     if (collection?.kind === 'show' && a.type === 'collection' && b.type === 'collection') {
-      const aNum = a.data.seasonNumber ?? Infinity;
-      const bNum = b.data.seasonNumber ?? Infinity;
+      const aNum = a.data.seasonNumber ?? leadingNumber(a.data.title);
+      const bNum = b.data.seasonNumber ?? leadingNumber(b.data.title);
       if (aNum !== bNum) return aNum - bNum;
     } else if (collection?.kind === 'season' && a.type === 'video' && b.type === 'video') {
-      const aNum = a.data.episodeNumber ?? Infinity;
-      const bNum = b.data.episodeNumber ?? Infinity;
+      const aNum = a.data.episodeNumber ?? leadingNumber(a.data.title);
+      const bNum = b.data.episodeNumber ?? leadingNumber(b.data.title);
       if (aNum !== bNum) return aNum - bNum;
     }
     return a.data.title.localeCompare(b.data.title);
