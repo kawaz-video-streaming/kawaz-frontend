@@ -306,7 +306,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
             controlPanelElements: compact
               ? ['play_pause', 'time_and_duration', 'mute', 'spacer', 'overflow_menu', 'fullscreen']
               : ['play_pause', 'time_and_duration', 'mute', 'volume', 'spacer', 'captions', 'language', 'chapter', 'overflow_menu', 'fullscreen'],
-            seekBarColors: { chapters: 'rgb(220 38 38)' },
+            seekBarColors: { chapters: 'transparent' },
           });
           requestAnimationFrame(() => (player as unknown as EventTarget)?.dispatchEvent(new Event('variantchanged')));
         };
