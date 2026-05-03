@@ -433,25 +433,29 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
       if (!playerFocused) return;
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
+        e.stopPropagation();
         video.currentTime = Math.max(0, video.currentTime - 5);
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
+        e.stopPropagation();
         video.currentTime = Math.min(video.duration || 0, video.currentTime + 5);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
+        e.stopPropagation();
         const next = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
         video.volume = next;
         showVolume(next);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
+        e.stopPropagation();
         const next = Math.max(0, Math.round((video.volume - 0.1) * 10) / 10);
         video.volume = next;
         showVolume(next);
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, { capture: true });
       if (volumeHideTimer.current !== null) window.clearTimeout(volumeHideTimer.current);
     };
   }, []);
