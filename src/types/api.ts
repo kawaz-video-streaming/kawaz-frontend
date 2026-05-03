@@ -56,6 +56,7 @@ export interface VideoListItem {
   durationInMs: number
   genres: string[]
   kind?: MediaKind
+  episodeNumber?: number
   thumbnailFocalPoint: Coordinates
   collectionId?: string
 }
