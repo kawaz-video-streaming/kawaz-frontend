@@ -221,8 +221,9 @@ export const LoginPage = () => {
                   <div className="h-px flex-1 bg-zinc-700" />
                 </div>
 
-                <a
-                  href="/auth/google/login"
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = '/api/auth/google/login' }}
                   className="flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700"
                 >
                   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
@@ -232,7 +233,7 @@ export const LoginPage = () => {
                     <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58Z" fill="#EA4335"/>
                   </svg>
                   Sign in with Google
-                </a>
+                </button>
               </>
             )}
 
