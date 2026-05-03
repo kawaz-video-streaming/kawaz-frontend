@@ -78,6 +78,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
     let markerRenderRetryTimer: number | null = null;
     let stallRecoveryTimer: number | null = null;
     let resizeObserver: ResizeObserver | null = null;
+    let chapterRenderGeneration = 0;
 
     const removeChapterMarkers = () => {
       const seekBarContainer = containerRef.current?.querySelector<HTMLElement>('.shaka-seek-bar-container');
@@ -99,6 +100,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
     };
 
     const renderChapterMarkers = async (attempt = 0) => {
+      const generation = ++chapterRenderGeneration;
       if (isDisposed || !player || !containerRef.current || !videoRef.current) return;
 
       const seekBarContainer = containerRef.current.querySelector<HTMLElement>('.shaka-seek-bar-container');
@@ -112,6 +114,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
       }
 
       const chapters = await getPlayerChapters();
+      if (generation !== chapterRenderGeneration || isDisposed) return;
       removeChapterMarkers();
       if (chapters.length === 0) return;
 
