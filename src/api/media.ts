@@ -1,6 +1,6 @@
 import z from 'zod';
 import { apiRequest, apiUpload } from './client';
-import type { Coordinates, MediaKind, PendingMediaItem, TmdbCollectionDetails, TmdbMovieDetails } from '../types/api';
+import type { Coordinates, MediaKind, PendingMediaItem, TmdbCollectionDetails, TmdbEpisodeDetails, TmdbMovieDetails, TmdbShowDetails } from '../types/api';
 
 export interface UploadMediaParams {
   file: File;
@@ -142,3 +142,9 @@ export const searchTmdbMovie = (title: string, year?: number) => {
 
 export const fetchTmdbCollection = (id: number) =>
   apiRequest<TmdbCollectionDetails>(`/media/tmdb/collection?id=${id}`);
+
+export const searchTmdbShow = (title: string, year: number) =>
+  apiRequest<TmdbShowDetails>(`/media/tmdb/show?title=${encodeURIComponent(title)}&year=${year}`);
+
+export const searchTmdbEpisode = (showTitle: string, showYear: number, seasonNumber: number, episodeNumber: number) =>
+  apiRequest<TmdbEpisodeDetails>(`/media/tmdb/episode?showTitle=${encodeURIComponent(showTitle)}&showYear=${showYear}&seasonNumber=${seasonNumber}&episodeNumber=${episodeNumber}`);

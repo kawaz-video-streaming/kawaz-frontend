@@ -118,6 +118,33 @@ export interface TmdbCollection {
   poster_url: string | null
 }
 
+export interface TmdbShowDetails {
+  id: number
+  name: string
+  overview: string
+  first_air_date: string
+  poster_url: string | null
+  backdrop_url: string | null
+  genres: TmdbGenre[]
+  vote_average: number
+  vote_count: number
+  number_of_seasons: number
+  tagline: string
+}
+
+export interface TmdbEpisodeDetails {
+  id: number
+  name: string
+  overview: string
+  air_date: string
+  episode_number: number
+  season_number: number
+  still_url: string | null
+  vote_average: number
+  vote_count: number
+  runtime: number | null
+}
+
 export interface TmdbCollectionDetails {
   id: number
   name: string

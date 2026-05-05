@@ -2,7 +2,7 @@ import { CheckCircle, FileVideo, Image, Loader2, Plus, Search, UploadCloud, X } 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import type { Coordinates, MediaKind, TmdbMovieDetails } from '../types/api';
+import type { Coordinates, MediaKind, TmdbEpisodeDetails, TmdbMovieDetails } from '../types/api';
 import { useUploadMedia } from '../hooks/useUploadMedia';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
@@ -11,7 +11,7 @@ import { useCreateCollection } from '../hooks/useCreateCollection';
 import { getFocalCropArea } from '../lib/focalPoints';
 import { buildTopographicList, buildSeasonGroups } from '../lib/collections';
 import { parsePositiveInt } from '../lib/parsePositiveInt';
-import { searchTmdbMovie, fetchTmdbCollection } from '../api/media';
+import { searchTmdbMovie, fetchTmdbCollection, searchTmdbEpisode } from '../api/media';
 
 const MAX_SIZE = 10 * 1024 ** 3; // 10 GB
 
@@ -92,6 +92,16 @@ export const UploadPage = () => {
   const [tmdbNewGenres, setTmdbNewGenres] = useState<string[]>([]);
   const [creatingGenres, setCreatingGenres] = useState<string[]>([]);
 
+  // Episode TMDB state
+  const [epShowTitle, setEpShowTitle] = useState('');
+  const [epShowYear, setEpShowYear] = useState('');
+  const [epSeason, setEpSeason] = useState('');
+  const [epEpisode, setEpEpisode] = useState('');
+  const [epTmdbResult, setEpTmdbResult] = useState<TmdbEpisodeDetails | null>(null);
+  const [epTmdbLoading, setEpTmdbLoading] = useState(false);
+  const [epTmdbError, setEpTmdbError] = useState<string | null>(null);
+  const [epTmdbApplying, setEpTmdbApplying] = useState(false);
+
   const [collectionCreating, setCollectionCreating] = useState(false);
   const [collectionCreated, setCollectionCreated] = useState(false);
 
@@ -165,6 +175,10 @@ export const UploadPage = () => {
       : selectedCollection?.kind === 'collection';
     if (!isValidSelection) {
       setCollectionId('');
+      return;
+    }
+    if (kind === 'episode' && selectedCollection?.genres?.length) {
+      setGenres(selectedCollection.genres);
     }
   }, [kind, collectionId, collections]);
 
@@ -174,6 +188,10 @@ export const UploadPage = () => {
       setTmdbError(null);
       setTmdbNewGenres([]);
       setCollectionCreated(false);
+    }
+    if (kind !== 'episode') {
+      setEpTmdbResult(null);
+      setEpTmdbError(null);
     }
   }, [kind]);
 
@@ -211,6 +229,12 @@ export const UploadPage = () => {
       setTmdbError(null);
       setTmdbNewGenres([]);
       setCollectionCreated(false);
+      setEpShowTitle('');
+      setEpShowYear('');
+      setEpSeason('');
+      setEpEpisode('');
+      setEpTmdbResult(null);
+      setEpTmdbError(null);
       removeThumbnail();
     }
     reset();
@@ -307,6 +331,52 @@ export const UploadPage = () => {
         });
       } finally {
         setTmdbApplying(false);
+      }
+    }
+  };
+
+  const handleEpTmdbSearch = async () => {
+    const showTitle = epShowTitle.trim();
+    const showYear = parseInt(epShowYear, 10);
+    const season = parseInt(epSeason, 10);
+    const episode = parseInt(epEpisode, 10);
+    if (!showTitle || isNaN(showYear) || isNaN(season) || isNaN(episode)) return;
+    setEpTmdbLoading(true);
+    setEpTmdbError(null);
+    setEpTmdbResult(null);
+    try {
+      const result = await searchTmdbEpisode(showTitle, showYear, season, episode);
+      setEpTmdbResult(result);
+    } catch (e) {
+      setEpTmdbError(e instanceof Error ? e.message : 'Search failed');
+    } finally {
+      setEpTmdbLoading(false);
+    }
+  };
+
+  const applyEpTmdbResult = async (result: TmdbEpisodeDetails) => {
+    setTitle(result.name);
+    setDescription(result.overview);
+    setEpisodeNumber(String(result.episode_number));
+    if (result.still_url) {
+      setEpTmdbApplying(true);
+      try {
+        const response = await fetch(`/api/media/tmdb/poster?url=${encodeURIComponent(result.still_url)}`, { credentials: 'include' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const ext = blob.type.split('/')[1] || 'jpg';
+        const file = new File([blob], `${result.name}-still.${ext}`, { type: blob.type });
+        if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+        setThumbnail(file);
+        setThumbnailPreview(URL.createObjectURL(file));
+        setThumbnailFocalPoint({ x: 0.5, y: 0.5 });
+      } catch (err) {
+        console.error('[TMDB still fetch]', err);
+        toast.error('Could not fetch episode still — add a thumbnail manually', {
+          style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+        });
+      } finally {
+        setEpTmdbApplying(false);
       }
     }
   };
@@ -526,6 +596,91 @@ export const UploadPage = () => {
                               {collectionCreating ? <Loader2 size={12} className="animate-spin" /> : 'Create collection'}
                             </button>
                           )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TMDB search — episode only */}
+                  {kind === 'episode' && (
+                    <div className="flex flex-col gap-2 rounded-xl border border-border bg-accent/30 p-4">
+                      <p className="text-sm font-medium">Search TMDB <span className="text-xs font-normal text-muted-foreground">(optional — auto-fills fields)</span></p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={epShowTitle}
+                          onChange={(e) => setEpShowTitle(e.target.value)}
+                          placeholder="Show title"
+                          className="col-span-2 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        />
+                        <input
+                          type="number"
+                          value={epShowYear}
+                          onChange={(e) => setEpShowYear(e.target.value)}
+                          onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                          placeholder="Show year"
+                          min={1900} max={2100}
+                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        />
+                        <input
+                          type="number"
+                          value={epSeason}
+                          onChange={(e) => setEpSeason(e.target.value)}
+                          onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                          placeholder="Season #"
+                          min={1}
+                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        />
+                        <input
+                          type="number"
+                          value={epEpisode}
+                          onChange={(e) => setEpEpisode(e.target.value)}
+                          onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                          placeholder="Episode #"
+                          min={1}
+                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleEpTmdbSearch}
+                          disabled={!epShowTitle.trim() || !epShowYear || !epSeason || !epEpisode || epTmdbLoading}
+                          className="flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {epTmdbLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                          Search
+                        </button>
+                      </div>
+
+                      {epTmdbError && <p className="text-xs text-red-500">{epTmdbError}</p>}
+
+                      {epTmdbResult && (
+                        <div className="flex gap-3 rounded-lg border border-border bg-background p-3">
+                          {epTmdbResult.still_url && (
+                            <img
+                              src={epTmdbResult.still_url}
+                              alt={epTmdbResult.name}
+                              className="h-16 w-28 shrink-0 rounded object-cover"
+                            />
+                          )}
+                          <div className="flex min-w-0 flex-1 flex-col gap-1">
+                            <p className="text-sm font-semibold leading-tight">
+                              {epTmdbResult.name}
+                              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                S{String(epTmdbResult.season_number).padStart(2, '0')}E{String(epTmdbResult.episode_number).padStart(2, '0')}
+                              </span>
+                            </p>
+                            {epTmdbResult.overview && (
+                              <p className="line-clamp-2 text-xs text-muted-foreground">{epTmdbResult.overview}</p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => applyEpTmdbResult(epTmdbResult)}
+                            disabled={epTmdbApplying}
+                            className="shrink-0 self-start rounded-lg border border-red-500 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {epTmdbApplying ? <Loader2 size={12} className="animate-spin" /> : 'Use this'}
+                          </button>
                         </div>
                       )}
                     </div>
