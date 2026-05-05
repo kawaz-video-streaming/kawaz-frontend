@@ -1,6 +1,6 @@
 import z from 'zod';
 import { apiRequest, apiUpload } from './client';
-import type { Coordinates, MediaKind, PendingMediaItem } from '../types/api';
+import type { Coordinates, MediaKind, PendingMediaItem, TmdbCollectionDetails, TmdbMovieDetails } from '../types/api';
 
 export interface UploadMediaParams {
   file: File;
@@ -133,3 +133,12 @@ export const deleteMedia = (id: string) =>
   apiRequest<{ message: string; }>(`/media/${id}`, { method: 'DELETE' });
 
 export const getUploadingMedia = () => apiRequest<PendingMediaItem[]>('/media/uploading');
+
+export const searchTmdbMovie = (title: string, year?: number) => {
+  const params = new URLSearchParams({ title });
+  if (year !== undefined) params.set('year', String(year));
+  return apiRequest<TmdbMovieDetails>(`/media/tmdb/movie?${params}`);
+};
+
+export const fetchTmdbCollection = (id: number) =>
+  apiRequest<TmdbCollectionDetails>(`/media/tmdb/collection?id=${id}`);
