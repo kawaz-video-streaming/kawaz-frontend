@@ -1,16 +1,17 @@
-import { CheckCircle, Image, Loader2, Plus, Search, X } from 'lucide-react';
+import { CheckCircle, Image, Loader2, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import type { CollectionKind, Coordinates, TmdbShowDetails } from '../types/api';
+import type { CollectionKind, Coordinates } from '../types/api';
 import { useCreateCollection } from '../hooks/useCreateCollection';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
-import { useCreateGenre } from '../hooks/useCreateGenre';
+import { useTmdbShowSearch } from '../hooks/useTmdbShowSearch';
 import { getFocalCropArea } from '../lib/focalPoints';
 import { parsePositiveInt } from '../lib/parsePositiveInt';
 import { buildTopographicList } from '../lib/collections';
-import { searchTmdbShow } from '../api/media';
+import { NewGenrePills } from '../components/NewGenrePills';
+import { TmdbResultCard } from '../components/TmdbResultCard';
 
 const ThumbnailFocalPointPicker = ({
   previewUrl,
@@ -70,24 +71,17 @@ export const CreateCollectionPage = () => {
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 });
 
-  // TMDB state (show only)
-  const [tmdbQuery, setTmdbQuery] = useState('');
-  const [tmdbYear, setTmdbYear] = useState('');
-  const [tmdbResult, setTmdbResult] = useState<TmdbShowDetails | null>(null);
-  const [tmdbLoading, setTmdbLoading] = useState(false);
-  const [tmdbError, setTmdbError] = useState<string | null>(null);
-  const [tmdbApplying, setTmdbApplying] = useState(false);
-  const [tmdbNewGenres, setTmdbNewGenres] = useState<string[]>([]);
-  const [creatingGenres, setCreatingGenres] = useState<string[]>([]);
-
   const { mutate: create, isPending, isSuccess, reset } = useCreateCollection();
   const { data: collections } = useCollections();
   const { data: genreOptions } = useGenres();
-  const { mutate: createGenre } = useCreateGenre();
 
-  const effectiveNewGenres = tmdbNewGenres.filter(
-    (name) => !(genreOptions ?? []).some((g) => g.name === name),
-  );
+  const showTmdb = useTmdbShowSearch({
+    genreOptions,
+    thumbnailPreview,
+    setTitle, setDescription, setGenres,
+    setThumbnail, setThumbnailPreview,
+    setThumbnailFocalPoint,
+  });
 
   const parentOptions = kind === 'season'
     ? (collections ?? []).filter((collection) => collection.kind === 'show')
@@ -98,12 +92,8 @@ export const CreateCollectionPage = () => {
       : [];
 
   useEffect(() => {
-    if (kind !== 'show') {
-      setTmdbResult(null);
-      setTmdbError(null);
-      setTmdbNewGenres([]);
-    }
-  }, [kind]);
+    if (kind !== 'show') showTmdb.reset();
+  }, [kind, showTmdb.reset]);
 
   useEffect(() => {
     if (kind === 'show' && parentCollectionId) {
@@ -152,55 +142,6 @@ export const CreateCollectionPage = () => {
   const toggleGenre = (name: string) =>
     setGenres((prev) => prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]);
 
-  const handleTmdbSearch = async () => {
-    const q = tmdbQuery.trim();
-    const y = parseInt(tmdbYear, 10);
-    if (!q || !tmdbYear || isNaN(y)) return;
-    setTmdbLoading(true);
-    setTmdbError(null);
-    setTmdbResult(null);
-    setTmdbNewGenres([]);
-    try {
-      const result = await searchTmdbShow(q, y);
-      setTmdbResult(result);
-    } catch (e) {
-      setTmdbError(e instanceof Error ? e.message : 'Search failed');
-    } finally {
-      setTmdbLoading(false);
-    }
-  };
-
-  const applyTmdbShow = async (result: TmdbShowDetails) => {
-    setTitle(result.name);
-    setDescription(result.overview);
-    const availableNames = new Set((genreOptions ?? []).map((g) => g.name));
-    const matched = result.genres.map((g) => g.name).filter((n) => availableNames.has(n));
-    const unmatched = result.genres.map((g) => g.name).filter((n) => !availableNames.has(n));
-    setGenres([...matched, ...unmatched]);
-    setTmdbNewGenres(unmatched);
-    if (result.poster_url) {
-      setTmdbApplying(true);
-      try {
-        const response = await fetch(`/api/media/tmdb/poster?url=${encodeURIComponent(result.poster_url)}`, { credentials: 'include' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const blob = await response.blob();
-        const ext = blob.type.split('/')[1] || 'jpg';
-        const file = new File([blob], `${result.name}-poster.${ext}`, { type: blob.type });
-        if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
-        setThumbnail(file);
-        setThumbnailPreview(URL.createObjectURL(file));
-        setThumbnailFocalPoint({ x: 0.5, y: 0.5 });
-      } catch (err) {
-        console.error('[TMDB poster fetch]', err);
-        toast.error('Could not fetch poster — add a thumbnail manually', {
-          style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
-        });
-      } finally {
-        setTmdbApplying(false);
-      }
-    }
-  };
-
   const handleSubmit = (e: SyntheticEvent) => {
     e.preventDefault();
     if (!title.trim() || !thumbnail) return;
@@ -245,10 +186,7 @@ export const CreateCollectionPage = () => {
           setKind('show');
           setSeasonNumber('');
           setParentCollectionId('');
-          setTmdbQuery('');
-          setTmdbYear('');
-          setTmdbResult(null);
-          setTmdbNewGenres([]);
+          showTmdb.reset();
           removeThumbnail();
           reset();
           void navigate('/');
@@ -294,16 +232,16 @@ export const CreateCollectionPage = () => {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={tmdbQuery}
-                  onChange={(e) => setTmdbQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleTmdbSearch())}
+                  value={showTmdb.query}
+                  onChange={(e) => showTmdb.setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), showTmdb.handleSearch())}
                   placeholder="Show title"
                   className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 />
                 <input
                   type="number"
-                  value={tmdbYear}
-                  onChange={(e) => setTmdbYear(e.target.value)}
+                  value={showTmdb.year}
+                  onChange={(e) => showTmdb.setYear(e.target.value)}
                   onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
                   placeholder="Year"
                   min={1900}
@@ -312,58 +250,30 @@ export const CreateCollectionPage = () => {
                 />
                 <button
                   type="button"
-                  onClick={handleTmdbSearch}
-                  disabled={!tmdbQuery.trim() || !tmdbYear || tmdbLoading}
+                  onClick={showTmdb.handleSearch}
+                  disabled={!showTmdb.query.trim() || !showTmdb.year || showTmdb.loading}
                   className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {tmdbLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  {showTmdb.loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
                   Search
                 </button>
               </div>
 
-              {tmdbError && <p className="text-xs text-red-500">{tmdbError}</p>}
+              {showTmdb.error && <p className="text-xs text-red-500">{showTmdb.error}</p>}
 
-              {tmdbResult && (
-                <div className="flex gap-3 rounded-lg border border-border bg-background p-3">
-                  {tmdbResult.poster_url && (
-                    <img
-                      src={tmdbResult.poster_url}
-                      alt={tmdbResult.name}
-                      className="h-24 w-16 shrink-0 rounded object-cover"
-                    />
-                  )}
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <p className="text-sm font-semibold leading-tight">
-                      {tmdbResult.name}
-                      {tmdbResult.first_air_date && (
-                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                          ({tmdbResult.first_air_date.slice(0, 4)})
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{tmdbResult.number_of_seasons} season{tmdbResult.number_of_seasons !== 1 ? 's' : ''}</p>
-                    {tmdbResult.overview && (
-                      <p className="line-clamp-2 text-xs text-muted-foreground">{tmdbResult.overview}</p>
-                    )}
-                    {tmdbResult.genres.length > 0 && (
-                      <div className="mt-auto flex flex-wrap gap-1 pt-1">
-                        {tmdbResult.genres.map((g) => (
-                          <span key={g.id} className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                            {g.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => applyTmdbShow(tmdbResult)}
-                    disabled={tmdbApplying}
-                    className="shrink-0 self-start rounded-lg border border-red-500 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {tmdbApplying ? <Loader2 size={12} className="animate-spin" /> : 'Use this'}
-                  </button>
-                </div>
+              {showTmdb.result && (
+                <TmdbResultCard
+                  imageUrl={showTmdb.result.poster_url}
+                  imageAlt={showTmdb.result.name}
+                  imageClassName="h-24 w-16"
+                  title={showTmdb.result.name}
+                  subtitle={showTmdb.result.first_air_date ? `(${showTmdb.result.first_air_date.slice(0, 4)})` : undefined}
+                  metaLine={`${showTmdb.result.number_of_seasons} season${showTmdb.result.number_of_seasons !== 1 ? 's' : ''}`}
+                  overview={showTmdb.result.overview || undefined}
+                  genres={showTmdb.result.genres.length > 0 ? showTmdb.result.genres : undefined}
+                  onApply={() => showTmdb.handleApply(showTmdb.result!)}
+                  applying={showTmdb.applying}
+                />
               )}
             </div>
           )}
@@ -439,47 +349,11 @@ export const CreateCollectionPage = () => {
                   </button>
                 );
               })}
-              {effectiveNewGenres.map((name) => {
-                const selected = genres.includes(name);
-                const isCreating = creatingGenres.includes(name);
-                return (
-                  <div key={name} className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => toggleGenre(name)}
-                      title="From TMDB — not yet in the genre library"
-                      className={[
-                        'rounded-l-full border border-dashed border-r-0 py-1 pl-3 pr-2 text-xs font-medium transition-colors',
-                        selected
-                          ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                          : 'border-border bg-background text-muted-foreground hover:border-amber-500/50 hover:text-foreground',
-                      ].join(' ')}
-                    >
-                      {name}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isCreating}
-                      title="Add to genre library"
-                      onClick={() => {
-                        setCreatingGenres((prev) => [...prev, name]);
-                        createGenre(name, {
-                          onSettled: () => setCreatingGenres((prev) => prev.filter((g) => g !== name)),
-                        });
-                      }}
-                      className={[
-                        'rounded-r-full border border-dashed py-1 pl-1.5 pr-2.5 text-xs transition-colors',
-                        selected
-                          ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20'
-                          : 'border-border bg-background text-muted-foreground hover:border-amber-500/50 hover:text-foreground',
-                        isCreating ? 'opacity-50 cursor-not-allowed' : '',
-                      ].join(' ')}
-                    >
-                      {isCreating ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
-                    </button>
-                  </div>
-                );
-              })}
+              <NewGenrePills
+                newGenres={showTmdb.effectiveNewGenres}
+                selectedGenres={genres}
+                onToggle={toggleGenre}
+              />
             </div>
           </div>
 

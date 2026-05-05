@@ -143,8 +143,24 @@ export const searchTmdbMovie = (title: string, year?: number) => {
 export const fetchTmdbCollection = (id: number) =>
   apiRequest<TmdbCollectionDetails>(`/media/tmdb/collection?id=${id}`);
 
-export const searchTmdbShow = (title: string, year: number) =>
-  apiRequest<TmdbShowDetails>(`/media/tmdb/show?title=${encodeURIComponent(title)}&year=${year}`);
+export const searchTmdbShow = (title: string, year: number) => {
+  const params = new URLSearchParams({ title, year: String(year) });
+  return apiRequest<TmdbShowDetails>(`/media/tmdb/show?${params}`);
+};
 
-export const searchTmdbEpisode = (showTitle: string, showYear: number, seasonNumber: number, episodeNumber: number) =>
-  apiRequest<TmdbEpisodeDetails>(`/media/tmdb/episode?showTitle=${encodeURIComponent(showTitle)}&showYear=${showYear}&seasonNumber=${seasonNumber}&episodeNumber=${episodeNumber}`);
+export const searchTmdbEpisode = (showTitle: string, showYear: number, seasonNumber: number, episodeNumber: number) => {
+  const params = new URLSearchParams({
+    showTitle,
+    showYear: String(showYear),
+    seasonNumber: String(seasonNumber),
+    episodeNumber: String(episodeNumber),
+  });
+  return apiRequest<TmdbEpisodeDetails>(`/media/tmdb/episode?${params}`);
+};
+
+export const fetchTmdbPoster = async (url: string): Promise<Blob> => {
+  const params = new URLSearchParams({ url });
+  const response = await fetch(`/api/media/tmdb/poster?${params}`, { credentials: 'include' });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.blob();
+};
