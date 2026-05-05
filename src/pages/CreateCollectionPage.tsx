@@ -1,4 +1,4 @@
-import { CheckCircle, Image, X } from 'lucide-react';
+import { CheckCircle, Image, Loader2, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -6,9 +6,12 @@ import type { CollectionKind, Coordinates } from '../types/api';
 import { useCreateCollection } from '../hooks/useCreateCollection';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
+import { useTmdbShowSearch } from '../hooks/useTmdbShowSearch';
 import { getFocalCropArea } from '../lib/focalPoints';
 import { parsePositiveInt } from '../lib/parsePositiveInt';
 import { buildTopographicList } from '../lib/collections';
+import { NewGenrePills } from '../components/NewGenrePills';
+import { TmdbResultCard } from '../components/TmdbResultCard';
 
 const ThumbnailFocalPointPicker = ({
   previewUrl,
@@ -32,7 +35,7 @@ const ThumbnailFocalPointPicker = ({
   const crop = naturalSize ? getFocalCropArea(naturalSize, value, 2 / 3) : null;
 
   return (
-    <div className="relative mx-auto max-w-[300px] cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
+    <div className="relative mx-auto max-w-75 cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
       <img
         src={previewUrl}
         alt="Thumbnail preview"
@@ -67,9 +70,18 @@ export const CreateCollectionPage = () => {
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 });
+
   const { mutate: create, isPending, isSuccess, reset } = useCreateCollection();
   const { data: collections } = useCollections();
   const { data: genreOptions } = useGenres();
+
+  const showTmdb = useTmdbShowSearch({
+    genreOptions,
+    thumbnailPreview,
+    setTitle, setDescription, setGenres,
+    setThumbnail, setThumbnailPreview,
+    setThumbnailFocalPoint,
+  });
 
   const parentOptions = kind === 'season'
     ? (collections ?? []).filter((collection) => collection.kind === 'show')
@@ -78,6 +90,10 @@ export const CreateCollectionPage = () => {
         .map(({ item }) => item)
         .filter((collection) => collection.kind === 'collection')
       : [];
+
+  useEffect(() => {
+    if (kind !== 'show') showTmdb.reset();
+  }, [kind, showTmdb.reset]);
 
   useEffect(() => {
     if (kind === 'show' && parentCollectionId) {
@@ -93,6 +109,10 @@ export const CreateCollectionPage = () => {
         : !selectedParent;
     if (!isValidParent) {
       setParentCollectionId('');
+      return;
+    }
+    if (kind === 'season' && selectedParent?.genres?.length) {
+      setGenres(selectedParent.genres);
     }
   }, [kind, parentCollectionId, collections]);
 
@@ -166,6 +186,7 @@ export const CreateCollectionPage = () => {
           setKind('show');
           setSeasonNumber('');
           setParentCollectionId('');
+          showTmdb.reset();
           removeThumbnail();
           reset();
           void navigate('/');
@@ -183,35 +204,8 @@ export const CreateCollectionPage = () => {
 
       <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium" htmlFor="col-title">
-              Title <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="col-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter a title"
-              required
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-            />
-          </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium" htmlFor="col-description">
-              Description
-            </label>
-            <textarea
-              id="col-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter a description (optional)"
-              rows={3}
-              className="resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-            />
-          </div>
-
+          {/* Kind */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium">Kind <span className="text-red-500">*</span></label>
             <div className="flex gap-3 flex-wrap">
@@ -231,6 +225,60 @@ export const CreateCollectionPage = () => {
             </div>
           </div>
 
+          {/* TMDB search — show only */}
+          {kind === 'show' && (
+            <div className="flex flex-col gap-2 rounded-xl border border-border bg-accent/30 p-4">
+              <p className="text-sm font-medium">Search TMDB <span className="text-xs font-normal text-muted-foreground">(optional — auto-fills fields)</span></p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={showTmdb.query}
+                  onChange={(e) => showTmdb.setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), showTmdb.handleSearch())}
+                  placeholder="Show title"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+                <input
+                  type="number"
+                  value={showTmdb.year}
+                  onChange={(e) => showTmdb.setYear(e.target.value)}
+                  onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                  placeholder="Year"
+                  min={1900}
+                  max={2100}
+                  className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+                <button
+                  type="button"
+                  onClick={showTmdb.handleSearch}
+                  disabled={!showTmdb.query.trim() || !showTmdb.year || showTmdb.loading}
+                  className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {showTmdb.loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  Search
+                </button>
+              </div>
+
+              {showTmdb.error && <p className="text-xs text-red-500">{showTmdb.error}</p>}
+
+              {showTmdb.result && (
+                <TmdbResultCard
+                  imageUrl={showTmdb.result.poster_url}
+                  imageAlt={showTmdb.result.name}
+                  imageClassName="h-24 w-16"
+                  title={showTmdb.result.name}
+                  subtitle={showTmdb.result.first_air_date ? `(${showTmdb.result.first_air_date.slice(0, 4)})` : undefined}
+                  metaLine={`${showTmdb.result.number_of_seasons} season${showTmdb.result.number_of_seasons !== 1 ? 's' : ''}`}
+                  overview={showTmdb.result.overview || undefined}
+                  genres={showTmdb.result.genres.length > 0 ? showTmdb.result.genres : undefined}
+                  onApply={() => showTmdb.handleApply(showTmdb.result!)}
+                  applying={showTmdb.applying}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Season number */}
           {kind === 'season' && (
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium" htmlFor="col-season-number">Season Number</label>
@@ -248,6 +296,38 @@ export const CreateCollectionPage = () => {
             </div>
           )}
 
+          {/* Title */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium" htmlFor="col-title">
+              Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="col-title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter a title"
+              required
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            />
+          </div>
+
+          {/* Description */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium" htmlFor="col-description">
+              Description
+            </label>
+            <textarea
+              id="col-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter a description (optional)"
+              rows={3}
+              className="resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            />
+          </div>
+
+          {/* Genres */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium">Genres</label>
             <div className="flex flex-wrap gap-2">
@@ -269,9 +349,15 @@ export const CreateCollectionPage = () => {
                   </button>
                 );
               })}
+              <NewGenrePills
+                newGenres={showTmdb.effectiveNewGenres}
+                selectedGenres={genres}
+                onToggle={toggleGenre}
+              />
             </div>
           </div>
 
+          {/* Parent collection */}
           {kind !== 'show' && (
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium" htmlFor="col-parent">
@@ -294,6 +380,7 @@ export const CreateCollectionPage = () => {
             </div>
           )}
 
+          {/* Thumbnail */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium">
               Thumbnail <span className="text-red-500">*</span>

@@ -106,3 +106,66 @@ export interface PendingUser {
   status: 'pending'
   role: string
 }
+
+export interface TmdbGenre {
+  id: number
+  name: string
+}
+
+export interface TmdbCollection {
+  id: number
+  name: string
+  poster_url: string | null
+}
+
+export interface TmdbShowDetails {
+  id: number
+  name: string
+  overview: string
+  first_air_date: string
+  poster_url: string | null
+  backdrop_url: string | null
+  genres: TmdbGenre[]
+  vote_average: number
+  vote_count: number
+  number_of_seasons: number
+  tagline: string
+}
+
+export interface TmdbEpisodeDetails {
+  id: number
+  name: string
+  overview: string
+  air_date: string
+  episode_number: number
+  season_number: number
+  still_url: string | null
+  vote_average: number
+  vote_count: number
+  runtime: number | null
+}
+
+export interface TmdbCollectionDetails {
+  id: number
+  name: string
+  overview: string
+  poster_url: string | null
+  backdrop_url: string | null
+  genres: TmdbGenre[]
+}
+
+export interface TmdbMovieDetails {
+  id: number
+  title: string
+  overview: string
+  release_date: string
+  poster_url: string | null
+  backdrop_url: string | null
+  genres: TmdbGenre[]
+  vote_average: number
+  vote_count: number
+  runtime: number | null
+  tagline: string
+  imdb_id: string | null
+  belongs_to_collection: TmdbCollection | null
+}

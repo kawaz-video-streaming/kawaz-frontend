@@ -1,4 +1,4 @@
-import { CheckCircle, FileVideo, Image, Loader2, UploadCloud, X } from 'lucide-react';
+import { CheckCircle, FileVideo, Image, Loader2, Search, UploadCloud, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -6,9 +6,13 @@ import type { Coordinates, MediaKind } from '../types/api';
 import { useUploadMedia } from '../hooks/useUploadMedia';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
+import { useTmdbMovieSearch } from '../hooks/useTmdbMovieSearch';
+import { useTmdbEpisodeSearch } from '../hooks/useTmdbEpisodeSearch';
 import { getFocalCropArea } from '../lib/focalPoints';
 import { buildTopographicList, buildSeasonGroups } from '../lib/collections';
 import { parsePositiveInt } from '../lib/parsePositiveInt';
+import { NewGenrePills } from '../components/NewGenrePills';
+import { TmdbResultCard } from '../components/TmdbResultCard';
 
 const MAX_SIZE = 10 * 1024 ** 3; // 10 GB
 
@@ -46,7 +50,7 @@ const ThumbnailFocalPointPicker = ({
   const crop = naturalSize ? getFocalCropArea(naturalSize, value, aspectRatio) : null;
 
   return (
-    <div className="relative mx-auto max-w-[300px] cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
+    <div className="relative mx-auto max-w-75 cursor-crosshair overflow-hidden rounded-lg border border-border" onClick={handleClick}>
       <img src={previewUrl} alt="Thumbnail preview" className="block w-full" draggable={false} onLoad={handleLoad} />
       {crop && (
         <div
@@ -78,9 +82,25 @@ export const UploadPage = () => {
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [thumbnailFocalPoint, setThumbnailFocalPoint] = useState<Coordinates>({ x: 0.5, y: 0.5 });
   const [collectionId, setCollectionId] = useState<string>('');
+
   const { mutate: upload, isPending, isSuccess, reset } = useUploadMedia();
   const { data: collections } = useCollections();
   const { data: genreOptions } = useGenres();
+
+  const movieTmdb = useTmdbMovieSearch({
+    genreOptions,
+    thumbnailPreview,
+    setTitle, setDescription, setGenres,
+    setThumbnail, setThumbnailPreview,
+    setThumbnailFocalPoint,
+  });
+
+  const epTmdb = useTmdbEpisodeSearch({
+    thumbnailPreview,
+    setTitle, setDescription, setEpisodeNumber,
+    setThumbnail, setThumbnailPreview,
+    setThumbnailFocalPoint,
+  });
 
   const collectionOptions = useMemo(() => kind === 'episode'
     ? (collections ?? []).filter((collection) => collection.kind === 'season')
@@ -99,8 +119,17 @@ export const UploadPage = () => {
       : selectedCollection?.kind === 'collection';
     if (!isValidSelection) {
       setCollectionId('');
+      return;
+    }
+    if (kind === 'episode' && selectedCollection?.genres?.length) {
+      setGenres(selectedCollection.genres);
     }
   }, [kind, collectionId, collections]);
+
+  useEffect(() => {
+    if (kind !== 'movie') movieTmdb.reset();
+    if (kind !== 'episode') epTmdb.reset();
+  }, [kind, movieTmdb.reset, epTmdb.reset]);
 
   useEffect(() => {
     if (!isPending) return;
@@ -108,6 +137,14 @@ export const UploadPage = () => {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isPending]);
+
+  const removeThumbnail = () => {
+    setThumbnail(null);
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setThumbnailPreview(null);
+    setThumbnailFocalPoint({ x: 0.5, y: 0.5 });
+    if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
+  };
 
   const applyFile = (file: File | null) => {
     if (file && !file.type.startsWith('video/')) {
@@ -130,17 +167,11 @@ export const UploadPage = () => {
       setKind('movie');
       setEpisodeNumber('');
       setCollectionId('');
+      movieTmdb.reset();
+      epTmdb.reset();
       removeThumbnail();
     }
     reset();
-  };
-
-  const removeThumbnail = () => {
-    setThumbnail(null);
-    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
-    setThumbnailPreview(null);
-    setThumbnailFocalPoint({ x: 0.5, y: 0.5 });
-    if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -277,35 +308,7 @@ export const UploadPage = () => {
               {/* Metadata form — shown after a file is selected */}
               {selectedFile && (
                 <>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium" htmlFor="media-title">
-                      Title <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="media-title"
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Enter a title"
-                      required
-                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium" htmlFor="media-description">
-                      Description
-                    </label>
-                    <textarea
-                      id="media-description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Enter a description (optional)"
-                      rows={3}
-                      className="resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                    />
-                  </div>
-
+                  {/* Kind */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium">Kind <span className="text-red-500">*</span></label>
                     <div className="flex gap-3">
@@ -325,6 +328,145 @@ export const UploadPage = () => {
                     </div>
                   </div>
 
+                  {/* TMDB search — movie only */}
+                  {kind === 'movie' && (
+                    <div className="flex flex-col gap-2 rounded-xl border border-border bg-accent/30 p-4">
+                      <p className="text-sm font-medium">Search TMDB <span className="text-xs font-normal text-muted-foreground">(optional — auto-fills fields)</span></p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={movieTmdb.query}
+                          onChange={(e) => movieTmdb.setQuery(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), movieTmdb.handleSearch())}
+                          placeholder="Movie title"
+                          className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        />
+                        <input
+                          type="number"
+                          value={movieTmdb.year}
+                          onChange={(e) => movieTmdb.setYear(e.target.value)}
+                          onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                          placeholder="Year"
+                          min={1900}
+                          max={2100}
+                          className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        />
+                        <button
+                          type="button"
+                          onClick={movieTmdb.handleSearch}
+                          disabled={!movieTmdb.query.trim() || movieTmdb.loading}
+                          className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {movieTmdb.loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                          Search
+                        </button>
+                      </div>
+
+                      {movieTmdb.error && <p className="text-xs text-red-500">{movieTmdb.error}</p>}
+
+                      {movieTmdb.result && (
+                        <TmdbResultCard
+                          imageUrl={movieTmdb.result.poster_url}
+                          imageAlt={movieTmdb.result.title}
+                          imageClassName="h-24 w-16"
+                          title={movieTmdb.result.title}
+                          subtitle={movieTmdb.result.release_date ? `(${movieTmdb.result.release_date.slice(0, 4)})` : undefined}
+                          overview={movieTmdb.result.overview || undefined}
+                          genres={movieTmdb.result.genres.length > 0 ? movieTmdb.result.genres : undefined}
+                          onApply={() => movieTmdb.handleApply(movieTmdb.result!)}
+                          applying={movieTmdb.applying}
+                          footer={movieTmdb.result.belongs_to_collection && (
+                            <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                              <span>
+                                Part of collection: <strong className="text-foreground">{movieTmdb.result.belongs_to_collection.name}</strong>
+                              </span>
+                              {movieTmdb.collectionCreated ? (
+                                <span className="shrink-0 font-medium text-green-600 dark:text-green-400">Created ✓</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={movieTmdb.collectionCreating}
+                                  onClick={() => movieTmdb.handleCreateCollection(movieTmdb.result!.belongs_to_collection!.id)}
+                                  className="shrink-0 font-medium text-red-500 hover:underline disabled:opacity-40"
+                                >
+                                  {movieTmdb.collectionCreating ? <Loader2 size={12} className="animate-spin" /> : 'Create collection'}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* TMDB search — episode only */}
+                  {kind === 'episode' && (
+                    <div className="flex flex-col gap-2 rounded-xl border border-border bg-accent/30 p-4">
+                      <p className="text-sm font-medium">Search TMDB <span className="text-xs font-normal text-muted-foreground">(optional — auto-fills fields)</span></p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={epTmdb.showTitle}
+                          onChange={(e) => epTmdb.setShowTitle(e.target.value)}
+                          placeholder="Show title"
+                          className="col-span-2 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        />
+                        <input
+                          type="number"
+                          value={epTmdb.showYear}
+                          onChange={(e) => epTmdb.setShowYear(e.target.value)}
+                          onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                          placeholder="Show year"
+                          min={1900} max={2100}
+                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        />
+                        <input
+                          type="number"
+                          value={epTmdb.season}
+                          onChange={(e) => epTmdb.setSeason(e.target.value)}
+                          onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                          placeholder="Season #"
+                          min={1}
+                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        />
+                        <input
+                          type="number"
+                          value={epTmdb.episode}
+                          onChange={(e) => epTmdb.setEpisode(e.target.value)}
+                          onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                          placeholder="Episode #"
+                          min={1}
+                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        />
+                        <button
+                          type="button"
+                          onClick={epTmdb.handleSearch}
+                          disabled={!epTmdb.showTitle.trim() || !epTmdb.showYear || !epTmdb.season || !epTmdb.episode || epTmdb.loading}
+                          className="flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {epTmdb.loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                          Search
+                        </button>
+                      </div>
+
+                      {epTmdb.error && <p className="text-xs text-red-500">{epTmdb.error}</p>}
+
+                      {epTmdb.result && (
+                        <TmdbResultCard
+                          imageUrl={epTmdb.result.still_url}
+                          imageAlt={epTmdb.result.name}
+                          imageClassName="h-16 w-28"
+                          title={epTmdb.result.name}
+                          subtitle={`S${String(epTmdb.result.season_number).padStart(2, '0')}E${String(epTmdb.result.episode_number).padStart(2, '0')}`}
+                          overview={epTmdb.result.overview || undefined}
+                          onApply={() => epTmdb.handleApply(epTmdb.result!)}
+                          applying={epTmdb.applying}
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Episode number */}
                   {kind === 'episode' && (
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium" htmlFor="episode-number">Episode Number</label>
@@ -342,6 +484,38 @@ export const UploadPage = () => {
                     </div>
                   )}
 
+                  {/* Title */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium" htmlFor="media-title">
+                      Title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="media-title"
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Enter a title"
+                      required
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium" htmlFor="media-description">
+                      Description
+                    </label>
+                    <textarea
+                      id="media-description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Enter a description (optional)"
+                      rows={3}
+                      className="resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    />
+                  </div>
+
+                  {/* Genres */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium">Genres</label>
                     <div className="flex flex-wrap gap-2">
@@ -363,9 +537,15 @@ export const UploadPage = () => {
                           </button>
                         );
                       })}
+                      <NewGenrePills
+                        newGenres={movieTmdb.effectiveNewGenres}
+                        selectedGenres={genres}
+                        onToggle={toggleGenre}
+                      />
                     </div>
                   </div>
 
+                  {/* Collection */}
                   {collectionOptions.length > 0 && (
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-medium" htmlFor="upload-collection">
@@ -398,6 +578,7 @@ export const UploadPage = () => {
                     </div>
                   )}
 
+                  {/* Thumbnail */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium">
                       Thumbnail <span className="text-red-500">*</span>

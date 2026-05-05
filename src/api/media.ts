@@ -1,6 +1,6 @@
 import z from 'zod';
 import { apiRequest, apiUpload } from './client';
-import type { Coordinates, MediaKind, PendingMediaItem } from '../types/api';
+import type { Coordinates, MediaKind, PendingMediaItem, TmdbCollectionDetails, TmdbEpisodeDetails, TmdbMovieDetails, TmdbShowDetails } from '../types/api';
 
 export interface UploadMediaParams {
   file: File;
@@ -133,3 +133,34 @@ export const deleteMedia = (id: string) =>
   apiRequest<{ message: string; }>(`/media/${id}`, { method: 'DELETE' });
 
 export const getUploadingMedia = () => apiRequest<PendingMediaItem[]>('/media/uploading');
+
+export const searchTmdbMovie = (title: string, year?: number) => {
+  const params = new URLSearchParams({ title });
+  if (year !== undefined) params.set('year', String(year));
+  return apiRequest<TmdbMovieDetails>(`/media/tmdb/movie?${params}`);
+};
+
+export const fetchTmdbCollection = (id: number) =>
+  apiRequest<TmdbCollectionDetails>(`/media/tmdb/collection?id=${id}`);
+
+export const searchTmdbShow = (title: string, year: number) => {
+  const params = new URLSearchParams({ title, year: String(year) });
+  return apiRequest<TmdbShowDetails>(`/media/tmdb/show?${params}`);
+};
+
+export const searchTmdbEpisode = (showTitle: string, showYear: number, seasonNumber: number, episodeNumber: number) => {
+  const params = new URLSearchParams({
+    showTitle,
+    showYear: String(showYear),
+    seasonNumber: String(seasonNumber),
+    episodeNumber: String(episodeNumber),
+  });
+  return apiRequest<TmdbEpisodeDetails>(`/media/tmdb/episode?${params}`);
+};
+
+export const fetchTmdbPoster = async (url: string): Promise<Blob> => {
+  const params = new URLSearchParams({ url });
+  const response = await fetch(`/api/media/tmdb/poster?${params}`, { credentials: 'include' });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.blob();
+};
