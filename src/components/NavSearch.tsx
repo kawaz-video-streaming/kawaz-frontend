@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { apiUrl } from '../api/client'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router'
 import { Search, X, FolderOpen } from 'lucide-react'
@@ -113,8 +114,8 @@ export const NavSearch = ({ open, onClose }: NavSearchProps) => {
                     <img
                       src={
                         item.type === 'collection'
-                          ? `/api/mediaCollection/${item.data._id}/thumbnail`
-                          : `/api/media/${item.data._id}/thumbnail`
+                          ? apiUrl(`/mediaCollection/${item.data._id}/thumbnail`)
+                          : apiUrl(`/media/${item.data._id}/thumbnail`)
                       }
                       alt={item.data.title}
                       className="h-full w-full object-cover"

@@ -1,4 +1,5 @@
 import { useState, type SyntheticEvent } from 'react'
+import { apiUrl } from '../api/client'
 import { useNavigate, useSearchParams } from 'react-router'
 import { Input } from '../components/ui/input'
 
@@ -27,7 +28,7 @@ export const ResetPasswordPage = () => {
     setLoading(true)
     setInlineMessage(null)
     try {
-      const response = await fetch('/api/auth/reset-password', {
+      const response = await fetch(apiUrl('/auth/reset-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword }),

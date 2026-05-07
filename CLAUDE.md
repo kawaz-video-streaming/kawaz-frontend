@@ -5,10 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev       # Start dev server (node with increased header size limit)
-npm run build     # Type-check then build for production (tsc -b && vite build)
-npm run preview   # Build then preview production build
-npm run clean     # Delete dist/
+npm run dev           # Start dev server (node with increased header size limit)
+npm run build         # Type-check then build for production (tsc -b && vite build)
+npm run build:native  # Build for Capacitor native (uses .env.native, then cap sync)
+npm run preview       # Build then preview production build
+npm run clean         # Delete dist/
 ```
 
 There are no tests in this project.
@@ -21,11 +22,26 @@ Requires a `.env.local` file (see `.env.example`):
 VITE_BACKEND_URL=http://localhost:8080  # Main backend API
 ```
 
+For native builds, create a `.env.native` file (gitignored):
+
+```env
+VITE_BACKEND_URL=https://kawazplus.com  # Production URL for Capacitor WebView
+```
+
+## Native Apps (Capacitor)
+
+The project targets Android and iOS via Capacitor. Platform directories (`android/`, `ios/`) are committed.
+
+- **`capacitor.config.ts`** — app ID (`com.kawaz.plus`), app name, web dir
+- **`assets/`** — source images (`icon.png` 1024×1024, `splash.png` 2732×2732) used by `@capacitor/assets` to generate all density variants
+- **Android release** — built via GitHub Actions (`.github/workflows/android-release.yml`) on tag push. Requires `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_PASSWORD` secrets. Keystore files (`android/keystore.jks`, `android/keystore.properties`) are gitignored.
+- **Android TV / Fire TV** — same APK; `LEANBACK_LAUNCHER` intent-filter added to manifest
+
 ## Architecture
 
 ### API Layer
 
-- **`src/api/client.ts`** — Authenticated fetch wrapper for `VITE_BACKEND_URL`. Sends cookies via `credentials: 'include'`. Use `apiRequest<T>()` for JSON endpoints and `apiUpload<T>()` for multipart uploads.
+- **`src/api/client.ts`** — Authenticated fetch wrapper. Exports `apiRequest<T>()`, `apiUpload<T>()`, and `apiUrl(path)`. All API calls and asset URLs go through `apiUrl()` which prepends `VITE_BACKEND_URL` (empty in web builds, `https://kawazplus.com` in native builds).
 - **`src/api/media.ts`** — Media upload, update, delete, and `getUploadingMedia()` (returns pending/processing/failed items; treats 404 as `[]`). Upload accepts optional `collectionId`.
 - **`src/api/mediaCollection.ts`** — Collection CRUD.
 - **`src/api/avatar.ts`** — Avatar catalog: list, image URL helper, upload (admin), delete (admin).

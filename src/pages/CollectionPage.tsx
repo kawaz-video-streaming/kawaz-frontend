@@ -1,4 +1,5 @@
 import { Check, ChevronRight, FolderOpen, Image, Pencil, Trash2, X } from 'lucide-react';
+import { apiUrl } from '../api/client';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router';
 import type { CollectionKind, CollectionListItem, Coordinates, VideoListItem } from '../types/api';
@@ -343,7 +344,7 @@ export const CollectionPage = () => {
     );
   }
 
-  const thumbnailSrc = `/api/mediaCollection/${collection._id}/thumbnail`;
+  const thumbnailSrc = apiUrl(`/mediaCollection/${collection._id}/thumbnail`);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -545,7 +546,7 @@ export const CollectionPage = () => {
               >
                 <div className="relative w-full pt-[150%]">
                   <ItemThumbnail
-                    src={`/api/mediaCollection/${item.data._id}/thumbnail`}
+                    src={apiUrl(`/mediaCollection/${item.data._id}/thumbnail`)}
                     title={item.data.title}
                     focalPoint={item.data.thumbnailFocalPoint}
                     aspectRatio={2 / 3}
@@ -571,7 +572,7 @@ export const CollectionPage = () => {
               >
                 <div className="relative w-full pt-[56.25%]">
                   <ItemThumbnail
-                    src={`/api/media/${item.data._id}/thumbnail`}
+                    src={apiUrl(`/media/${item.data._id}/thumbnail`)}
                     title={item.data.title}
                     focalPoint={item.data.thumbnailFocalPoint}
                     aspectRatio={16 / 9}

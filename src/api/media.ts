@@ -1,5 +1,5 @@
 import z from 'zod';
-import { apiRequest, apiUpload } from './client';
+import { apiRequest, apiUpload, apiUrl } from './client';
 import type { Coordinates, MediaKind, PendingMediaItem, TmdbCollectionDetails, TmdbEpisodeDetails, TmdbMovieDetails, TmdbShowDetails } from '../types/api';
 
 export interface UploadMediaParams {
@@ -160,7 +160,7 @@ export const searchTmdbEpisode = (showTitle: string, showYear: number, seasonNum
 
 export const fetchTmdbPoster = async (url: string): Promise<Blob> => {
   const params = new URLSearchParams({ url });
-  const response = await fetch(`/api/media/tmdb/poster?${params}`, { credentials: 'include' });
+  const response = await fetch(apiUrl(`/media/tmdb/poster?${params}`), { credentials: 'include' });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.blob();
 };

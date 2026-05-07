@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { apiUrl } from '../api/client';
 import { useNavigate } from 'react-router';
 import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
 import { useVideos } from '../hooks/useVideos';
@@ -337,7 +338,7 @@ export const HomePage = () => {
       >
         <div className={`relative w-full ${config.paddingClass}`}>
           <ItemThumbnail
-            src={`/api/mediaCollection/${item.data._id}/thumbnail`}
+            src={apiUrl(`/mediaCollection/${item.data._id}/thumbnail`)}
             title={item.data.title}
             focalPoint={item.data.thumbnailFocalPoint}
             aspectRatio={config.aspectRatio}
@@ -365,7 +366,7 @@ export const HomePage = () => {
       >
         <div className={`relative w-full ${config.paddingClass}`}>
           <ItemThumbnail
-            src={`/api/media/${item.data._id}/thumbnail`}
+            src={apiUrl(`/media/${item.data._id}/thumbnail`)}
             title={item.data.title}
             focalPoint={item.data.thumbnailFocalPoint}
             aspectRatio={config.aspectRatio}

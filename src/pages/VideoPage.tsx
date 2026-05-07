@@ -1,4 +1,5 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
+import { apiUrl } from '../api/client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import type { Coordinates, MediaKind } from '../types/api';
@@ -254,7 +255,7 @@ export const VideoPage = () => {
     );
   }
 
-  const thumbnailSrc = `/api/media/${video._id}/thumbnail`;
+  const thumbnailSrc = apiUrl(`/media/${video._id}/thumbnail`);
   const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3;
 
   return (
@@ -287,9 +288,9 @@ export const VideoPage = () => {
       })()}
 
       <VideoPlayer
-        manifestUrl={`/api/media/stream/${video.playUrl}`}
-        chaptersUrl={video.chaptersUrl ? `/api/media/stream/${video.chaptersUrl}` : undefined}
-        thumbnailsUrl={video.thumbnailsUrl ? `/api/media/stream/${video.thumbnailsUrl}` : undefined}
+        manifestUrl={apiUrl(`/media/stream/${video.playUrl}`)}
+        chaptersUrl={video.chaptersUrl ? apiUrl(`/media/stream/${video.chaptersUrl}`) : undefined}
+        thumbnailsUrl={video.thumbnailsUrl ? apiUrl(`/media/stream/${video.thumbnailsUrl}`) : undefined}
         className="mb-6 rounded-xl"
       />
 
