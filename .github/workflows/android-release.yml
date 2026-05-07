@@ -34,11 +34,11 @@ jobs:
         run: npm run build:native
 
       - name: Decode keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/keystore.jks
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
 
       - name: Create keystore.properties
         run: |
-          cat > android/keystore.properties <<EOF
+          cat > android/app/keystore.properties <<EOF
           storePassword=${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
           keyAlias=kawaz
