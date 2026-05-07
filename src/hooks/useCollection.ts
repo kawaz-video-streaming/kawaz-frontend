@@ -9,7 +9,7 @@ const collectionSchema = z.object({
   description: z.string().optional(),
   genres: z.array(z.string()).default([]),
   kind: z.enum(['show', 'season', 'collection']).optional(),
-  seasonNumber: z.number().optional(),
+  seasonNumber: z.coerce.number().optional(),
   thumbnailFocalPoint: z.object({ x: z.number(), y: z.number() }).default({ x: 0.5, y: 0.5 }),
   collectionId: z.string().optional(),
 }).loose();

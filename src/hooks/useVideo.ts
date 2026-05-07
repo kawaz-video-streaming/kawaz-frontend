@@ -9,7 +9,7 @@ const mediaSchema = z.object({
   description: z.string().optional(),
   genres: z.array(z.string()).default([]),
   kind: z.enum(['movie', 'episode']).optional(),
-  episodeNumber: z.number().optional(),
+  episodeNumber: z.coerce.number().optional(),
   thumbnailFocalPoint: z.object({ x: z.number(), y: z.number() }).default({ x: 0.5, y: 0.5 }),
   collectionId: z.string().optional(),
   metadata: z.object({

@@ -147,6 +147,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
 
         const hoverTarget = document.createElement('button');
         hoverTarget.type = 'button';
+        hoverTarget.tabIndex = -1;
         hoverTarget.className = 'kawaz-chapter-hover-target';
         hoverTarget.style.left = leftPct;
         hoverTarget.setAttribute('data-title', chapter.title);
@@ -431,7 +432,12 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
         active === document.documentElement ||
         !!containerRef.current?.contains(active);
       if (!playerFocused) return;
-      if (e.key === 'ArrowLeft') {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (video.paused) video.play().catch(() => {});
+        else video.pause();
+      } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
         e.stopPropagation();
         video.currentTime = Math.max(0, video.currentTime - 5);

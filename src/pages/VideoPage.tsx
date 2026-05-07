@@ -225,7 +225,12 @@ export const VideoPage = () => {
 
   const siblings = allVideos
     ?.filter((v) => v.collectionId === routeCollectionId)
-    .sort((a, b) => a.title.localeCompare(b.title)) ?? [];
+    .sort((a, b) => {
+      const aNum = a.episodeNumber ?? Infinity;
+      const bNum = b.episodeNumber ?? Infinity;
+      if (aNum !== bNum) return aNum - bNum;
+      return a.title.localeCompare(b.title);
+    }) ?? [];
   const currentIndex = siblings.findIndex((v) => v._id === id);
   const prevVideo = currentIndex > 0 ? siblings[currentIndex - 1] : null;
   const nextVideo = currentIndex < siblings.length - 1 ? siblings[currentIndex + 1] : null;
