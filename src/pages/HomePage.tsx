@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { apiUrl } from '../api/client';
 import { useNavigate } from 'react-router';
 import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
 import { useVideos } from '../hooks/useVideos';
 import { useCollections } from '../hooks/useCollections';
+import { mediaThumbnailUrl } from '../api/media';
+import { collectionThumbnailUrl } from '../api/mediaCollection';
+import { useAuth } from '../auth/useAuth';
 import { ORIENTATION_CONFIG } from '../hooks/useThumbnailOrientation';
 import { getObjectPositionFromFocalPoint } from '../lib/focalPoints';
 import type { CollectionListItem, VideoListItem, Coordinates } from '../types/api';
@@ -247,6 +249,8 @@ const SectionCarousel = ({
 
 export const HomePage = () => {
   const navigate = useNavigate();
+  const { isAdmin, specialPool } = useAuth();
+  const special = isAdmin && specialPool;
   const { data: videos, isLoading, isError } = useVideos();
   const { data: collections } = useCollections();
   const [selectedKind, setSelectedKind] = useState<string>('All');
@@ -338,7 +342,7 @@ export const HomePage = () => {
       >
         <div className={`relative w-full ${config.paddingClass}`}>
           <ItemThumbnail
-            src={apiUrl(`/mediaCollection/${item.data._id}/thumbnail`)}
+            src={collectionThumbnailUrl(item.data._id, special)}
             title={item.data.title}
             focalPoint={item.data.thumbnailFocalPoint}
             aspectRatio={config.aspectRatio}
@@ -366,7 +370,7 @@ export const HomePage = () => {
       >
         <div className={`relative w-full ${config.paddingClass}`}>
           <ItemThumbnail
-            src={apiUrl(`/media/${item.data._id}/thumbnail`)}
+            src={mediaThumbnailUrl(item.data._id, special)}
             title={item.data.title}
             focalPoint={item.data.thumbnailFocalPoint}
             aspectRatio={config.aspectRatio}

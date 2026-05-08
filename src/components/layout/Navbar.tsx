@@ -189,7 +189,7 @@ export const Navbar = () => {
               aria-label="Account menu"
             >
               {selectedProfile ? (
-                <img src={avatarImageUrl(selectedProfile.avatarId)} alt={selectedProfile.name} className="h-full w-full object-cover" style={{ transform: 'translateZ(0)', imageRendering: 'auto' }} />
+                <img src={avatarImageUrl(selectedProfile.avatarId, isAdmin && specialPool)} alt={selectedProfile.name} className="h-full w-full object-cover" style={{ transform: 'translateZ(0)', imageRendering: 'auto' }} />
               ) : (
                 <UserCircle2 size={18} />
               )}

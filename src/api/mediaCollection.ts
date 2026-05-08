@@ -1,4 +1,4 @@
-import { apiRequest, apiUpload, specialParam } from './client'
+import { apiRequest, apiUpload, apiUrl, specialParam } from './client'
 import type { CollectionKind, Coordinates } from '../types/api'
 
 const appendGenres = (formData: FormData, genres: string[]) => {
@@ -98,3 +98,6 @@ export const updateCollection = async ({ id, title, description, genres, kind, s
 
 export const deleteCollection = (id: string, special = false) =>
   apiRequest<{ message: string }>(`/mediaCollection/${id}${specialParam(special)}`, { method: 'DELETE' })
+
+export const collectionThumbnailUrl = (id: string, special = false) =>
+  apiUrl(`/mediaCollection/${id}/thumbnail${specialParam(special)}`)

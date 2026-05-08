@@ -137,6 +137,12 @@ export const deleteMedia = (id: string, special = false) =>
 export const getUploadingMedia = (special = false) =>
   apiRequest<PendingMediaItem[]>(`/media/uploading${specialParam(special)}`);
 
+export const mediaThumbnailUrl = (id: string, special = false) =>
+  apiUrl(`/media/${id}/thumbnail${specialParam(special)}`);
+
+export const mediaStreamUrl = (path: string, special = false) =>
+  apiUrl(`/media/stream/${path}${specialParam(special)}`);
+
 export const searchTmdbMovie = (title: string, year?: number) => {
   const params = new URLSearchParams({ title });
   if (year !== undefined) params.set('year', String(year));
