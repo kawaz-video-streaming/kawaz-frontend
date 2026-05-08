@@ -15,7 +15,9 @@ interface AuthContextValue {
   isAdmin: boolean
   username: string | null
   selectedProfile: SelectedProfile | null
+  specialPool: boolean
   selectProfile: (profile: SelectedProfile) => void
+  toggleSpecialPool: () => void
   login: (role?: string, username?: string) => void
   logout: () => void
 }
@@ -34,6 +36,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Role and username are kept in memory only — not persisted — so they cannot be spoofed via localStorage.
   const [role, setRole] = useState<string | null>(null)
   const [username, setUsername] = useState<string | null>(null)
+  const [specialPool, setSpecialPool] = useState(false)
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile | null>(() => {
     const stored = localStorage.getItem(PROFILE_KEY)
     return stored ? JSON.parse(stored) : null
@@ -69,9 +72,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setRole(null)
     setUsername(null)
     setSelectedProfile(null)
+    setSpecialPool(false)
     localStorage.removeItem(PROFILE_KEY)
     queryClient.clear()
   }, [queryClient])
+
+  const toggleSpecialPool = useCallback(() => setSpecialPool((p) => !p), [])
 
   const selectProfile = useCallback((profile: SelectedProfile) => {
     localStorage.setItem(PROFILE_KEY, JSON.stringify(profile))
@@ -79,7 +85,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isAdmin: role === 'admin', username, selectedProfile, selectProfile, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, isAdmin: role === 'admin', username, selectedProfile, specialPool, selectProfile, toggleSpecialPool, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

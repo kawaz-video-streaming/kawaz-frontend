@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search } from 'lucide-react';
+import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search, Database } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useTheme } from '../../theme/ThemeContext';
 import { avatarImageUrl } from '../../api/avatar';
@@ -11,7 +11,7 @@ import { PendingSignupsPanel } from '../PendingSignupsPanel';
 import { NavSearch } from '../NavSearch';
 
 export const Navbar = () => {
-  const { logout, isAdmin, username, selectedProfile } = useAuth();
+  const { logout, isAdmin, username, selectedProfile, specialPool, toggleSpecialPool } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -113,6 +113,20 @@ export const Navbar = () => {
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
+
+          {/* Special pool toggle (admin only) — hidden on mobile, BottomNav handles it there */}
+          {isAdmin && (
+            <button
+              onClick={toggleSpecialPool}
+              className={`relative hidden lg:flex rounded-lg p-2 transition-colors hover:bg-accent ${specialPool ? 'text-purple-500' : 'text-muted-foreground hover:text-foreground'}`}
+              aria-label={specialPool ? 'Switch to regular pool' : 'Switch to special pool'}
+            >
+              <Database size={16} />
+              {specialPool && (
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-purple-500" />
+              )}
+            </button>
+          )}
 
           {/* Processing panel (admin only) — hidden on mobile, BottomNav handles it there */}
           {isAdmin && (

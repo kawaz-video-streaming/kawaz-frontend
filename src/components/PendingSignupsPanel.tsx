@@ -41,12 +41,20 @@ export const PendingSignupsPanel = ({ onClose, positionClass }: { onClose: () =>
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => approve(user.name)}
+                    onClick={() => approve({ username: user.name, role: 'user' })}
                     disabled={busy}
                     className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <UserCheck size={12} />
-                    Approve
+                    User
+                  </button>
+                  <button
+                    onClick={() => approve({ username: user.name, role: 'special' })}
+                    disabled={busy}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <UserCheck size={12} />
+                    Special
                   </button>
                   {confirmDeny === user.name ? (
                     <div className="flex flex-1 gap-1.5">

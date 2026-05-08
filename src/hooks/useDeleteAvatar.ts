@@ -1,15 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { deleteAvatar } from '../api/avatar'
+import { useAuth } from '../auth/useAuth'
 import type { Avatar } from '../types/api'
 
 export const useDeleteAvatar = () => {
   const queryClient = useQueryClient()
+  const { isAdmin, specialPool } = useAuth()
+  const special = isAdmin && specialPool
   return useMutation({
-    mutationFn: (id: string) => deleteAvatar(id),
+    mutationFn: (id: string) => deleteAvatar(id, special),
     onSuccess: (_, id) => {
       toast.success('Avatar deleted')
-      queryClient.setQueryData<Avatar[]>(['avatars'], (old) => old?.filter((a) => a._id !== id) ?? [])
+      queryClient.setQueryData<Avatar[]>(['avatars', special], (old) => old?.filter((a) => a._id !== id) ?? [])
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Failed to delete avatar', {

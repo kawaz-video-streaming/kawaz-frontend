@@ -15,6 +15,8 @@ const BASE = import.meta.env.VITE_BACKEND_URL ?? ''
 
 export const apiUrl = (path: string) => `${BASE}/api${path}`
 
+export const specialParam = (special: boolean) => special ? '?special=true' : ''
+
 export const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(apiUrl(path), {
     ...init,

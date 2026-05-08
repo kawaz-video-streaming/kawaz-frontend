@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { FolderPlus, Image, Loader2, Tag, Upload, UserPlus } from 'lucide-react'
+import { Database, FolderPlus, Image, Loader2, Tag, Upload, UserPlus } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { usePendingMedia } from '../../hooks/usePendingMedia'
 import { usePendingUsers } from '../../hooks/usePendingUsers'
@@ -10,7 +10,7 @@ import { PendingSignupsPanel } from '../PendingSignupsPanel'
 const PANEL_CLASS = 'fixed inset-x-4 bottom-20 z-[60]'
 
 export const BottomNav = () => {
-  const { isAdmin } = useAuth()
+  const { isAdmin, specialPool, toggleSpecialPool } = useAuth()
   const location = useLocation()
   const [processingOpen, setProcessingOpen] = useState(false)
   const [signupsOpen, setSignupsOpen] = useState(false)
@@ -75,6 +75,20 @@ export const BottomNav = () => {
           <Tag size={18} />
           <span>Genres</span>
         </Link>
+
+        <button
+          onClick={toggleSpecialPool}
+          className={btnCls(specialPool)}
+          aria-label={specialPool ? 'Switch to regular pool' : 'Switch to special pool'}
+        >
+          <span className="relative">
+            <Database size={18} />
+            {specialPool && (
+              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-purple-500" />
+            )}
+          </span>
+          <span>Special</span>
+        </button>
 
         <div ref={processingRef}>
           <button

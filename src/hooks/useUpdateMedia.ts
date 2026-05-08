@@ -1,14 +1,17 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { updateMedia, type UpdateMediaParams } from '../api/media'
+import { useAuth } from '../auth/useAuth'
 
 export const useUpdateMedia = (id: string) => {
   const queryClient = useQueryClient()
+  const { isAdmin, specialPool } = useAuth()
+  const special = isAdmin && specialPool
   return useMutation({
-    mutationFn: (params: Omit<UpdateMediaParams, 'id'>) => updateMedia({ id, ...params }),
+    mutationFn: (params: Omit<UpdateMediaParams, 'id'>) => updateMedia({ id, ...params }, special),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['videos', id] })
-      void queryClient.invalidateQueries({ queryKey: ['videos'] })
+      void queryClient.invalidateQueries({ queryKey: ['videos', id, special] })
+      void queryClient.invalidateQueries({ queryKey: ['videos', special] })
       toast.success('Media updated')
     },
     onError: (err) => {
