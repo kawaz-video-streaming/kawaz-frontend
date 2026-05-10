@@ -287,7 +287,7 @@ export const HomePage = () => {
   const newestItems = useMemo(() => [
     ...topLevelCollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
     ...movies.map((video): PageItem => ({ type: 'video', data: video })),
-  ].slice(-10).reverse(), [topLevelCollections, movies]);
+  ].sort((a, b) => a.data._id.localeCompare(b.data._id)).slice(-10).reverse(), [topLevelCollections, movies]);
 
   const kindTabs = useMemo(() => [
     ...(movies.length > 0 ? ['Movies'] : []),
@@ -303,6 +303,11 @@ export const HomePage = () => {
     kindFilteredItems.flatMap((item) => getItemAllGenres(item)),
   )].sort((a, b) => a.localeCompare(b)), [kindFilteredItems]);
 
+  const effectiveSelectedGenres = useMemo(
+    () => selectedGenres.filter((genre) => availableGenres.includes(genre)),
+    [selectedGenres, availableGenres],
+  );
+
   useEffect(() => {
     setSelectedGenres((prev) => {
       const next = prev.filter((genre) => availableGenres.includes(genre));
@@ -312,18 +317,18 @@ export const HomePage = () => {
     });
   }, [availableGenres]);
 
-  const genreSections: Array<{ key: string; items: PageItem[]; }> = useMemo(() => (selectedGenres.length > 0 ? selectedGenres : availableGenres)
+  const genreSections: Array<{ key: string; items: PageItem[]; }> = useMemo(() => (effectiveSelectedGenres.length > 0 ? effectiveSelectedGenres : availableGenres)
     .map((genre) => ({
       key: genre,
       items: kindFilteredItems.filter((item) =>
-        selectedGenres.length > 0
+        effectiveSelectedGenres.length > 0
           ? getItemAllGenres(item).includes(genre)
           : getItemPrimaryGenre(item) === genre,
       ),
     }))
-    .filter((section) => section.items.length > 0), [selectedGenres, availableGenres, kindFilteredItems]);
+    .filter((section) => section.items.length > 0), [effectiveSelectedGenres, availableGenres, kindFilteredItems]);
 
-  const showNewest = selectedKind === 'All' && selectedGenres.length === 0;
+  const showNewest = selectedKind === 'All' && effectiveSelectedGenres.length === 0;
 
   const visibleSections: Array<{ key: string; items: PageItem[]; }> = useMemo(() => [
     ...(showNewest && newestItems.length > 0 ? [{ key: 'Newest Releases', items: newestItems }] : []),
@@ -443,7 +448,7 @@ export const HomePage = () => {
                 onClick={() => setSelectedGenres([])}
                 className={[
                   'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                  selectedGenres.length === 0
+                  effectiveSelectedGenres.length === 0
                     ? 'border-red-500 bg-red-500/10 text-red-500'
                     : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
                 ].join(' ')}
@@ -457,7 +462,7 @@ export const HomePage = () => {
                   onClick={() => toggleGenre(genre)}
                   className={[
                     'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                    selectedGenres.includes(genre)
+                    effectiveSelectedGenres.includes(genre)
                       ? 'border-red-500 bg-red-500/10 text-red-500'
                       : 'border-border bg-background text-muted-foreground hover:border-red-500/50 hover:text-foreground',
                   ].join(' ')}

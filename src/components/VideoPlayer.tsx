@@ -19,10 +19,17 @@ const prefetchFirstSegments = async (manifestUrl: string, special: boolean) => {
     const base = manifestPath.slice(0, manifestPath.lastIndexOf('/') + 1);
     const sp = special ? '?special=true' : '';
 
-    const initTemplate = text.match(/initialization="([^"]+)"/)?.[1];
-    const mediaTemplate = text.match(/media="([^"]+)"/)?.[1];
+    const repIds: string[] = [];
+    let initTemplate: string | undefined;
+    let mediaTemplate: string | undefined;
+    for (const block of text.split('</AdaptationSet>')) {
+      const init = block.match(/initialization="([^"]+)"/)?.[1];
+      const media = block.match(/\bmedia="([^"]+)"/)?.[1];
+      if (!init || !media) continue;
+      if (!initTemplate) { initTemplate = init; mediaTemplate = media; }
+      for (const m of block.matchAll(/<Representation\b[^>]*\s+id="(\d+)"/g)) repIds.push(m[1]);
+    }
     const startNum = parseInt(text.match(/startNumber="(\d+)"/)?.[1] ?? '1');
-    const repIds = [...text.matchAll(/<Representation\b[^>]*\s+id="(\d+)"/g)].map(m => m[1]);
 
     if (!initTemplate || !mediaTemplate || repIds.length === 0) return;
 
@@ -45,11 +52,12 @@ interface VideoPlayerProps {
   manifestUrl: string;
   chaptersUrl?: string;
   thumbnailsUrl?: string;
+  posterUrl?: string;
   special?: boolean;
   className?: string;
 }
 
-export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, special = false, className }: VideoPlayerProps) => {
+export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl, special = false, className }: VideoPlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const destroyPromiseRef = useRef<Promise<void>>(Promise.resolve());
@@ -303,7 +311,6 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, special =
           clearStallRecoveryTimer();
           if (!isDisposed) setPlayerError(null);
         };
-
         player.addEventListener('trackschanged', handleTracksChanged);
         player.addEventListener('error', handlePlayerError);
         video.addEventListener('durationchange', handleDurationChange);
@@ -489,7 +496,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, special =
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
       <div ref={containerRef} className="relative w-full">
-        <video ref={videoRef} className="w-full" />
+        <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} />
         {volumeDisplay !== null && (
           <div className="pointer-events-none absolute left-1/2 top-6 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm">
             {volumeDisplay === 0 ? 'Muted' : `Volume ${volumeDisplay}%`}

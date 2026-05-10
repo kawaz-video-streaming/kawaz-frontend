@@ -292,6 +292,7 @@ export const VideoPage = () => {
         manifestUrl={mediaStreamUrl(video.playUrl, special)}
         chaptersUrl={video.chaptersUrl ? mediaStreamUrl(video.chaptersUrl, special) : undefined}
         thumbnailsUrl={video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined}
+        posterUrl={thumbnailSrc}
         special={special}
         className="mb-6 rounded-xl"
       />
