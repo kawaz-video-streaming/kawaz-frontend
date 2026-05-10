@@ -1,5 +1,6 @@
 import { Check, ChevronRight, FolderOpen, Image, Pencil, Trash2, X } from 'lucide-react';
-import { apiUrl } from '../api/client';
+import { mediaThumbnailUrl } from '../api/media';
+import { collectionThumbnailUrl } from '../api/mediaCollection';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router';
 import type { CollectionKind, CollectionListItem, Coordinates, VideoListItem } from '../types/api';
@@ -108,7 +109,8 @@ const formatDuration = (ms: number) => {
 export const CollectionPage = () => {
   const { id } = useParams<{ id: string; }>();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, specialPool } = useAuth();
+  const special = isAdmin && specialPool;
   const { data: collection, isLoading, isError } = useCollection(id ?? '');
   const { data: allCollections } = useCollections();
   const { data: allVideos } = useVideos();
@@ -344,7 +346,7 @@ export const CollectionPage = () => {
     );
   }
 
-  const thumbnailSrc = apiUrl(`/mediaCollection/${collection._id}/thumbnail`);
+  const thumbnailSrc = collectionThumbnailUrl(collection._id, special);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -546,7 +548,7 @@ export const CollectionPage = () => {
               >
                 <div className="relative w-full pt-[150%]">
                   <ItemThumbnail
-                    src={apiUrl(`/mediaCollection/${item.data._id}/thumbnail`)}
+                    src={collectionThumbnailUrl(item.data._id, special)}
                     title={item.data.title}
                     focalPoint={item.data.thumbnailFocalPoint}
                     aspectRatio={2 / 3}
@@ -572,7 +574,7 @@ export const CollectionPage = () => {
               >
                 <div className="relative w-full pt-[56.25%]">
                   <ItemThumbnail
-                    src={apiUrl(`/media/${item.data._id}/thumbnail`)}
+                    src={mediaThumbnailUrl(item.data._id, special)}
                     title={item.data.title}
                     focalPoint={item.data.thumbnailFocalPoint}
                     aspectRatio={16 / 9}

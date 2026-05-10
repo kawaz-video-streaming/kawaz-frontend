@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { apiUrl } from '../api/client'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router'
 import { Search, X, FolderOpen } from 'lucide-react'
 import { useVideos } from '../hooks/useVideos'
 import { useCollections } from '../hooks/useCollections'
+import { mediaThumbnailUrl } from '../api/media'
+import { collectionThumbnailUrl } from '../api/mediaCollection'
+import { useAuth } from '../auth/useAuth'
 import type { VideoListItem, CollectionListItem } from '../types/api'
 
 type SearchItem =
@@ -27,6 +29,8 @@ interface NavSearchProps {
 
 export const NavSearch = ({ open, onClose }: NavSearchProps) => {
   const navigate = useNavigate()
+  const { isAdmin, specialPool } = useAuth()
+  const special = isAdmin && specialPool
   const { data: videos } = useVideos()
   const { data: collections } = useCollections()
   const [query, setQuery] = useState('')
@@ -114,8 +118,8 @@ export const NavSearch = ({ open, onClose }: NavSearchProps) => {
                     <img
                       src={
                         item.type === 'collection'
-                          ? apiUrl(`/mediaCollection/${item.data._id}/thumbnail`)
-                          : apiUrl(`/media/${item.data._id}/thumbnail`)
+                          ? collectionThumbnailUrl(item.data._id, special)
+                          : mediaThumbnailUrl(item.data._id, special)
                       }
                       alt={item.data.title}
                       className="h-full w-full object-cover"

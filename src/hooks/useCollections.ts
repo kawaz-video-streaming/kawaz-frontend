@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import z from 'zod';
-import { apiRequest } from '../api/client';
+import { apiRequest, specialParam } from '../api/client';
+import { useAuth } from '../auth/useAuth';
 import type { CollectionListItem } from '../types/api';
 
 const collectionSchema = z.object({
@@ -14,11 +15,13 @@ const collectionSchema = z.object({
   collectionId: z.string().optional(),
 }).loose();
 
-export const useCollections = () =>
-  useQuery<CollectionListItem[]>({
-    queryKey: ['collections'],
+export const useCollections = () => {
+  const { isAdmin, specialPool } = useAuth();
+  const special = isAdmin && specialPool;
+  return useQuery<CollectionListItem[]>({
+    queryKey: ['collections', special],
     queryFn: async () => {
-      const raw = await apiRequest<unknown[]>('/mediaCollection');
+      const raw = await apiRequest<unknown[]>(`/mediaCollection${specialParam(special)}`);
       return raw.map((item) => {
         const { _id, title, description, genres, kind, seasonNumber, thumbnailFocalPoint, collectionId } = collectionSchema.parse(item);
         return { _id, title, description, genres, kind, seasonNumber, thumbnailFocalPoint, collectionId };
@@ -26,3 +29,4 @@ export const useCollections = () =>
     },
     retry: false,
   });
+};

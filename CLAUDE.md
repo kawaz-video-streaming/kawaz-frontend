@@ -41,16 +41,18 @@ The project targets Android and iOS via Capacitor. Platform directories (`androi
 
 ### API Layer
 
-- **`src/api/client.ts`** — Authenticated fetch wrapper. Exports `apiRequest<T>()`, `apiUpload<T>()`, and `apiUrl(path)`. All API calls and asset URLs go through `apiUrl()` which prepends `VITE_BACKEND_URL` (empty in web builds, `https://kawazplus.com` in native builds).
-- **`src/api/media.ts`** — Media upload, update, delete, and `getUploadingMedia()` (returns pending/processing/failed items; treats 404 as `[]`). Upload accepts optional `collectionId`.
-- **`src/api/mediaCollection.ts`** — Collection CRUD.
-- **`src/api/avatar.ts`** — Avatar catalog: list, image URL helper, upload (admin), delete (admin).
+- **`src/api/client.ts`** — Authenticated fetch wrapper. Exports `apiRequest<T>()`, `apiUpload<T>()`, `apiUrl(path)`, and `specialParam(special)` (returns `'?special=true'` or `''`). All API calls and asset URLs go through `apiUrl()` which prepends `VITE_BACKEND_URL` (empty in web builds, `https://kawazplus.com` in native builds).
+- **`src/api/media.ts`** — Media upload, update, delete, and `getUploadingMedia()` (returns pending/processing/failed items; treats 404 as `[]`). Upload accepts optional `collectionId`. All mutating functions accept `special?: boolean` to target the special data pool.
+- **`src/api/mediaCollection.ts`** — Collection CRUD. All functions accept `special?: boolean`.
+- **`src/api/avatar.ts`** — Avatar catalog: list, image URL helper, upload (admin), delete (admin). All functions accept `special?: boolean`; `avatarImageUrl(id, special?)` appends `?special=true` when needed.
 - **`src/api/user.ts`** — User profile CRUD: get, create, update (change avatar), delete.
-- **`src/api/admin.ts`** — Admin user approval: `getPendingUsers()`, `approveUser(username)`, `denyUser(username)`.
+- **`src/api/admin.ts`** — Admin user approval: `getPendingUsers()`, `approveUser(username, role)` (role: `'user' | 'special'`), `denyUser(username)`.
 
 ### Auth
 
-`AuthContext` holds `isAuthenticated`, `isAdmin`, `username`, `selectedProfile`, `login()`, `logout()`, and `selectProfile()`. Backed by `localStorage` for the auth flag; role/username are in-memory only. On logout, `queryClient.clear()` wipes the TanStack Query cache so no user's data leaks to the next session. `ProtectedRoute` enforces authentication — unauthenticated users are redirected to `/login`, authenticated users on public routes are redirected to `/profiles`.
+`AuthContext` holds `isAuthenticated`, `isAdmin`, `username`, `selectedProfile`, `specialPool`, `login()`, `logout()`, `selectProfile()`, and `toggleSpecialPool()`. Backed by `localStorage` for the auth flag; role/username/specialPool are in-memory only. `specialPool` lets admins view and manage the special (demo) data pool — all pool-aware hooks read this flag and append `?special=true` to API calls when set. On logout, `queryClient.clear()` wipes the TanStack Query cache so no user's data leaks to the next session. `ProtectedRoute` enforces authentication — unauthenticated users are redirected to `/login`, authenticated users on public routes are redirected to `/profiles`.
+
+User roles: `user` (regular pool), `special` (demo/special pool — isolated DB), `admin` (can access both pools via `?special=true` toggle).
 
 ### Data Fetching
 
@@ -94,11 +96,11 @@ After login, users land on `/profiles`. Selecting a profile stores it in `AuthCo
 
 - **ProfilesPage** — Netflix-style profile picker. No navbar. Users select a profile to enter the app. Supports creating (name + avatar picker dialog) and deleting profiles. The avatar picker dialog is a separate modal showing only images grouped by category.
 - **AvatarAdminPage** — Admin-only. Shows all avatar categories (always, even if empty) with fixed-height rows. Supports uploading new avatars (name, category from fixed enum, image) and deleting existing ones with a confirmation dialog.
-- **Navbar** (`src/components/layout/Navbar.tsx`) — Sticky top bar. Left: admin nav links (Upload, New Collection, Avatars) shown only for admins on `lg+` screens. Center: Kawaz+ logo and welcome message. Right: theme toggle, admin processing panel (`hidden lg:block`), admin pending signups panel (`hidden lg:block`), search icon, avatar menu. The admin panels are hidden on mobile — `BottomNav` handles them there.
-- **BottomNav** (`src/components/layout/BottomNav.tsx`) — Mobile-only (`lg:hidden`), admin-only fixed bottom bar. Contains links to Upload, Collection, Avatars and toggle buttons for the MediaProcessingPanel and PendingSignupsPanel (both rendered as `fixed inset-x-4 bottom-20` overlays). Shows badge counts on the panel buttons. Uses `env(safe-area-inset-bottom)` for notch padding.
+- **Navbar** (`src/components/layout/Navbar.tsx`) — Sticky top bar. Left: admin nav links (Upload, New Collection, Avatars) shown only for admins on `lg+` screens. Center: Kawaz+ logo and welcome message. Right: theme toggle, special-pool toggle (Database icon, purple when active), admin processing panel, admin pending signups panel, search icon, avatar menu. Admin panels and pool toggle are `hidden lg:block` — `BottomNav` handles them on mobile.
+- **BottomNav** (`src/components/layout/BottomNav.tsx`) — Mobile-only (`lg:hidden`), admin-only fixed bottom bar. Contains links to Upload, Collection, Avatars, Genres and toggle buttons for special pool, MediaProcessingPanel, and PendingSignupsPanel (both rendered as `fixed inset-x-4 bottom-20` overlays). Shows badge counts on the panel buttons. Uses `env(safe-area-inset-bottom)` for notch padding.
 - **NavSearch** (`src/components/NavSearch.tsx`) — Full-screen search overlay, opened by the search icon button in the Navbar. Calls `useVideos()` and `useCollections()` directly (TanStack Query serves cached data, no extra requests). Filters top-level items (no `collectionId`) by title and description substring match. Results appear with portrait thumbnails. Closes on outside click or Escape.
 - **MediaProcessingPanel** (`src/components/MediaProcessingPanel.tsx`) — Dropdown/overlay panel listing all non-ready media with SVG circular progress bars (floored %). Color-coded by status: yellow=pending, blue=processing, red=failed. Supports deleting failed items. Closes on outside click.
-- **PendingSignupsPanel** (`src/components/PendingSignupsPanel.tsx`) — Admin-only dropdown/overlay listing pending user signups (name + email). Approve button acts immediately; Deny requires a second confirmation click. Powered by `usePendingUsers`, `useApproveUser`, `useDenyUser`.
+- **PendingSignupsPanel** (`src/components/PendingSignupsPanel.tsx`) — Admin-only dropdown/overlay listing pending user signups (name + email). Two approve buttons: green "User" (regular pool) and blue "Special" (demo pool); Deny requires a second confirmation click. Powered by `usePendingUsers`, `useApproveUser`, `useDenyUser`.
 
 ### Avatar Categories (fixed enum)
 

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import z from 'zod'
-import { apiRequest } from '../api/client'
+import { apiRequest, specialParam } from '../api/client'
+import { useAuth } from '../auth/useAuth'
 import type { VideoListItem } from '../types/api'
 
 const mediaListItemSchema = z.object({
@@ -17,11 +18,13 @@ const mediaListItemSchema = z.object({
   }).optional(),
 }).loose()
 
-export const useVideos = () =>
-  useQuery<VideoListItem[]>({
-    queryKey: ['videos'],
+export const useVideos = () => {
+  const { isAdmin, specialPool } = useAuth()
+  const special = isAdmin && specialPool
+  return useQuery<VideoListItem[]>({
+    queryKey: ['videos', special],
     queryFn: async () => {
-      const raw = await apiRequest<unknown[]>('/media')
+      const raw = await apiRequest<unknown[]>(`/media${specialParam(special)}`)
       return raw.map(item => {
         const { _id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, collectionId, metadata } = mediaListItemSchema.parse(item)
         return { _id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, durationInMs: metadata?.durationInMs ?? 0, collectionId }
@@ -29,3 +32,4 @@ export const useVideos = () =>
     },
     retry: false,
   })
+}
