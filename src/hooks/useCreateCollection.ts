@@ -1,13 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createCollection, type CreateCollectionParams } from '../api/mediaCollection'
+import { useAuth } from '../auth/useAuth'
 
 export const useCreateCollection = () => {
   const queryClient = useQueryClient()
+  const { isAdmin, specialPool } = useAuth()
+  const special = isAdmin && specialPool
   return useMutation({
-    mutationFn: (params: CreateCollectionParams) => createCollection(params),
+    mutationFn: (params: CreateCollectionParams) => createCollection(params, special),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['collections'] })
+      void queryClient.invalidateQueries({ queryKey: ['collections', special] })
       toast.success('Collection created')
     },
     onError: (err) => {

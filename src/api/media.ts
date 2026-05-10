@@ -1,5 +1,5 @@
 import z from 'zod';
-import { apiRequest, apiUpload } from './client';
+import { apiRequest, apiUpload, apiUrl, specialParam } from './client';
 import type { Coordinates, MediaKind, PendingMediaItem, TmdbCollectionDetails, TmdbEpisodeDetails, TmdbMovieDetails, TmdbShowDetails } from '../types/api';
 
 export interface UploadMediaParams {
@@ -32,8 +32,9 @@ const putToStorage = (url: string, file: File): Promise<void> =>
     xhr.send(file);
   });
 
-export const uploadMedia = async ({ file, title, description, genres, kind, episodeNumber, thumbnail, thumbnailFocalPoint, collectionId }: UploadMediaParams): Promise<{ message: string; }> => {
-  const raw = await apiRequest<unknown>('/media/upload/initiate', {
+export const uploadMedia = async ({ file, title, description, genres, kind, episodeNumber, thumbnail, thumbnailFocalPoint, collectionId }: UploadMediaParams, special = false): Promise<{ message: string; }> => {
+  const sp = specialParam(special);
+  const raw = await apiRequest<unknown>(`/media/upload/initiate${sp}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -54,7 +55,7 @@ export const uploadMedia = async ({ file, title, description, genres, kind, epis
   await putToStorage(videoUploadUrl, file);
   await putToStorage(thumbnailUploadUrl, thumbnail);
 
-  return apiRequest<{ message: string; }>('/media/upload/complete', {
+  return apiRequest<{ message: string; }>(`/media/upload/complete${sp}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ mediaId }),
@@ -94,11 +95,12 @@ const buildMediaUpdateBody = ({
   ...(collectionId !== undefined ? { collectionId } : {}),
 });
 
-export const updateMedia = async ({ id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, thumbnail, collectionId }: UpdateMediaParams) => {
+export const updateMedia = async ({ id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, thumbnail, collectionId }: UpdateMediaParams, special = false) => {
   const body = buildMediaUpdateBody({ title, description, genres, kind, episodeNumber, thumbnailFocalPoint, collectionId });
+  const sp = specialParam(special);
 
   if (collectionId === null && !thumbnail) {
-    return apiRequest<{ message: string; }>(`/media/${id}`, {
+    return apiRequest<{ message: string; }>(`/media/${id}${sp}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -116,10 +118,10 @@ export const updateMedia = async ({ id, title, description, genres, kind, episod
   if (thumbnail) formData.append('thumbnail', thumbnail);
   if (typeof collectionId === 'string') formData.append('collectionId', collectionId);
 
-  const result = await apiUpload<{ message: string; }>(`/media/${id}`, formData, 'PUT');
+  const result = await apiUpload<{ message: string; }>(`/media/${id}${sp}`, formData, 'PUT');
 
   if (collectionId === null) {
-    return apiRequest<{ message: string; }>(`/media/${id}`, {
+    return apiRequest<{ message: string; }>(`/media/${id}${sp}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -129,10 +131,17 @@ export const updateMedia = async ({ id, title, description, genres, kind, episod
   return result;
 };
 
-export const deleteMedia = (id: string) =>
-  apiRequest<{ message: string; }>(`/media/${id}`, { method: 'DELETE' });
+export const deleteMedia = (id: string, special = false) =>
+  apiRequest<{ message: string; }>(`/media/${id}${specialParam(special)}`, { method: 'DELETE' });
 
-export const getUploadingMedia = () => apiRequest<PendingMediaItem[]>('/media/uploading');
+export const getUploadingMedia = (special = false) =>
+  apiRequest<PendingMediaItem[]>(`/media/uploading${specialParam(special)}`);
+
+export const mediaThumbnailUrl = (id: string, special = false) =>
+  apiUrl(`/media/${id}/thumbnail${specialParam(special)}`);
+
+export const mediaStreamUrl = (path: string, special = false) =>
+  apiUrl(`/media/stream/${path}${specialParam(special)}`);
 
 export const searchTmdbMovie = (title: string, year?: number) => {
   const params = new URLSearchParams({ title });
@@ -160,7 +169,7 @@ export const searchTmdbEpisode = (showTitle: string, showYear: number, seasonNum
 
 export const fetchTmdbPoster = async (url: string): Promise<Blob> => {
   const params = new URLSearchParams({ url });
-  const response = await fetch(`/api/media/tmdb/poster?${params}`, { credentials: 'include' });
+  const response = await fetch(apiUrl(`/media/tmdb/poster?${params}`), { credentials: 'include' });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.blob();
 };

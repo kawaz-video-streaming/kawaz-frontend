@@ -1,14 +1,17 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { uploadAvatar } from '../api/avatar'
+import { useAuth } from '../auth/useAuth'
 
 export const useUploadAvatar = () => {
   const queryClient = useQueryClient()
+  const { isAdmin, specialPool } = useAuth()
+  const special = isAdmin && specialPool
   return useMutation({
     mutationFn: ({ name, categoryId, file }: { name: string; categoryId: string; file: File }) =>
-      uploadAvatar(name, categoryId, file),
+      uploadAvatar(name, categoryId, file, special),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['avatars'] })
+      void queryClient.invalidateQueries({ queryKey: ['avatars', special] })
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Failed to upload avatar', {

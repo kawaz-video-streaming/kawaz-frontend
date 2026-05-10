@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .env.local
+.env.native
+android/keystore.jks
+android/keystore.properties
 .DS_Store
 npm-debug.log*
 yarn-debug.log*

@@ -1,4 +1,5 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
+import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import type { Coordinates, MediaKind } from '../types/api';
@@ -66,7 +67,7 @@ const FocalPointPicker = ({
 export const VideoPage = () => {
   const { id, collectionId: routeCollectionId } = useParams<{ id: string; collectionId?: string; }>();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, specialPool } = useAuth();
   const { data: video, isError, isLoading } = useVideo(id ?? '');
   const { mutate: update, isPending: isUpdating } = useUpdateMedia(id ?? '');
   const { mutate: remove, isPending: isDeleting } = useDeleteMedia();
@@ -254,7 +255,8 @@ export const VideoPage = () => {
     );
   }
 
-  const thumbnailSrc = `/api/media/${video._id}/thumbnail`;
+  const special = isAdmin && specialPool;
+  const thumbnailSrc = mediaThumbnailUrl(video._id, special);
   const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3;
 
   return (
@@ -287,9 +289,11 @@ export const VideoPage = () => {
       })()}
 
       <VideoPlayer
-        manifestUrl={`/api/media/stream/${video.playUrl}`}
-        chaptersUrl={video.chaptersUrl ? `/api/media/stream/${video.chaptersUrl}` : undefined}
-        thumbnailsUrl={video.thumbnailsUrl ? `/api/media/stream/${video.thumbnailsUrl}` : undefined}
+        manifestUrl={mediaStreamUrl(video.playUrl, special)}
+        chaptersUrl={video.chaptersUrl ? mediaStreamUrl(video.chaptersUrl, special) : undefined}
+        thumbnailsUrl={video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined}
+        posterUrl={thumbnailSrc}
+        special={special}
         className="mb-6 rounded-xl"
       />
 

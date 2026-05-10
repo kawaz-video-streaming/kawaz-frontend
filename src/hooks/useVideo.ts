@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import z from 'zod';
-import { apiRequest } from '../api/client';
+import { apiRequest, specialParam } from '../api/client';
+import { useAuth } from '../auth/useAuth';
 import type { Video } from '../types/api';
 
 const mediaSchema = z.object({
@@ -28,14 +29,17 @@ const mediaSchema = z.object({
   }),
 }).loose();
 
-export const useVideo = (id: string) =>
-  useQuery<Video>({
-    queryKey: ['videos', id],
+export const useVideo = (id: string) => {
+  const { isAdmin, specialPool } = useAuth();
+  const special = isAdmin && specialPool;
+  return useQuery<Video>({
+    queryKey: ['videos', id, special],
     queryFn: async () => {
-      const raw = await apiRequest<unknown>(`/media/${id}`);
+      const raw = await apiRequest<unknown>(`/media/${id}${specialParam(special)}`);
       const { _id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, collectionId, metadata } = mediaSchema.parse(raw);
       return { _id, title, description, genres, kind, episodeNumber, thumbnailFocalPoint, collectionId, ...metadata };
     },
     retry: false,
     enabled: id.length > 0,
   });
+};

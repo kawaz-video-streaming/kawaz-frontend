@@ -1,4 +1,4 @@
-import { apiRequest, apiUpload } from './client'
+import { apiRequest, apiUpload, apiUrl, specialParam } from './client'
 import type { CollectionKind, Coordinates } from '../types/api'
 
 const appendGenres = (formData: FormData, genres: string[]) => {
@@ -16,7 +16,7 @@ export interface CreateCollectionParams {
   collectionId?: string
 }
 
-export const createCollection = ({ title, description, genres, kind, seasonNumber, thumbnail, thumbnailFocalPoint, collectionId }: CreateCollectionParams) => {
+export const createCollection = ({ title, description, genres, kind, seasonNumber, thumbnail, thumbnailFocalPoint, collectionId }: CreateCollectionParams, special = false) => {
   const formData = new FormData()
   formData.append('title', title)
   if (description) formData.append('description', description)
@@ -27,7 +27,7 @@ export const createCollection = ({ title, description, genres, kind, seasonNumbe
   formData.append('thumbnailFocalPoint[x]', String(thumbnailFocalPoint.x))
   formData.append('thumbnailFocalPoint[y]', String(thumbnailFocalPoint.y))
   if (collectionId) formData.append('collectionId', collectionId)
-  return apiUpload<{ message: string }>('/mediaCollection', formData)
+  return apiUpload<{ message: string }>(`/mediaCollection${specialParam(special)}`, formData)
 }
 
 export interface UpdateCollectionParams {
@@ -60,11 +60,12 @@ const buildCollectionUpdateBody = ({
   ...(collectionId !== undefined ? { collectionId } : {}),
 })
 
-export const updateCollection = async ({ id, title, description, genres, kind, seasonNumber, thumbnailFocalPoint, thumbnail, collectionId }: UpdateCollectionParams) => {
+export const updateCollection = async ({ id, title, description, genres, kind, seasonNumber, thumbnailFocalPoint, thumbnail, collectionId }: UpdateCollectionParams, special = false) => {
   const body = buildCollectionUpdateBody({ title, description, genres, kind, seasonNumber, thumbnailFocalPoint, collectionId })
+  const sp = specialParam(special)
 
   if (collectionId === null && !thumbnail) {
-    return apiRequest<{ message: string }>(`/mediaCollection/${id}`, {
+    return apiRequest<{ message: string }>(`/mediaCollection/${id}${sp}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -82,10 +83,10 @@ export const updateCollection = async ({ id, title, description, genres, kind, s
   if (thumbnail) formData.append('thumbnail', thumbnail)
   if (typeof collectionId === 'string') formData.append('collectionId', collectionId)
 
-  const result = await apiUpload<{ message: string }>(`/mediaCollection/${id}`, formData, 'PUT')
+  const result = await apiUpload<{ message: string }>(`/mediaCollection/${id}${sp}`, formData, 'PUT')
 
   if (collectionId === null) {
-    return apiRequest<{ message: string }>(`/mediaCollection/${id}`, {
+    return apiRequest<{ message: string }>(`/mediaCollection/${id}${sp}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -95,5 +96,8 @@ export const updateCollection = async ({ id, title, description, genres, kind, s
   return result
 }
 
-export const deleteCollection = (id: string) =>
-  apiRequest<{ message: string }>(`/mediaCollection/${id}`, { method: 'DELETE' })
+export const deleteCollection = (id: string, special = false) =>
+  apiRequest<{ message: string }>(`/mediaCollection/${id}${specialParam(special)}`, { method: 'DELETE' })
+
+export const collectionThumbnailUrl = (id: string, special = false) =>
+  apiUrl(`/mediaCollection/${id}/thumbnail${specialParam(special)}`)

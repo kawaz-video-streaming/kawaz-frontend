@@ -1,4 +1,5 @@
 import { useState, useEffect, type SyntheticEvent } from 'react'
+import { apiUrl } from '../api/client'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Input } from '../components/ui/input'
@@ -52,7 +53,7 @@ export const LoginPage = () => {
 
     if (mode === 'forgot') {
       try {
-        await fetch('/api/auth/forgot-password', {
+        await fetch(apiUrl('/auth/forgot-password'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email }),
@@ -71,7 +72,7 @@ export const LoginPage = () => {
       const body = mode === 'login'
         ? { username, password }
         : { username, password, email }
-      const response = await fetch(`/api${path}`, {
+      const response = await fetch(apiUrl(path), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -230,7 +231,7 @@ export const LoginPage = () => {
 
                 <button
                   type="button"
-                  onClick={() => { window.location.href = '/api/auth/google/login' }}
+                  onClick={() => { window.location.href = apiUrl('/auth/google/login') }}
                   className="flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700"
                 >
                   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">

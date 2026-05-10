@@ -6,8 +6,8 @@ import type { PendingUser } from '../types/api'
 export const useApproveUser = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (username: string) => approveUser(username),
-    onSuccess: (_, username) => {
+    mutationFn: ({ username, role }: { username: string; role: 'user' | 'special' }) => approveUser(username, role),
+    onSuccess: (_, { username }) => {
       toast.success(`${username} approved`)
       queryClient.setQueryData<PendingUser[]>(['pending-users'], (old) =>
         old?.filter((u) => u.name !== username) ?? []

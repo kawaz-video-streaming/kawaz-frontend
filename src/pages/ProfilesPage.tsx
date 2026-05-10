@@ -22,6 +22,8 @@ const AvatarPickerDialog = ({
   onSelect: (avatar: Avatar) => void
   onClose: () => void
 }) => {
+  const { isAdmin, specialPool } = useAuth()
+  const special = isAdmin && specialPool
   const byCategory = avatars.reduce<Record<string, Avatar[]>>((acc, a) => {
     ; (acc[a.categoryId] ??= []).push(a)
     return acc
@@ -51,7 +53,7 @@ const AvatarPickerDialog = ({
                       className="flex flex-col items-center gap-1.5 transition-transform hover:scale-105 focus:outline-none"
                     >
                       <div className="h-20 w-20 overflow-hidden rounded-full ring-1 ring-border focus-within:ring-2 focus-within:ring-red-500">
-                        <img src={avatarImageUrl(avatar._id)} alt={avatar.name} className="h-full w-full object-cover" />
+                        <img src={avatarImageUrl(avatar._id, special)} alt={avatar.name} className="h-full w-full object-cover" />
                       </div>
                       <span className="max-w-20 truncate text-[11px] text-muted-foreground">{avatar.name}</span>
                     </button>
@@ -68,7 +70,8 @@ const AvatarPickerDialog = ({
 
 export const ProfilesPage = () => {
   const navigate = useNavigate()
-  const { selectProfile } = useAuth()
+  const { selectProfile, isAdmin, specialPool } = useAuth()
+  const special = isAdmin && specialPool
   const { data: profiles, isLoading: profilesLoading } = useProfiles()
   const { data: avatars } = useAvatars()
   const { data: categories } = useAvatarCategories()
@@ -126,7 +129,7 @@ export const ProfilesPage = () => {
                 >
                   {avatar ? (
                     <div className="h-36 w-36 overflow-hidden rounded-full sm:h-48 sm:w-48 lg:h-64 lg:w-64 xl:h-72 xl:w-72">
-                      <img src={avatarImageUrl(avatar._id)} alt={avatar.name} className="h-full w-full object-cover" />
+                      <img src={avatarImageUrl(avatar._id, special)} alt={avatar.name} className="h-full w-full object-cover" />
                     </div>
                   ) : (
                     <div className="flex h-36 w-36 items-center justify-center rounded-full bg-accent text-3xl font-bold text-muted-foreground sm:h-48 sm:w-48 lg:h-64 lg:w-64 xl:h-72 xl:w-72">
@@ -207,7 +210,7 @@ export const ProfilesPage = () => {
                   {selectedAvatar ? (
                     <>
                       <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
-                        <img src={avatarImageUrl(selectedAvatar._id)} alt={selectedAvatar.name} className="h-full w-full object-cover" />
+                        <img src={avatarImageUrl(selectedAvatar._id, special)} alt={selectedAvatar.name} className="h-full w-full object-cover" />
                       </div>
                       <span className="flex-1 text-left text-sm">{selectedAvatar.name}</span>
                     </>

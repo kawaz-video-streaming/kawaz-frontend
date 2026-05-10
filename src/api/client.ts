@@ -11,8 +11,14 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
   return response.json() as Promise<T>
 }
 
+const BASE = import.meta.env.VITE_BACKEND_URL ?? ''
+
+export const apiUrl = (path: string) => `${BASE}/api${path}`
+
+export const specialParam = (special: boolean) => special ? '?special=true' : ''
+
 export const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     credentials: 'include',
     headers: {
@@ -23,7 +29,7 @@ export const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T
 }
 
 export const apiUpload = async <T>(path: string, formData: FormData, method = 'POST'): Promise<T> => {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(apiUrl(path), {
     method,
     credentials: 'include',
     body: formData,
