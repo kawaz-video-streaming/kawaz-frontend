@@ -8,12 +8,16 @@ declare global {
   }
 }
 
-const prefetchFirstSegments = async (manifestUrl: string) => {
+const prefetchFirstSegments = async (manifestUrl: string, special: boolean) => {
   try {
     const res = await fetch(manifestUrl, { credentials: 'include' });
     if (!res.ok) return;
     const text = await res.text();
-    const base = manifestUrl.slice(0, manifestUrl.lastIndexOf('/') + 1);
+    const manifestPath = manifestUrl.includes('?')
+      ? manifestUrl.slice(0, manifestUrl.indexOf('?'))
+      : manifestUrl;
+    const base = manifestPath.slice(0, manifestPath.lastIndexOf('/') + 1);
+    const sp = special ? '?special=true' : '';
 
     const initTemplate = text.match(/initialization="([^"]+)"/)?.[1];
     const mediaTemplate = text.match(/media="([^"]+)"/)?.[1];
@@ -24,11 +28,11 @@ const prefetchFirstSegments = async (manifestUrl: string) => {
 
     const urls: string[] = [];
     for (const id of repIds) {
-      urls.push(base + initTemplate.replace(/\$RepresentationID\$/g, id));
+      urls.push(base + initTemplate.replace(/\$RepresentationID\$/g, id) + sp);
       const firstSeg = mediaTemplate
         .replace(/\$RepresentationID\$/g, id)
         .replace(/\$Number%0(\d+)d\$/, (_, w) => String(startNum).padStart(Number(w), '0'));
-      urls.push(base + firstSeg);
+      urls.push(base + firstSeg + sp);
     }
 
     await Promise.all(urls.map(u => fetch(u, { credentials: 'include' })));
@@ -41,10 +45,11 @@ interface VideoPlayerProps {
   manifestUrl: string;
   chaptersUrl?: string;
   thumbnailsUrl?: string;
+  special?: boolean;
   className?: string;
 }
 
-export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className }: VideoPlayerProps) => {
+export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, special = false, className }: VideoPlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const destroyPromiseRef = useRef<Promise<void>>(Promise.resolve());
@@ -200,7 +205,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
       setIsLoadingPlayer(true);
       setPlayerError(null);
 
-      void prefetchFirstSegments(manifestUrl);
+      void prefetchFirstSegments(manifestUrl, special);
 
       await destroyPromiseRef.current;
       if (isDisposed) return undefined;
@@ -233,8 +238,23 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
           const isExternal = !uri.startsWith('/') && !uri.startsWith(window.location.origin);
           if (isExternal) {
             request.allowCrossSiteCredentials = false;
+          } else if (special && !uri.includes('special=true')) {
+            request.uris = request.uris.map(u => u + (u.includes('?') ? '&special=true' : '?special=true'));
           }
         });
+
+        if (special) {
+          player.getNetworkingEngine()?.registerResponseFilter((_type, response) => {
+            const uri = response.uri;
+            if (!uri.includes('.vtt')) return;
+            const text = new TextDecoder().decode(response.data);
+            // Thumbnail VTTs reference image URLs with #xywh= fragments.
+            // Shaka's UI loads those images via <img>.src (bypassing the request filter),
+            // so we rewrite the VTT itself to include ?special=true before the fragment.
+            const rewritten = text.replace(/(#xywh=)/g, '?special=true#xywh=');
+            response.data = new TextEncoder().encode(rewritten).buffer as ArrayBuffer;
+          });
+        }
 
         const configurablePlayer = player as import('shaka-player').Player & {
           configure?: (config: object) => void;
@@ -414,7 +434,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, className
         }
       })();
     };
-  }, [manifestUrl, chaptersUrl, thumbnailsUrl]);
+  }, [manifestUrl, chaptersUrl, thumbnailsUrl, special]);
 
   useEffect(() => {
     const showVolume = (vol: number) => {
