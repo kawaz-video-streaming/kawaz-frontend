@@ -53,7 +53,6 @@ export const BottomNav = () => {
   return (
     <div
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-border bg-background/95 backdrop-blur-md"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex items-center justify-around">
         <Link to="/upload" className={linkCls('/upload')}>
