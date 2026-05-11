@@ -1,8 +1,10 @@
 import 'shaka-player/dist/controls.css';
+import { Capacitor } from '@capacitor/core';
 import { useEffect, useRef, useState } from 'react';
+import { cn } from '../lib/utils';
+import { SystemBars } from '../plugins/systemBars';
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
-import { cn } from '../lib/utils';
 
 declare global {
   interface Window {
@@ -453,6 +455,21 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   }, [manifestUrl, chaptersUrl, thumbnailsUrl, special]);
 
   useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const handleFullscreenChange = async () => {
+      if (document.fullscreenElement) {
+        await SystemBars.hide();
+      } else {
+        await SystemBars.show();
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
     const showVolume = (vol: number) => {
       setVolumeDisplay(Math.round(vol * 100));
       if (volumeHideTimer.current !== null) window.clearTimeout(volumeHideTimer.current);
@@ -471,7 +488,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
-        if (video.paused) video.play().catch(() => {});
+        if (video.paused) video.play().catch(() => { });
         else video.pause();
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
