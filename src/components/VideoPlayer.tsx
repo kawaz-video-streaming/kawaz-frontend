@@ -1,5 +1,7 @@
 import 'shaka-player/dist/controls.css';
 import { useEffect, useRef, useState } from 'react';
+
+const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
 import { cn } from '../lib/utils';
 
 declare global {
@@ -243,11 +245,18 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
         player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
           const uri = request.uris[0];
-          const isExternal = !uri.startsWith('/') && !uri.startsWith(window.location.origin);
-          if (isExternal) {
+          const isOwnServer = uri.startsWith('/') || uri.startsWith(window.location.origin) || (BACKEND_BASE !== '' && uri.startsWith(BACKEND_BASE));
+          if (!isOwnServer) {
             request.allowCrossSiteCredentials = false;
-          } else if (special && !uri.includes('special=true')) {
-            request.uris = request.uris.map(u => u + (u.includes('?') ? '&special=true' : '?special=true'));
+          } else {
+            // In native builds the WebView origin (https://localhost) differs from the backend —
+            // explicitly allow credentials so session cookies are sent on cross-origin segment requests.
+            if (!uri.startsWith('/') && !uri.startsWith(window.location.origin)) {
+              request.allowCrossSiteCredentials = true;
+            }
+            if (special && !uri.includes('special=true')) {
+              request.uris = request.uris.map(u => u + (u.includes('?') ? '&special=true' : '?special=true'));
+            }
           }
         });
 
