@@ -14,7 +14,7 @@ export const Layout = () => {
       </div>
       <main
         className="flex-1 px-4 pt-8 sm:px-6 lg:px-10 xl:px-16"
-        style={{ paddingBottom: isAdmin ? 'calc(5rem + env(safe-area-inset-bottom))' : 'env(safe-area-inset-bottom)' }}
+        style={{ paddingBottom: isAdmin ? 'calc(5rem + env(safe-area-inset-bottom))' : 'max(env(safe-area-inset-bottom), 3rem)' }}
       >
         <Outlet />
       </main>
