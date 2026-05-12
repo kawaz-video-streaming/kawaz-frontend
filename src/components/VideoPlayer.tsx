@@ -455,13 +455,12 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   }, [manifestUrl, chaptersUrl, thumbnailsUrl, special]);
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-
     const handleFullscreenChange = async () => {
-      if (document.fullscreenElement) {
-        await SystemBars.hide();
-      } else {
-        await SystemBars.show();
+      const inFullscreen = !!document.fullscreenElement;
+      containerRef.current?.classList.toggle('kawaz-fullscreen', inFullscreen);
+      if (Capacitor.isNativePlatform()) {
+        if (inFullscreen) await SystemBars.hide();
+        else await SystemBars.show();
       }
     };
 

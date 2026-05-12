@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { Outlet } from 'react-router'
 import { Navbar } from './Navbar'
 import { BottomNav } from './BottomNav'
@@ -14,6 +15,9 @@ export const Layout = () => {
         <Outlet />
       </main>
       <BottomNav />
+      {Capacitor.isNativePlatform() && (
+        <div className="fixed bottom-0 left-0 right-0 z-49 bg-background" style={{ height: '3.5rem' }} aria-hidden />
+      )}
     </div>
   )
 }

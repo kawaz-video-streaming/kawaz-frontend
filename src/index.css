@@ -252,9 +252,11 @@ a:focus-visible,
   }
 }
 
-/* In fullscreen, let Shaka control video sizing — remove aspect-ratio and object-cover constraints */
-:fullscreen .kawaz-video-player video,
-:-webkit-full-screen .kawaz-video-player video {
+/* In fullscreen, let Shaka control video sizing — remove aspect-ratio and object-cover constraints.
+   .kawaz-fullscreen is toggled via JS (fullscreenchange) because `:fullscreen` is unreliable in Capacitor WebView. */
+:fullscreen video,
+:-webkit-full-screen video,
+.kawaz-fullscreen video {
   aspect-ratio: unset !important;
   width: 100% !important;
   height: 100% !important;
