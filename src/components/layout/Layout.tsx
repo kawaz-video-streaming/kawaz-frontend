@@ -2,10 +2,8 @@ import { Capacitor } from '@capacitor/core'
 import { Outlet } from 'react-router'
 import { Navbar } from './Navbar'
 import { BottomNav } from './BottomNav'
-import { useSpatialNavigation } from '../../hooks/useSpatialNavigation'
 
 export const Layout = () => {
-  useSpatialNavigation()
   return (
     <div className="min-h-dvh flex flex-col bg-background">
       <div className="sticky top-0 z-50">
@@ -16,7 +14,7 @@ export const Layout = () => {
       </main>
       <BottomNav />
       {Capacitor.isNativePlatform() && (
-        <div className="fixed bottom-0 left-0 right-0 z-49 bg-background" style={{ height: '3rem' }} aria-hidden />
+        <div className="fixed bottom-0 left-0 right-0 z-49 bg-background landscape:hidden" style={{ height: '3rem' }} aria-hidden />
       )}
     </div>
   )

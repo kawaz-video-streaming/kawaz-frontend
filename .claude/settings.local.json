@@ -7,7 +7,9 @@
       "Bash(grep -oP 'uj=function.{0,800}' \"G:/Downloads/ido/projects/services/kawaz-frontend/node_modules/shaka-player/dist/shaka-player.ui.js\")",
       "Bash(grep -oP 'function ns\\\\\\(.{0,400}' \"G:/Downloads/ido/projects/services/kawaz-frontend/node_modules/shaka-player/dist/shaka-player.ui.js\")",
       "Bash(ls \"G:/Downloads/ido/projects/android-release/debug_screenshots\")",
-      "Read(//g/Downloads/ido/projects/android-release/debug_screenshots/**)"
+      "Read(//g/Downloads/ido/projects/android-release/debug_screenshots/**)",
+      "Bash(ls \"F:\\\\My Drive\\\\ido\\\\projects\\\\TODO\\\\mobile and tv screenshots\\\\tv\")",
+      "Read(//f/My Drive/ido/projects/TODO/mobile and tv screenshots/tv/**)"
     ]
   }
 }

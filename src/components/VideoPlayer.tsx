@@ -1,5 +1,6 @@
 import 'shaka-player/dist/controls.css';
 import { Capacitor } from '@capacitor/core';
+import { isTV } from '../lib/platform';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import { SystemBars } from '../plugins/systemBars';
@@ -479,10 +480,11 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       const video = videoRef.current;
       if (!video) return;
       const active = document.activeElement;
-      const playerFocused =
-        active === document.body ||
-        active === document.documentElement ||
-        !!containerRef.current?.contains(active);
+      // On TV, spatial navigation owns arrow keys when focus is on body/document.
+      // Only intercept when a specific element inside the player has focus.
+      const playerFocused = isTV
+        ? !!containerRef.current?.contains(active)
+        : active === document.body || active === document.documentElement || !!containerRef.current?.contains(active);
       if (!playerFocused) return;
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
