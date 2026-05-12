@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { Database, FolderPlus, Image, Loader2, Tag, Upload, UserPlus } from 'lucide-react'
@@ -53,7 +54,7 @@ export const BottomNav = () => {
   return (
     <div
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-border bg-background/95 backdrop-blur-md"
-      style={{ paddingBottom: '1rem' }}
+      style={Capacitor.isNativePlatform() ? { paddingBottom: '2rem' } : undefined}
     >
       <div className="flex items-center justify-around">
         <Link to="/upload" className={linkCls('/upload')}>
