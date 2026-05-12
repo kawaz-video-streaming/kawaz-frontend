@@ -16,7 +16,7 @@ export const Layout = () => {
       </main>
       <BottomNav />
       {Capacitor.isNativePlatform() && (
-        <div className="fixed bottom-0 left-0 right-0 z-49 bg-background" style={{ height: '3.5rem' }} aria-hidden />
+        <div className="fixed bottom-0 left-0 right-0 z-49 bg-background" style={{ height: '2.5rem' }} aria-hidden />
       )}
     </div>
   )
