@@ -252,6 +252,17 @@ a:focus-visible,
   }
 }
 
+/* In fullscreen, let Shaka control video sizing — remove aspect-ratio and object-cover constraints.
+   .kawaz-fullscreen is toggled via JS (fullscreenchange) because `:fullscreen` is unreliable in Capacitor WebView. */
+:fullscreen video,
+:-webkit-full-screen video,
+.kawaz-fullscreen video {
+  aspect-ratio: unset !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
 /* Webkit scrollbar — must live outside @layer to apply to pseudo-elements */
 ::-webkit-scrollbar {
   width: 5px;

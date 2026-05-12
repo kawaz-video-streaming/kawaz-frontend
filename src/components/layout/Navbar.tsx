@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search, Database } from 'lucide-react';
@@ -72,7 +73,7 @@ export const Navbar = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md" style={Capacitor.isNativePlatform() ? { paddingTop: '2rem' } : undefined}>
       <div className="flex items-center px-3 py-3 sm:px-6">
         {/* Left: Navigation Links — flex-1 so center stays naturally centered */}
         <div className="flex flex-1 items-center gap-3 lg:gap-6">

@@ -5,7 +5,9 @@
       "Bash(grep -oP '.{0,400}getChaptersAsync.{0,400}' \"G:/Downloads/ido/projects/services/kawaz-frontend/node_modules/shaka-player/dist/shaka-player.ui.js\")",
       "Bash(grep -oP '.{0,50}prototype\\\\.uj\\\\s*=\\\\s*.{0,600}' \"G:/Downloads/ido/projects/services/kawaz-frontend/node_modules/shaka-player/dist/shaka-player.ui.js\")",
       "Bash(grep -oP 'uj=function.{0,800}' \"G:/Downloads/ido/projects/services/kawaz-frontend/node_modules/shaka-player/dist/shaka-player.ui.js\")",
-      "Bash(grep -oP 'function ns\\\\\\(.{0,400}' \"G:/Downloads/ido/projects/services/kawaz-frontend/node_modules/shaka-player/dist/shaka-player.ui.js\")"
+      "Bash(grep -oP 'function ns\\\\\\(.{0,400}' \"G:/Downloads/ido/projects/services/kawaz-frontend/node_modules/shaka-player/dist/shaka-player.ui.js\")",
+      "Bash(ls \"G:/Downloads/ido/projects/android-release/debug_screenshots\")",
+      "Read(//g/Downloads/ido/projects/android-release/debug_screenshots/**)"
     ]
   }
 }

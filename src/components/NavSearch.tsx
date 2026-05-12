@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router'
@@ -76,7 +77,7 @@ export const NavSearch = ({ open, onClose }: NavSearchProps) => {
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex flex-col bg-background/95 backdrop-blur-md">
+    <div className="fixed inset-0 z-100 flex flex-col bg-background/95 backdrop-blur-md" style={Capacitor.isNativePlatform() ? { paddingTop: '2rem' } : undefined}>
       <div className="flex items-center gap-3 border-b border-border px-4 py-4 sm:px-8">
         <Search size={20} className="shrink-0 text-muted-foreground" />
         <input

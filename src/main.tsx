@@ -9,8 +9,8 @@ import { App } from './App'
 import './index.css'
 
 if (Capacitor.isNativePlatform()) {
+  StatusBar.setOverlaysWebView({ overlay: true });
   StatusBar.setStyle({ style: Style.Dark });
-  StatusBar.setBackgroundColor({ color: '#171717' });
   SplashScreen.hide();
 
   CapacitorApp.addListener('backButton', ({ canGoBack }) => {
