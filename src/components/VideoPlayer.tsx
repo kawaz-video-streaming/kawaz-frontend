@@ -1,6 +1,8 @@
 import 'shaka-player/dist/controls.css';
+import { Capacitor } from '@capacitor/core';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
+import { SystemBars } from '../plugins/systemBars';
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
 
@@ -451,6 +453,21 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       })();
     };
   }, [manifestUrl, chaptersUrl, thumbnailsUrl, special]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const handleFullscreenChange = async () => {
+      if (document.fullscreenElement) {
+        await SystemBars.hide();
+      } else {
+        await SystemBars.show();
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   useEffect(() => {
     const showVolume = (vol: number) => {
