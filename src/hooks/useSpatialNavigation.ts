@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex="0"]'
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
 
 type Direction = 'up' | 'down' | 'left' | 'right'
 
@@ -52,8 +52,11 @@ export function useSpatialNavigation() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as Element).tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (tag === 'SELECT') return
       if ((e.target as HTMLElement).isContentEditable) return
+      // Inside a text input: left/right move the cursor — don't hijack them.
+      // Up/down have no in-input meaning so let them navigate away.
+      if ((tag === 'INPUT' || tag === 'TEXTAREA') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return
 
       const dirMap: Record<string, Direction> = {
         ArrowUp: 'up',
