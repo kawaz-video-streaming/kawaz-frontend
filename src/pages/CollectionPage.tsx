@@ -586,15 +586,6 @@ export const CollectionPage = () => {
                   {item.data.description && (
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.data.description}</p>
                   )}
-                  {item.data.genres.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {item.data.genres.map((name) => (
-                        <span key={name} className="rounded-full bg-accent px-2 py-0.5 text-xs text-muted-foreground">
-                          {name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </button>
             ),

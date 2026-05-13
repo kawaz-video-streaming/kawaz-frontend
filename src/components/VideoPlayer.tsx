@@ -341,6 +341,13 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
         uiOverlay = new shaka.ui.Overlay(player, container, video);
 
         let currentCompact: boolean | null = null;
+
+        const ensureShakaButtonsFocusable = () => {
+          container.querySelectorAll<HTMLButtonElement>('.shaka-controls-container button').forEach(btn => {
+            btn.setAttribute('tabindex', '0');
+          });
+        };
+
         const reconfigureUI = () => {
           if (!uiOverlay) return;
           const compact = container.clientWidth < 640;
@@ -352,11 +359,16 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
               : ['play_pause', 'time_and_duration', 'mute', 'volume', 'spacer', 'captions', 'language', 'chapter', 'overflow_menu', 'fullscreen'],
             seekBarColors: { chapters: 'transparent' },
           });
+          if (isTV) window.setTimeout(ensureShakaButtonsFocusable, 50);
           requestAnimationFrame(() => (player as unknown as EventTarget)?.dispatchEvent(new Event('variantchanged')));
         };
         reconfigureUI();
         resizeObserver = new ResizeObserver(reconfigureUI);
         resizeObserver.observe(container);
+
+        if (isTV) {
+          window.setTimeout(ensureShakaButtonsFocusable, 100);
+        }
 
         if (chaptersUrl) {
           try {
@@ -473,6 +485,15 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   }, []);
 
   useEffect(() => {
+    if (!isTV) return;
+    const handler = () => {
+      containerRef.current?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true }));
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  useEffect(() => {
     // On TV: spatial navigation owns arrow keys for page navigation,
     // and Shaka's built-in controls handle playback. Hardware volume
     // buttons on the remote control TV volume directly.
@@ -529,7 +550,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
-      <div ref={containerRef} className={cn('relative w-full', isTV && 'kawaz-tv-player')}>
+      <div ref={containerRef} className={cn('relative w-full', Capacitor.isNativePlatform() && !isTV && 'landscape:max-h-[50vh] landscape:mx-auto', isTV && 'kawaz-tv-player')}>
         <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} />
         {volumeDisplay !== null && (
           <div className="pointer-events-none absolute left-1/2 top-6 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm">
