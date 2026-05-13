@@ -2,6 +2,10 @@ import { useEffect } from 'react'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
 
+// Android TV WebView injects tabindex="0" on arbitrary elements (divs, paragraphs, etc.).
+// Only navigate to elements that are inherently interactive or are <a>/<button>.
+const INTERACTIVE_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'TEXTAREA', 'SELECT'])
+
 type Direction = 'up' | 'down' | 'left' | 'right'
 
 function isVisible(rect: DOMRect): boolean {
@@ -72,6 +76,7 @@ export function useSpatialNavigation() {
 
       const focused = document.activeElement
       const all = Array.from(document.querySelectorAll<Element>(FOCUSABLE))
+        .filter(el => INTERACTIVE_TAGS.has(el.tagName))
       const candidates = all
         .filter(el => el !== focused)
         .map(el => ({ el, rect: el.getBoundingClientRect() }))

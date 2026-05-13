@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { AuthProvider } from './auth/AuthContext'
 import { ThemeProvider } from './theme/ThemeContext'
 import { useSpatialNavigation } from './hooks/useSpatialNavigation'
+import { isTV } from './lib/platform'
 import { Layout } from './components/layout/Layout'
 import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute'
 import { AdminRoute } from './components/AdminRoute'
@@ -20,6 +21,9 @@ import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 
 const AppRoutes = () => {
   useSpatialNavigation()
+  // TEMP debug — remove after confirming TV detection. Check Android logcat for "[platform]" lines.
+  console.log('[platform] UA:', navigator.userAgent)
+  console.log('[platform] isTV:', isTV)
   return (
     <Routes>
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />

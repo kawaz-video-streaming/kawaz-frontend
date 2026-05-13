@@ -6,17 +6,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { isTV } from './lib/platform'
 import './index.css'
 
 if (Capacitor.isNativePlatform()) {
-  // Android TV / Fire TV: force lg+ viewport so the desktop layout applies
-  if (/Android TV|AFTM|AFTT|AFTS|AFTB|AFTRS|AFTRE|AFTSO|AFTSSS|AFTA/.test(navigator.userAgent)) {
+  if (isTV) {
+    // Force lg+ viewport so the desktop layout applies on Android TV / Fire TV
     const meta = document.querySelector('meta[name="viewport"]') as HTMLMetaElement | null
     if (meta) meta.content = 'width=1280'
+  } else {
+    StatusBar.setOverlaysWebView({ overlay: true });
+    StatusBar.setStyle({ style: Style.Dark });
   }
 
-  StatusBar.setOverlaysWebView({ overlay: true });
-  StatusBar.setStyle({ style: Style.Dark });
   SplashScreen.hide();
 
   CapacitorApp.addListener('backButton', ({ canGoBack }) => {

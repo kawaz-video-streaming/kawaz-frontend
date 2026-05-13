@@ -470,6 +470,11 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   }, []);
 
   useEffect(() => {
+    // On TV: spatial navigation owns arrow keys for page navigation,
+    // and Shaka's built-in controls handle playback. Hardware volume
+    // buttons on the remote control TV volume directly.
+    if (isTV) return;
+
     const showVolume = (vol: number) => {
       setVolumeDisplay(Math.round(vol * 100));
       if (volumeHideTimer.current !== null) window.clearTimeout(volumeHideTimer.current);
@@ -480,11 +485,10 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       const video = videoRef.current;
       if (!video) return;
       const active = document.activeElement;
-      // On TV, spatial navigation owns arrow keys when focus is on body/document.
-      // Only intercept when a specific element inside the player has focus.
-      const playerFocused = isTV
-        ? !!containerRef.current?.contains(active)
-        : active === document.body || active === document.documentElement || !!containerRef.current?.contains(active);
+      const playerFocused =
+        active === document.body ||
+        active === document.documentElement ||
+        !!containerRef.current?.contains(active);
       if (!playerFocused) return;
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();

@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 
+// Android TV WebViews don't include "Mobile" in the user agent; phones always do.
 export const isTV =
   Capacitor.isNativePlatform() &&
-  /Android TV|AFTM|AFTT|AFTS|AFTB|AFTRS|AFTRE|AFTSO|AFTSSS|AFTA/.test(navigator.userAgent)
+  !navigator.userAgent.includes('Mobile')
