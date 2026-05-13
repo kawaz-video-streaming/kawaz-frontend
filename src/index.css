@@ -263,6 +263,15 @@ a:focus-visible,
   object-fit: contain !important;
 }
 
+/* On TV, Shaka controls must stay visible — no mouse hover to trigger fade-in.
+   Force the controls container and all its children to remain opaque and interactive. */
+.kawaz-tv-player .shaka-controls-container,
+.kawaz-tv-player .shaka-controls-container * {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+
 /* Webkit scrollbar — must live outside @layer to apply to pseudo-elements */
 ::-webkit-scrollbar {
   width: 5px;

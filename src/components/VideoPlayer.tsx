@@ -529,7 +529,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
-      <div ref={containerRef} className="relative w-full">
+      <div ref={containerRef} className={cn('relative w-full', isTV && 'kawaz-tv-player')}>
         <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} />
         {volumeDisplay !== null && (
           <div className="pointer-events-none absolute left-1/2 top-6 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm">

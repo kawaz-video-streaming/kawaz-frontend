@@ -197,7 +197,7 @@ const SectionCarousel = ({
           ref={trackRef}
           className={[
             'grid grid-flow-col gap-3',
-            'auto-cols-[calc((100%-1.5rem)/3)] sm:auto-cols-[calc((100%-2.25rem)/4)] lg:auto-cols-[calc((100%-3rem)/5)] xl:auto-cols-[calc((100%-3.75rem)/6)]',
+            'auto-cols-[calc((100%-1.5rem)/3)] sm:auto-cols-[calc((100%-3rem)/5)] xl:auto-cols-[calc((100%-3.75rem)/6)]',
             transitionEnabled ? 'transition-transform duration-300 ease-out' : '',
           ].join(' ')}
           style={{ transform: `translateX(${translateX}px)` }}
@@ -225,6 +225,7 @@ const SectionCarousel = ({
           ].join(' ')}
           aria-label={`Scroll ${sectionKey} left`}
           tabIndex={-1}
+          data-spatial-ignore="true"
         >
           <ChevronLeft size={16} />
         </button>
@@ -241,6 +242,7 @@ const SectionCarousel = ({
           ].join(' ')}
           aria-label={`Scroll ${sectionKey} right`}
           tabIndex={-1}
+          data-spatial-ignore="true"
         >
           <ChevronRight size={16} />
         </button>
@@ -360,7 +362,7 @@ export const HomePage = () => {
             </span>
           </div>
         </div>
-        <div className="flex flex-col gap-0.5 p-2.5">
+        <div className="portrait:hidden flex flex-col gap-0.5 p-2.5">
           <p className="text-sm font-semibold leading-tight">
             {item.data.title}
           </p>
@@ -383,7 +385,7 @@ export const HomePage = () => {
             aspectRatio={config.aspectRatio}
           />
         </div>
-        <div className="flex flex-col gap-0.5 p-2.5">
+        <div className="portrait:hidden flex flex-col gap-0.5 p-2.5">
           <p className="text-sm font-semibold leading-tight">
             {item.data.title}
           </p>

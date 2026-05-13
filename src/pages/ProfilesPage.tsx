@@ -140,7 +140,7 @@ export const ProfilesPage = () => {
                 <span className="text-sm font-medium">{profile.name}</span>
                 <button
                   onClick={() => setEditingProfileName(profile.name)}
-                  className="absolute -left-2 -top-2 hidden rounded-full bg-background p-1 text-muted-foreground shadow ring-1 ring-border transition-colors hover:text-foreground group-hover:flex"
+                  className="absolute -left-2 -top-2 hidden rounded-full bg-background p-1 text-muted-foreground shadow ring-1 ring-border transition-colors hover:text-foreground group-hover:flex group-focus-within:flex"
                   aria-label={`Change avatar for ${profile.name}`}
                 >
                   <Pencil size={12} />
@@ -148,7 +148,7 @@ export const ProfilesPage = () => {
                 <button
                   onClick={() => handleDelete(profile.name)}
                   disabled={deleting && deletingName === profile.name}
-                  className="absolute -right-2 -top-2 hidden rounded-full bg-background p-1 text-muted-foreground shadow ring-1 ring-border transition-colors hover:text-red-500 group-hover:flex"
+                  className="absolute -right-2 -top-2 hidden rounded-full bg-background p-1 text-muted-foreground shadow ring-1 ring-border transition-colors hover:text-red-500 group-hover:flex group-focus-within:flex"
                   aria-label={`Delete ${profile.name}`}
                 >
                   <Trash2 size={12} />

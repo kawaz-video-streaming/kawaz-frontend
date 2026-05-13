@@ -1,21 +1,31 @@
 import { useEffect } from 'react'
 import { Capacitor } from '@capacitor/core'
 
-const FOCUSABLE = 'a[href], button:not([disabled]):not([tabindex="-1"]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
 
 // Android TV WebView injects tabindex="0" on arbitrary elements (divs, paragraphs, etc.).
-// Only navigate to elements that are inherently interactive or are <a>/<button>.
+// Only navigate to elements that are inherently interactive.
 const INTERACTIVE_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'TEXTAREA', 'SELECT'])
 
 // On native, register in capture phase so arrow keys are intercepted before Shaka Player
-// (which registers bubble-phase listeners on the player container and handles arrow keys for
-// seeking/volume). stopPropagation prevents Shaka from seeing the event at all.
+// (which registers bubble-phase listeners on the player container).
 const isNative = Capacitor.isNativePlatform()
 
 type Direction = 'up' | 'down' | 'left' | 'right'
 
 function isInNavbar(el: Element): boolean {
-  return !!el.closest('nav')
+  return !!el.closest('nav, [data-spatial-navzone]')
+}
+
+// Walk up the DOM to find the nearest scrollable ancestor.
+function getScrollableAncestor(el: Element): Element | null {
+  let current = el.parentElement
+  while (current && current !== document.body) {
+    const { overflowY } = window.getComputedStyle(current)
+    if (overflowY === 'auto' || overflowY === 'scroll') return current
+    current = current.parentElement
+  }
+  return null
 }
 
 function isVisible(rect: DOMRect): boolean {
@@ -23,10 +33,10 @@ function isVisible(rect: DOMRect): boolean {
     rect.width > 0 &&
     rect.height > 0 &&
     rect.right > 0 &&
-    rect.bottom > 0 &&
     rect.left < window.innerWidth
-    // rect.top < window.innerHeight intentionally omitted: sections below the fold in
-    // scrollable containers must be reachable via D-pad; scrollIntoView handles the scroll.
+    // Vertical constraints (rect.bottom > 0, rect.top < window.innerHeight) are omitted:
+    // elements scrolled off the top or bottom of a scroll container are valid D-pad targets;
+    // scrollIntoView brings them into view after focus.
   )
 }
 
@@ -93,11 +103,12 @@ export function useSpatialNavigation() {
         .filter(el => INTERACTIVE_TAGS.has(el.tagName))
       const candidates = all
         .filter(el => el !== focused)
+        .filter(el => !el.hasAttribute('data-spatial-ignore'))
         .map(el => ({ el, rect: el.getBoundingClientRect() }))
         .filter(({ rect }) => isVisible(rect))
 
       if (!focused || focused === document.body) {
-        // On initial focus, prefer page content over navbar elements
+        // On initial focus, prefer page content (non-navbar) over navbar elements
         const contentFirst = candidates.find(c => !isInNavbar(c.el))
         const first = (contentFirst ?? candidates[0])?.el as HTMLElement | undefined
         first?.focus()
@@ -105,15 +116,24 @@ export function useSpatialNavigation() {
         return
       }
 
+      const scrollAncestor = getScrollableAncestor(focused)
       let nearest: Element | null = null
 
-      // When pressing up from page content, exhaust page content first.
-      // Only reach the navbar when there is nothing above in the page.
-      if (dir === 'up' && !isInNavbar(focused)) {
+      // Phase 1 (up/down only): stay inside the same scrollable container first.
+      // This lets D-pad navigate through all sections before escaping to the filter
+      // buttons or navbar above/below the scroll zone.
+      if ((dir === 'up' || dir === 'down') && scrollAncestor && !isInNavbar(focused)) {
+        const inScrollZone = candidates.filter(c => scrollAncestor.contains(c.el))
+        nearest = findNearest(focused.getBoundingClientRect(), inScrollZone, dir)
+      }
+
+      // Phase 2 (up only): scroll zone exhausted — prefer page content over navbar.
+      if (!nearest && dir === 'up' && !isInNavbar(focused)) {
         const pageContent = candidates.filter(c => !isInNavbar(c.el))
         nearest = findNearest(focused.getBoundingClientRect(), pageContent, dir)
       }
 
+      // Phase 3: all candidates (navbar reachable as last resort on up).
       if (!nearest) {
         nearest = findNearest(focused.getBoundingClientRect(), candidates, dir)
       }
