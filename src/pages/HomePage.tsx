@@ -197,7 +197,7 @@ const SectionCarousel = ({
           ref={trackRef}
           className={[
             'grid grid-flow-col gap-3',
-            'auto-cols-[calc((100%-0.75rem)/2)] sm:auto-cols-[calc((100%-1.5rem)/3)] lg:auto-cols-[calc((100%-2.25rem)/4)] xl:auto-cols-[calc((100%-3rem)/5)] 2xl:auto-cols-[calc((100%-3.75rem)/6)]',
+            'auto-cols-[calc((100%-1.5rem)/3)] sm:auto-cols-[calc((100%-2.25rem)/4)] lg:auto-cols-[calc((100%-3rem)/5)] xl:auto-cols-[calc((100%-3.75rem)/6)]',
             transitionEnabled ? 'transition-transform duration-300 ease-out' : '',
           ].join(' ')}
           style={{ transform: `translateX(${translateX}px)` }}
@@ -224,6 +224,7 @@ const SectionCarousel = ({
             isAnimating ? 'opacity-50' : 'hover:border-red-500/50 hover:text-foreground',
           ].join(' ')}
           aria-label={`Scroll ${sectionKey} left`}
+          tabIndex={-1}
         >
           <ChevronLeft size={16} />
         </button>
@@ -239,6 +240,7 @@ const SectionCarousel = ({
             isAnimating ? 'opacity-50' : 'hover:border-red-500/50 hover:text-foreground',
           ].join(' ')}
           aria-label={`Scroll ${sectionKey} right`}
+          tabIndex={-1}
         >
           <ChevronRight size={16} />
         </button>

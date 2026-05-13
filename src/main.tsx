@@ -12,9 +12,9 @@ import './index.css'
 
 if (Capacitor.isNativePlatform()) {
   if (isTV) {
-    // Force lg+ viewport so the desktop layout applies on Android TV / Fire TV
+    // Use device-width for 1:1 pixel mapping on TV (1080p TV + DPR=1 = 1920px CSS viewport → 2xl: layout)
     const meta = document.querySelector('meta[name="viewport"]') as HTMLMetaElement | null
-    if (meta) meta.content = 'width=1280'
+    if (meta) meta.content = 'width=device-width, initial-scale=1'
   } else {
     StatusBar.setOverlaysWebView({ overlay: true });
     StatusBar.setStyle({ style: Style.Dark });

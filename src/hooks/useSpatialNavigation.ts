@@ -1,12 +1,22 @@
 import { useEffect } from 'react'
+import { Capacitor } from '@capacitor/core'
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+const FOCUSABLE = 'a[href], button:not([disabled]):not([tabindex="-1"]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
 
 // Android TV WebView injects tabindex="0" on arbitrary elements (divs, paragraphs, etc.).
 // Only navigate to elements that are inherently interactive or are <a>/<button>.
 const INTERACTIVE_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'TEXTAREA', 'SELECT'])
 
+// On native, register in capture phase so arrow keys are intercepted before Shaka Player
+// (which registers bubble-phase listeners on the player container and handles arrow keys for
+// seeking/volume). stopPropagation prevents Shaka from seeing the event at all.
+const isNative = Capacitor.isNativePlatform()
+
 type Direction = 'up' | 'down' | 'left' | 'right'
+
+function isInNavbar(el: Element): boolean {
+  return !!el.closest('nav')
+}
 
 function isVisible(rect: DOMRect): boolean {
   return (
@@ -14,8 +24,9 @@ function isVisible(rect: DOMRect): boolean {
     rect.height > 0 &&
     rect.right > 0 &&
     rect.bottom > 0 &&
-    rect.left < window.innerWidth &&
-    rect.top < window.innerHeight
+    rect.left < window.innerWidth
+    // rect.top < window.innerHeight intentionally omitted: sections below the fold in
+    // scrollable containers must be reachable via D-pad; scrollIntoView handles the scroll.
   )
 }
 
@@ -73,6 +84,9 @@ export function useSpatialNavigation() {
       if (!dir) return
 
       e.preventDefault()
+      // On native: stop propagation so Shaka Player and other element-level handlers
+      // never see arrow keys. On web: allow bubbling so Shaka keeps its keyboard controls.
+      if (isNative) e.stopPropagation()
 
       const focused = document.activeElement
       const all = Array.from(document.querySelectorAll<Element>(FOCUSABLE))
@@ -83,20 +97,35 @@ export function useSpatialNavigation() {
         .filter(({ rect }) => isVisible(rect))
 
       if (!focused || focused === document.body) {
-        const first = candidates[0]?.el as HTMLElement | undefined
+        // On initial focus, prefer page content over navbar elements
+        const contentFirst = candidates.find(c => !isInNavbar(c.el))
+        const first = (contentFirst ?? candidates[0])?.el as HTMLElement | undefined
         first?.focus()
         first?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
         return
       }
 
-      const nearest = findNearest(focused.getBoundingClientRect(), candidates, dir)
+      let nearest: Element | null = null
+
+      // When pressing up from page content, exhaust page content first.
+      // Only reach the navbar when there is nothing above in the page.
+      if (dir === 'up' && !isInNavbar(focused)) {
+        const pageContent = candidates.filter(c => !isInNavbar(c.el))
+        nearest = findNearest(focused.getBoundingClientRect(), pageContent, dir)
+      }
+
+      if (!nearest) {
+        nearest = findNearest(focused.getBoundingClientRect(), candidates, dir)
+      }
+
       if (nearest) {
         ;(nearest as HTMLElement).focus()
         nearest.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
       }
     }
 
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    // Capture phase on native: fires before element-level handlers (Shaka, etc.)
+    window.addEventListener('keydown', handler, isNative)
+    return () => window.removeEventListener('keydown', handler, isNative)
   }, [])
 }
