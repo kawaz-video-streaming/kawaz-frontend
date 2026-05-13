@@ -2,6 +2,7 @@ import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { StatusBar, Style } from '@capacitor/status-bar'
+import { SystemBars } from './plugins/systemBars'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -17,6 +18,15 @@ if (Capacitor.isNativePlatform()) {
   } else {
     StatusBar.setOverlaysWebView({ overlay: true });
     StatusBar.setStyle({ style: Style.Dark });
+
+    // Hide system bars in landscape for an edge-to-edge experience; restore in portrait.
+    const orientationMq = window.matchMedia('(orientation: landscape)')
+    const handleOrientation = (e: MediaQueryList | MediaQueryListEvent) => {
+      if (e.matches) SystemBars.hide();
+      else SystemBars.show();
+    }
+    handleOrientation(orientationMq)
+    orientationMq.addEventListener('change', handleOrientation)
   }
 
   SplashScreen.hide();

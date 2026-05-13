@@ -460,8 +460,11 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       const inFullscreen = !!document.fullscreenElement;
       containerRef.current?.classList.toggle('kawaz-fullscreen', inFullscreen);
       if (Capacitor.isNativePlatform()) {
-        if (inFullscreen) await SystemBars.hide();
-        else await SystemBars.show();
+        if (inFullscreen) {
+          await SystemBars.hide();
+        } else if (!window.matchMedia('(orientation: landscape)').matches) {
+          await SystemBars.show();
+        }
       }
     };
 
