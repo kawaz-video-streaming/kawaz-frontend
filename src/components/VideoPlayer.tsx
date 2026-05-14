@@ -348,6 +348,26 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           });
         };
 
+        // Watch for Shaka adding/rebuilding buttons and immediately make them focusable.
+        // Shaka resets tabindex when it reconfigures the controls DOM, so a one-shot
+        // setTimeout is not enough — the observer fires on every change.
+        const buttonObserver = new MutationObserver(ensureShakaButtonsFocusable);
+        const controlsContainer = container.querySelector('.shaka-controls-container');
+        if (controlsContainer) {
+          buttonObserver.observe(controlsContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex'] });
+        } else {
+          // Controls container added asynchronously — watch the player container until it appears
+          const waitObserver = new MutationObserver(() => {
+            const cc = container.querySelector('.shaka-controls-container');
+            if (cc) {
+              waitObserver.disconnect();
+              ensureShakaButtonsFocusable();
+              buttonObserver.observe(cc, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex'] });
+            }
+          });
+          waitObserver.observe(container, { childList: true });
+        }
+
         const reconfigureUI = () => {
           if (!uiOverlay) return;
           const compact = container.clientWidth < 640;
@@ -359,16 +379,11 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
               : ['play_pause', 'time_and_duration', 'mute', 'volume', 'spacer', 'captions', 'language', 'chapter', 'overflow_menu', 'fullscreen'],
             seekBarColors: { chapters: 'transparent' },
           });
-          if (isTV) window.setTimeout(ensureShakaButtonsFocusable, 50);
           requestAnimationFrame(() => (player as unknown as EventTarget)?.dispatchEvent(new Event('variantchanged')));
         };
         reconfigureUI();
         resizeObserver = new ResizeObserver(reconfigureUI);
         resizeObserver.observe(container);
-
-        if (isTV) {
-          window.setTimeout(ensureShakaButtonsFocusable, 100);
-        }
 
         if (chaptersUrl) {
           try {
@@ -392,6 +407,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
         return () => {
           resizeObserver?.disconnect();
           resizeObserver = null;
+          buttonObserver.disconnect();
           clearStallRecoveryTimer();
           player?.removeEventListener('trackschanged', handleTracksChanged);
           player?.removeEventListener('error', handlePlayerError);
@@ -485,6 +501,33 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   }, []);
 
   useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    if (isTV) {
+      void containerRef.current?.requestFullscreen().catch(() => {});
+      return;
+    }
+
+    // Mobile: keep fullscreen in sync with orientation
+    const handleOrientation = async (e: MediaQueryList | MediaQueryListEvent) => {
+      if (e.matches) {
+        if (!document.fullscreenElement) {
+          await containerRef.current?.requestFullscreen().catch(() => {});
+        }
+      } else {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {});
+        }
+      }
+    };
+
+    const mq = window.matchMedia('(orientation: landscape)');
+    void handleOrientation(mq);
+    mq.addEventListener('change', handleOrientation);
+    return () => mq.removeEventListener('change', handleOrientation);
+  }, []);
+
+  useEffect(() => {
     if (!isTV) return;
     const handler = () => {
       containerRef.current?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true }));
@@ -550,7 +593,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
-      <div ref={containerRef} className={cn('relative w-full', Capacitor.isNativePlatform() && !isTV && 'landscape:max-h-[50vh] landscape:mx-auto', isTV && 'kawaz-tv-player')}>
+      <div ref={containerRef} className={cn('relative w-full', Capacitor.isNativePlatform() && !isTV && 'landscape:max-h-[50vh]', isTV && 'kawaz-tv-player')}>
         <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} />
         {volumeDisplay !== null && (
           <div className="pointer-events-none absolute left-1/2 top-6 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm">
