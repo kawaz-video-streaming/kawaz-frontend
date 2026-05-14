@@ -31,7 +31,7 @@ export function useTVControls(
       const activeEl = document.activeElement as HTMLElement;
       const activeTag = activeEl?.tagName ?? 'null'
       const activeClass = activeEl?.className?.slice(0, 35) ?? ''
-      dbg(`KEY[${e.key}] active=${activeTag}[${activeClass}]`)
+      dbg(`KEY[${e.key}] active=${activeTag}[${activeClass}] fs=${isFullscreenRef.current}`)
       // Show Shaka controls on any key press
       containerRef.current?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true }));
 

@@ -82,8 +82,10 @@ export function useSpatialNavigation() {
       // Inside a text input: left/right move the cursor — don't hijack them.
       // Up/down have no in-input meaning so let them navigate away.
       if ((tag === 'INPUT' || tag === 'TEXTAREA') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return
-      // Range inputs (e.g. volume slider): all arrow keys adjust the value natively — don't intercept.
-      if (tag === 'INPUT' && (e.target as HTMLInputElement).type === 'range') return
+      // Range inputs (e.g. volume/seekbar): left/right adjust the value natively — don't intercept.
+      // Up/down still run spatial navigation so the user can escape the slider with the D-pad.
+      if (tag === 'INPUT' && (e.target as HTMLInputElement).type === 'range' &&
+          (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return
 
       const dirMap: Record<string, Direction> = {
         ArrowUp: 'up',

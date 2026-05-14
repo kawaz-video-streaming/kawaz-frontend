@@ -478,8 +478,9 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   useEffect(() => {
     const handleFullscreenChange = async () => {
       const inFullscreen = !!document.fullscreenElement;
-      dbg(`FSCHANGE inFS=${inFullscreen} el=${document.fullscreenElement?.tagName ?? 'null'}`)
+      dbg(`FSCHANGE inFS=${inFullscreen} el=${document.fullscreenElement?.tagName ?? 'null'} fsRefBefore=${isFullscreenRef.current}`)
       isFullscreenRef.current = inFullscreen;
+      dbg(`FSCHANGE fsRefAfter=${isFullscreenRef.current}`)
       containerRef.current?.classList.toggle('kawaz-fullscreen', inFullscreen);
       if (Capacitor.isNativePlatform()) {
         if (inFullscreen) {
