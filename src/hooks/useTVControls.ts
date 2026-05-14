@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
-import type { MutableRefObject, RefObject } from 'react'
+import type { RefObject } from 'react'
 import { App } from '@capacitor/app'
 import { isTV } from '../lib/platform'
 
 export function useTVControls(
-  isFullscreenRef: MutableRefObject<boolean>,
+  isFullscreenRef: RefObject<boolean>,
   containerRef: RefObject<HTMLDivElement | null>,
   dbg: (msg: string) => void = () => {},
 ) {
