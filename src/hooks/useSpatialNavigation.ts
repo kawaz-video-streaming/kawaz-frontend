@@ -99,11 +99,15 @@ export function useSpatialNavigation() {
       if (isNative) e.stopPropagation()
 
       const focused = document.activeElement
+      // data-spatial-root: when present on any element, confines D-pad entirely within it.
+      // Used by the TV video player to prevent page elements from competing with controls.
+      const spatialRoot = document.querySelector('[data-spatial-root]')
       const all = Array.from(document.querySelectorAll<Element>(FOCUSABLE))
         .filter(el => INTERACTIVE_TAGS.has(el.tagName))
       const candidates = all
         .filter(el => el !== focused)
         .filter(el => !el.hasAttribute('data-spatial-ignore'))
+        .filter(el => !spatialRoot || spatialRoot.contains(el))
         .filter(el => !document.fullscreenElement || document.fullscreenElement.contains(el))
         .map(el => ({ el, rect: el.getBoundingClientRect() }))
         .filter(({ rect }) => isVisible(rect))

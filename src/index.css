@@ -264,8 +264,14 @@ a:focus-visible,
 }
 
 /* On TV, Shaka controls must stay visible — no mouse hover to trigger fade-in.
-   Force the controls container and all its children to remain opaque and interactive. */
-.kawaz-tv-player .shaka-controls-container,
+   Force the controls container and all its children to remain opaque and interactive.
+   z-index: 10 ensures controls sit above the video element (which is at z-index 0). */
+.kawaz-tv-player .shaka-controls-container {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  z-index: 10 !important;
+}
 .kawaz-tv-player .shaka-controls-container * {
   opacity: 1 !important;
   pointer-events: auto !important;

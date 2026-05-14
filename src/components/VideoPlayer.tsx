@@ -420,20 +420,24 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           const min = parseFloat(seekBar.min || '0');
           const max = parseFloat(seekBar.max || String(video.duration || 1));
           const fraction = max > min ? (parseFloat(seekBar.value) - min) / (max - min) : 0;
-          seekBar.dispatchEvent(new MouseEvent('mousemove', {
-            bubbles: true,
-            cancelable: true,
-            clientX: rect.left + fraction * rect.width,
-            clientY: rect.top + rect.height / 2,
-          }));
+          const clientX = rect.left + fraction * rect.width;
+          const clientY = rect.top + rect.height / 2;
+          const moveEvent = () => new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX, clientY });
+          // Dispatch on the input, its parent, and the full container — different Shaka
+          // versions listen on different elements for the thumbnail preview logic.
+          seekBar.dispatchEvent(moveEvent());
+          seekBar.parentElement?.dispatchEvent(moveEvent());
+          container.dispatchEvent(moveEvent());
         };
         container.addEventListener('input', seekSyncHandler);
+        container.addEventListener('change', seekSyncHandler);
 
         return () => {
           resizeObserver?.disconnect();
           resizeObserver = null;
           buttonObserver.disconnect();
           container.removeEventListener('input', seekSyncHandler);
+          container.removeEventListener('change', seekSyncHandler);
           clearStallRecoveryTimer();
           player?.removeEventListener('trackschanged', handleTracksChanged);
           player?.removeEventListener('error', handlePlayerError);
@@ -514,9 +518,6 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       const inFullscreen = !!document.fullscreenElement;
       isFullscreenRef.current = inFullscreen;
       containerRef.current?.classList.toggle('kawaz-fullscreen', inFullscreen);
-      // Push a synthetic history entry when entering fullscreen on TV so the hardware back
-      // button navigates the browser history (firing popstate) rather than leaving the page.
-      if (inFullscreen && isTV) history.pushState({ kawazFullscreen: true }, '');
       if (Capacitor.isNativePlatform()) {
         if (inFullscreen) {
           await SystemBars.hide();
@@ -541,8 +542,17 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
     if (!Capacitor.isNativePlatform()) return;
 
     if (isTV) {
+      // Set our own fullscreen state and push a history entry immediately — do NOT wait for
+      // fullscreenchange, because requestFullscreen() often fails silently in Capacitor WebView
+      // (the activity is already fullscreen at the Android level), so that event never fires.
+      isFullscreenRef.current = true;
+      history.pushState({ kawazTVPlayer: true }, '');
       void containerRef.current?.requestFullscreen().catch(() => {});
-      return;
+      return () => {
+        // If the component unmounts without the user pressing back (e.g. navigated away via
+        // React Router), replace the fake state so it doesn't litter the history stack.
+        if (history.state?.kawazTVPlayer) history.replaceState(null, '');
+      };
     }
 
     // Mobile: keep fullscreen in sync with orientation
@@ -567,9 +577,18 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   useEffect(() => {
     if (!isTV) return;
 
-    const exitFullscreen = () => {
+    let isExiting = false;
+    const exitFullscreen = (popHistory = true) => {
+      // Guard against double-exit: both App.addListener and keydown Escape can fire
+      // for the same hardware back press on some remotes, which would call history.back() twice.
+      if (isExiting || !isFullscreenRef.current) return;
+      isExiting = true;
       isFullscreenRef.current = false;
       void document.exitFullscreen().catch(() => {});
+      // Pop the fake history entry we pushed on mount so the next back press goes to the
+      // actual previous page (not the same URL again). Skip when called from popstate because
+      // the browser already popped it.
+      if (popHistory) history.back();
     };
 
     const keyHandler = (e: KeyboardEvent) => {
@@ -583,13 +602,15 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       if (e.key === 'Enter' && document.activeElement instanceof HTMLButtonElement) {
         e.preventDefault();
         e.stopPropagation();
-        document.activeElement.click();
+        // Dispatch a non-bubbling click so the button's own handler runs but the event
+        // doesn't bubble up to Shaka's video container click handler (which toggles play/pause).
+        document.activeElement.dispatchEvent(new MouseEvent('click', { bubbles: false, cancelable: false }));
       }
 
       // Keyboard Escape fallback (some devices/keyboards send this for back)
       if ((e.key === 'Escape' || e.key === 'GoBack') && isFullscreenRef.current) {
         e.preventDefault();
-        exitFullscreen();
+        exitFullscreen(true);
       }
     };
     window.addEventListener('keydown', keyHandler, { capture: true });
@@ -598,17 +619,17 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
     // does NOT trigger WebView history.back() automatically.
     const backHandlePromise = App.addListener('backButton', () => {
       if (isFullscreenRef.current) {
-        exitFullscreen();
+        exitFullscreen(true); // pop the fake history entry we pushed on mount
       } else {
         window.history.back();
       }
     });
 
-    // Fallback: if App.addListener doesn't intercept the WebView navigation, the browser
-    // fires popstate (because we pushed a synthetic entry on fullscreen enter). Exit fullscreen
-    // without re-pushing — same URL means React Router won't navigate.
+    // Fallback: if App.addListener doesn't prevent WebView navigation, the browser pops the
+    // fake history entry we pushed on mount and fires popstate. The state is already gone, so
+    // don't call history.back() — just exit fullscreen and let React Router stay on this URL.
     const onPopState = () => {
-      if (isFullscreenRef.current) exitFullscreen();
+      if (isFullscreenRef.current) exitFullscreen(false);
     };
     window.addEventListener('popstate', onPopState);
 
@@ -676,7 +697,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
-      <div ref={containerRef} className={cn('relative w-full', Capacitor.isNativePlatform() && !isTV && 'landscape:max-h-[50vh]', isTV && 'kawaz-tv-player')}>
+      <div ref={containerRef} data-spatial-root={isTV ? '' : undefined} className={cn('relative w-full', Capacitor.isNativePlatform() && !isTV && 'landscape:max-h-[50vh]', isTV && 'kawaz-tv-player')}>
         <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} />
         {volumeDisplay !== null && (
           <div className="pointer-events-none absolute left-1/2 top-6 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm">
