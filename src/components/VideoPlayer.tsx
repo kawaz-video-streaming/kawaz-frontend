@@ -35,8 +35,10 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
   const [, setDebugRev] = useState(0)
   const debugLogsRef = useRef<string[]>([])
+  const lastSeekRef = useRef<string>('')
   const dbg = (msg: string) => {
     const ts = new Date().toTimeString().slice(0, 8)
+    if (msg.startsWith('SEEK ')) lastSeekRef.current = msg
     debugLogsRef.current = [...debugLogsRef.current.slice(-28), `${ts} ${msg}`]
     setDebugRev(v => v + 1)
   }
@@ -366,40 +368,16 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
         // On TV: buttons exist now — focus the play button so D-pad is immediately usable.
         if (isTV) {
           requestAnimationFrame(() => {
-            const playBtn = container.querySelector<HTMLButtonElement>('.shaka-play-pause-button');
+            const playBtn = container.querySelector<HTMLButtonElement>('.shaka-play-button');
             dbg(`FOCUS_PLAY: found=${!!playBtn} class=${playBtn?.className?.slice(0, 40) ?? 'none'}`)
             playBtn?.focus();
           });
         }
 
-        // On TV with thumbnails: Shaka only shows the thumbnail preview on mousemove events.
-        // Keyboard scrubbing fires `input` events on the range, not mouse events, so thumbnails
-        // never appear. Dispatch a synthetic mousemove at the position matching the current
-        // range value so Shaka's thumbnail logic runs normally.
-        const seekSyncHandler = (evt: Event) => {
-          const seekBar = evt.target as HTMLInputElement;
-          if (!seekBar.classList.contains('shaka-seek-bar')) return;
-          const rect = seekBar.getBoundingClientRect();
-          if (rect.width === 0) return;
-          const min = parseFloat(seekBar.min || '0');
-          const max = parseFloat(seekBar.max || String(video.duration || 1));
-          const fraction = max > min ? (parseFloat(seekBar.value) - min) / (max - min) : 0;
-          const clientX = rect.left + fraction * rect.width;
-          const clientY = rect.top + rect.height / 2;
-          const moveEvent = () => new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX, clientY });
-          seekBar.dispatchEvent(moveEvent());
-          seekBar.parentElement?.dispatchEvent(moveEvent());
-          container.dispatchEvent(moveEvent());
-        };
-        container.addEventListener('input', seekSyncHandler);
-        container.addEventListener('change', seekSyncHandler);
-
         return () => {
           resizeObserver?.disconnect();
           resizeObserver = null;
           buttonObserver.disconnect();
-          container.removeEventListener('input', seekSyncHandler);
-          container.removeEventListener('change', seekSyncHandler);
           clearStallRecoveryTimer();
           player?.removeEventListener('trackschanged', handleTracksChanged);
           player?.removeEventListener('error', handlePlayerError);
@@ -492,7 +470,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       // On TV: focus a Shaka button on both enter and exit fullscreen so D-pad stays in the player
       if (isTV) {
         requestAnimationFrame(() => {
-          const playBtn = containerRef.current?.querySelector<HTMLButtonElement>('.shaka-play-pause-button');
+          const playBtn = containerRef.current?.querySelector<HTMLButtonElement>('.shaka-play-button');
           playBtn?.focus();
         });
       }
@@ -550,6 +528,11 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
             <div style={{ color: '#ff0', fontWeight: 'bold', marginBottom: '2px', fontSize: '11px' }}>
               {`TV=${isTV} NATIVE=${Capacitor.isNativePlatform()} fsRef=${isFullscreenRef.current} hist=${JSON.stringify(history.state)?.slice(0, 50)}`}
             </div>
+            {lastSeekRef.current ? (
+              <div style={{ color: '#f80', marginBottom: '2px', fontSize: '11px' }}>
+                {`LAST: ${lastSeekRef.current}`}
+              </div>
+            ) : null}
             <div style={{ color: '#0ff', marginBottom: '3px', fontSize: '10px', wordBreak: 'break-all' }}>
               {`UA: ${navigator.userAgent.slice(0, 120)}`}
             </div>

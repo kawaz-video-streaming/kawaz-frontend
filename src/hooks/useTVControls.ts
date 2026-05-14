@@ -19,12 +19,14 @@ export function useTVControls(
     let isExiting = false;
     const exitFullscreen = () => {
       dbg(`EXIT exiting=${isExiting} fsRef=${isFullscreenRef.current}`)
-      // Guard against double-exit: both App.addListener and keydown Escape can fire
-      // for the same hardware back press on some remotes.
+      // Guard against double-exit: GoBack keydown and Capacitor backButton both fire
+      // for the same hardware back press — isExiting blocks the second handler.
       if (isExiting || !isFullscreenRef.current) return;
       isExiting = true;
       isFullscreenRef.current = false;
       void document.exitFullscreen().catch(() => {});
+      // Reset after fullscreen animation so a subsequent intentional back press can navigate.
+      setTimeout(() => { isExiting = false; }, 600);
     };
 
     const keyHandler = (e: KeyboardEvent) => {
@@ -35,24 +37,26 @@ export function useTVControls(
       // Show Shaka controls on any key press
       containerRef.current?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true }));
 
-      // When the seekbar (range input) is focused, dispatch a mousemove directly on it so
-      // Shaka's thumbnail preview fires. We wait one tick for the browser to update the value.
       if (
         activeEl instanceof HTMLInputElement &&
         activeEl.type === 'range' &&
         (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
       ) {
-        setTimeout(() => {
-          const rect = activeEl.getBoundingClientRect();
-          if (rect.width === 0) return;
+        const rect = activeEl.getBoundingClientRect();
+        if (rect.width > 0) {
           const min = parseFloat(activeEl.min || '0');
           const max = parseFloat(activeEl.max || '100');
-          const val = parseFloat(activeEl.value);
-          const fraction = max > min ? (val - min) / (max - min) : 0;
+          const step = parseFloat(activeEl.step || '1') || 1;
+          const cur = parseFloat(activeEl.value);
+          const next = e.key === 'ArrowRight'
+            ? Math.min(max, cur + step)
+            : Math.max(min, cur - step);
+          dbg(`SEEK step=${activeEl.step} cur=${cur.toFixed(1)} next=${next.toFixed(1)}`)
+          const fraction = max > min ? (next - min) / (max - min) : 0;
           const clientX = rect.left + 6 + fraction * (rect.width - 12);
           const clientY = rect.top + rect.height / 2;
           activeEl.dispatchEvent(new MouseEvent('mousemove', { bubbles: false, cancelable: true, clientX, clientY }));
-        }, 0);
+        }
       }
 
       if (e.key === 'Enter') {
@@ -85,10 +89,11 @@ export function useTVControls(
     // Capacitor: when any listener is registered, hardware back does NOT auto-navigate.
     // We must handle both cases (in fullscreen and not) explicitly.
     const backHandlePromise = App.addListener('backButton', ({ canGoBack }) => {
-      dbg(`BACK_BTN fsRef=${isFullscreenRef.current} canGoBack=${canGoBack}`)
+      dbg(`BACK_BTN fsRef=${isFullscreenRef.current} canGoBack=${canGoBack} exiting=${isExiting}`)
       if (isFullscreenRef.current) {
         exitFullscreen();
-      } else if (canGoBack) {
+      } else if (canGoBack && !isExiting) {
+        // !isExiting: skip if GoBack keydown already handled this same press
         window.history.back();
       }
     });
