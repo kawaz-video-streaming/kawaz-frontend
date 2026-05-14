@@ -272,6 +272,14 @@ a:focus-visible,
   visibility: visible !important;
 }
 
+/* TV D-pad focus ring on Shaka buttons — use :focus (not just :focus-visible) because
+   Android TV WebView may not set the focus-visible flag for remote control navigation. */
+.kawaz-tv-player .shaka-controls-container button:focus,
+.kawaz-fullscreen .shaka-controls-container button:focus {
+  outline: 3px solid #ef4444 !important;
+  outline-offset: 2px !important;
+}
+
 /* Webkit scrollbar — must live outside @layer to apply to pseudo-elements */
 ::-webkit-scrollbar {
   width: 5px;

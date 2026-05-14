@@ -1,4 +1,5 @@
 import 'shaka-player/dist/controls.css';
+import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { isTV } from '../lib/platform';
 import { useEffect, useRef, useState } from 'react';
@@ -343,28 +344,22 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
         let currentCompact: boolean | null = null;
 
         const ensureShakaButtonsFocusable = () => {
-          container.querySelectorAll<HTMLButtonElement>('.shaka-controls-container button').forEach(btn => {
-            if (btn.getAttribute('tabindex') !== '0') btn.setAttribute('tabindex', '0');
+          // Buttons (control bar + overflow/settings menus) and range inputs (seek bar,
+          // volume slider) all need tabindex="0" so D-pad spatial nav can reach them.
+          container.querySelectorAll<HTMLElement>(
+            '.shaka-controls-container button, .shaka-controls-container input[type="range"]'
+          ).forEach(el => {
+            if (el.getAttribute('tabindex') !== '0') el.setAttribute('tabindex', '0');
           });
         };
 
-        // Watch for Shaka adding/rebuilding buttons (childList only — no attributes,
-        // which would cause an infinite loop when we set tabindex ourselves).
+        // Observe the container itself, not .shaka-controls-container — Shaka replaces
+        // the entire controls container element on each uiOverlay.configure() call, which
+        // would silently detach a more-specific observer from the new element.
         const buttonObserver = new MutationObserver(ensureShakaButtonsFocusable);
-        const controlsContainer = container.querySelector('.shaka-controls-container');
-        if (controlsContainer) {
-          buttonObserver.observe(controlsContainer, { childList: true, subtree: true });
-        } else {
-          const waitObserver = new MutationObserver(() => {
-            const cc = container.querySelector('.shaka-controls-container');
-            if (cc) {
-              waitObserver.disconnect();
-              ensureShakaButtonsFocusable();
-              buttonObserver.observe(cc, { childList: true, subtree: true });
-            }
-          });
-          waitObserver.observe(container, { childList: true });
-        }
+        buttonObserver.observe(container, { childList: true, subtree: true });
+
+        ensureShakaButtonsFocusable();
 
         const reconfigureUI = () => {
           if (!uiOverlay) return;
@@ -400,6 +395,16 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           } catch (e) {
             console.warn('Failed to load thumbnails track:', e);
           }
+        }
+
+        // On TV: buttons exist now — focus the play button so D-pad is immediately usable.
+        // The fullscreenchange handler handles re-focus on fullscreen enter/exit, but it fires
+        // before Shaka has finished building its controls, so this is the reliable anchor.
+        if (isTV) {
+          requestAnimationFrame(() => {
+            const playBtn = container.querySelector<HTMLButtonElement>('.shaka-play-pause-button, .shaka-controls-container button');
+            playBtn?.focus();
+          });
         }
 
         return () => {
@@ -492,10 +497,12 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           await SystemBars.show();
         }
       }
-      // On TV: when exiting fullscreen, focus the play button so D-pad stays in the player
-      if (isTV && !inFullscreen) {
-        const playBtn = containerRef.current?.querySelector<HTMLButtonElement>('.shaka-play-pause-button, .shaka-small-play-button, .shaka-controls-container button');
-        playBtn?.focus();
+      // On TV: focus a Shaka button on both enter and exit fullscreen so D-pad stays in the player
+      if (isTV) {
+        requestAnimationFrame(() => {
+          const playBtn = containerRef.current?.querySelector<HTMLButtonElement>('.shaka-play-pause-button, .shaka-small-play-button, .shaka-controls-container button');
+          playBtn?.focus();
+        });
       }
     };
 
@@ -532,18 +539,43 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
   useEffect(() => {
     if (!isTV) return;
-    const handler = (e: KeyboardEvent) => {
+
+    const keyHandler = (e: KeyboardEvent) => {
       // Show Shaka controls on any key press
       containerRef.current?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true }));
 
-      // Back button (Escape) in fullscreen: exit fullscreen only, don't navigate back
+      // Center/Select on the remote sends Enter. Some Android TV WebViews don't auto-fire
+      // click on dynamically-created buttons with forced tabindex, so trigger it explicitly.
+      if (e.key === 'Enter') {
+        const active = document.activeElement;
+        if (active instanceof HTMLButtonElement || active instanceof HTMLInputElement) {
+          active.click();
+        }
+      }
+
+      // Keyboard Escape fallback (some devices/keyboards send this for back)
       if ((e.key === 'Escape' || e.key === 'GoBack') && document.fullscreenElement) {
         e.preventDefault();
         void document.exitFullscreen();
       }
     };
-    window.addEventListener('keydown', handler, { capture: true });
-    return () => window.removeEventListener('keydown', handler, { capture: true });
+    window.addEventListener('keydown', keyHandler, { capture: true });
+
+    // Hardware back button on Android TV — Capacitor fires this instead of generating
+    // a keydown event, so the Escape handler above never runs. Adding ANY listener here
+    // takes over full control of the back button, so we must also handle the normal case.
+    const backHandlePromise = App.addListener('backButton', () => {
+      if (document.fullscreenElement) {
+        void document.exitFullscreen();
+      } else {
+        window.history.back();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('keydown', keyHandler, { capture: true });
+      void backHandlePromise.then(h => h.remove());
+    };
   }, []);
 
   useEffect(() => {
