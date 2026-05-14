@@ -49,7 +49,7 @@ export function useTVControls(
           const max = parseFloat(activeEl.max || '100');
           const val = parseFloat(activeEl.value);
           const fraction = max > min ? (val - min) / (max - min) : 0;
-          const clientX = rect.left + fraction * rect.width;
+          const clientX = rect.left + 6 + fraction * (rect.width - 12);
           const clientY = rect.top + rect.height / 2;
           activeEl.dispatchEvent(new MouseEvent('mousemove', { bubbles: false, cancelable: true, clientX, clientY }));
         }, 0);
