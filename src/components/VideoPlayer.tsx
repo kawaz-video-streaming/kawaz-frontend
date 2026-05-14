@@ -344,25 +344,23 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
         const ensureShakaButtonsFocusable = () => {
           container.querySelectorAll<HTMLButtonElement>('.shaka-controls-container button').forEach(btn => {
-            btn.setAttribute('tabindex', '0');
+            if (btn.getAttribute('tabindex') !== '0') btn.setAttribute('tabindex', '0');
           });
         };
 
-        // Watch for Shaka adding/rebuilding buttons and immediately make them focusable.
-        // Shaka resets tabindex when it reconfigures the controls DOM, so a one-shot
-        // setTimeout is not enough — the observer fires on every change.
+        // Watch for Shaka adding/rebuilding buttons (childList only — no attributes,
+        // which would cause an infinite loop when we set tabindex ourselves).
         const buttonObserver = new MutationObserver(ensureShakaButtonsFocusable);
         const controlsContainer = container.querySelector('.shaka-controls-container');
         if (controlsContainer) {
-          buttonObserver.observe(controlsContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex'] });
+          buttonObserver.observe(controlsContainer, { childList: true, subtree: true });
         } else {
-          // Controls container added asynchronously — watch the player container until it appears
           const waitObserver = new MutationObserver(() => {
             const cc = container.querySelector('.shaka-controls-container');
             if (cc) {
               waitObserver.disconnect();
               ensureShakaButtonsFocusable();
-              buttonObserver.observe(cc, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex'] });
+              buttonObserver.observe(cc, { childList: true, subtree: true });
             }
           });
           waitObserver.observe(container, { childList: true });
