@@ -492,6 +492,11 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           await SystemBars.show();
         }
       }
+      // On TV: when exiting fullscreen, focus the play button so D-pad stays in the player
+      if (isTV && !inFullscreen) {
+        const playBtn = containerRef.current?.querySelector<HTMLButtonElement>('.shaka-play-pause-button, .shaka-small-play-button, .shaka-controls-container button');
+        playBtn?.focus();
+      }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -527,11 +532,18 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
   useEffect(() => {
     if (!isTV) return;
-    const handler = () => {
+    const handler = (e: KeyboardEvent) => {
+      // Show Shaka controls on any key press
       containerRef.current?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true }));
+
+      // Back button (Escape) in fullscreen: exit fullscreen only, don't navigate back
+      if ((e.key === 'Escape' || e.key === 'GoBack') && document.fullscreenElement) {
+        e.preventDefault();
+        void document.exitFullscreen();
+      }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, { capture: true });
+    return () => window.removeEventListener('keydown', handler, { capture: true });
   }, []);
 
   useEffect(() => {

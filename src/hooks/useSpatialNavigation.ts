@@ -104,6 +104,7 @@ export function useSpatialNavigation() {
       const candidates = all
         .filter(el => el !== focused)
         .filter(el => !el.hasAttribute('data-spatial-ignore'))
+        .filter(el => !document.fullscreenElement || document.fullscreenElement.contains(el))
         .map(el => ({ el, rect: el.getBoundingClientRect() }))
         .filter(({ rect }) => isVisible(rect))
 
