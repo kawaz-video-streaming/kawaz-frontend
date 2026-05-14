@@ -551,24 +551,24 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
             {volumeDisplay === 0 ? 'Muted' : `Volume ${volumeDisplay}%`}
           </div>
         )}
+        {Capacitor.isNativePlatform() && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)', color: '#0f0', fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.4', padding: '6px 10px', pointerEvents: 'none', maxHeight: '45vh', overflow: 'hidden' }}>
+            <div style={{ color: '#ff0', fontWeight: 'bold', marginBottom: '2px', fontSize: '11px' }}>
+              {`TV=${isTV} NATIVE=${Capacitor.isNativePlatform()} fsRef=${isFullscreenRef.current} hist=${JSON.stringify(history.state)?.slice(0, 50)}`}
+            </div>
+            <div style={{ color: '#0ff', marginBottom: '3px', fontSize: '10px', wordBreak: 'break-all' }}>
+              {`UA: ${navigator.userAgent.slice(0, 120)}`}
+            </div>
+            {debugLogsRef.current.map((line, i) => (
+              <div key={i} style={{ fontSize: '11px' }}>{line}</div>
+            ))}
+          </div>
+        )}
       </div>
       {isLoadingPlayer && (
         <p className="mt-2 text-sm text-muted-foreground">Loading player...</p>
       )}
       {playerError && <p className="mt-2 text-sm text-destructive">{playerError}</p>}
-      {Capacitor.isNativePlatform() && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)', color: '#0f0', fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.4', padding: '6px 10px', pointerEvents: 'none', maxHeight: '45vh', overflow: 'hidden' }}>
-          <div style={{ color: '#ff0', fontWeight: 'bold', marginBottom: '2px', fontSize: '11px' }}>
-            {`TV=${isTV} NATIVE=${Capacitor.isNativePlatform()} fsRef=${isFullscreenRef.current} hist=${JSON.stringify(history.state)?.slice(0, 50)}`}
-          </div>
-          <div style={{ color: '#0ff', marginBottom: '3px', fontSize: '10px', wordBreak: 'break-all' }}>
-            {`UA: ${navigator.userAgent.slice(0, 120)}`}
-          </div>
-          {debugLogsRef.current.map((line, i) => (
-            <div key={i} style={{ fontSize: '11px' }}>{line}</div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
