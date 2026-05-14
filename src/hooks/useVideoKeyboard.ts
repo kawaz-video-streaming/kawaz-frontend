@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
+import { isTV } from '../lib/platform'
 
 export function useVideoKeyboard(
   videoRef: RefObject<HTMLVideoElement | null>,
@@ -9,6 +10,9 @@ export function useVideoKeyboard(
   const volumeHideTimer = useRef<number | null>(null)
 
   useEffect(() => {
+    // On TV: spatial navigation owns arrow keys, Shaka owns Enter,
+    // and hardware volume buttons on the remote control TV volume directly.
+    if (isTV) return;
     const showVolume = (vol: number) => {
       setVolumeDisplay(Math.round(vol * 100));
       if (volumeHideTimer.current !== null) window.clearTimeout(volumeHideTimer.current);

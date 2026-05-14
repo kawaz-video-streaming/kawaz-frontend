@@ -301,6 +301,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
         dbg('UI_OVERLAY_CREATED')
 
         let currentCompact: boolean | null = null;
+        let lastBtnCount = -1;
 
         const ensureShakaButtonsFocusable = () => {
           // Buttons (control bar + overflow/settings menus) and range inputs (seek bar,
@@ -311,17 +312,17 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           els.forEach(el => {
             if (el.getAttribute('tabindex') !== '0') el.setAttribute('tabindex', '0');
           });
-          const hasCtrl = !!container.querySelector('.shaka-controls-container')
-          dbg(`SHAKA_BTNS: ${els.length} found, hasCtrl=${hasCtrl}`)
+          if (els.length !== lastBtnCount) {
+            lastBtnCount = els.length
+            const hasCtrl = !!container.querySelector('.shaka-controls-container')
+            dbg(`SHAKA_BTNS: ${els.length} found, hasCtrl=${hasCtrl}`)
+          }
         };
 
         // Observe the container itself, not .shaka-controls-container — Shaka replaces
         // the entire controls container element on each uiOverlay.configure() call, which
         // would silently detach a more-specific observer from the new element.
-        const buttonObserver = new MutationObserver(() => {
-          dbg('DOM_MUTATE')
-          ensureShakaButtonsFocusable()
-        });
+        const buttonObserver = new MutationObserver(ensureShakaButtonsFocusable);
         buttonObserver.observe(container, { childList: true, subtree: true });
 
         ensureShakaButtonsFocusable();
@@ -555,7 +556,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
         <p className="mt-2 text-sm text-muted-foreground">Loading player...</p>
       )}
       {playerError && <p className="mt-2 text-sm text-destructive">{playerError}</p>}
-      {isTV && (
+      {Capacitor.isNativePlatform() && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)', color: '#0f0', fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.4', padding: '6px 10px', pointerEvents: 'none', maxHeight: '45vh', overflow: 'hidden' }}>
           <div style={{ color: '#ff0', fontWeight: 'bold', marginBottom: '2px', fontSize: '11px' }}>
             {`TV=${isTV} NATIVE=${Capacitor.isNativePlatform()} fsRef=${isFullscreenRef.current} hist=${JSON.stringify(history.state)?.slice(0, 50)}`}
