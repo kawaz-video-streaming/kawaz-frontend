@@ -263,19 +263,22 @@ a:focus-visible,
   object-fit: contain !important;
 }
 
+/* Hide the chapter skip-previous/skip-next overlay buttons on TV (added by the
+   `chapter` control panel element, which we no longer include in the TV config). */
+.kawaz-tv-player .shaka-skip-previous-button,
+.kawaz-tv-player .shaka-skip-next-button {
+  display: none !important;
+}
+
 /* On TV, Shaka controls must stay visible — no mouse hover to trigger fade-in.
    Force the controls container and all its children to remain opaque and interactive.
    z-index: 10 ensures controls sit above the video element (which is at z-index 0). */
 .kawaz-tv-player .shaka-controls-container {
-  opacity: 1 !important;
   pointer-events: auto !important;
-  visibility: visible !important;
   z-index: 10 !important;
 }
 .kawaz-tv-player .shaka-controls-container * {
-  opacity: 1 !important;
   pointer-events: auto !important;
-  visibility: visible !important;
 }
 
 /* TV D-pad focus ring on Shaka buttons — use :focus (not just :focus-visible) because

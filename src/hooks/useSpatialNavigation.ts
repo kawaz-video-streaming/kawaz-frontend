@@ -82,6 +82,8 @@ export function useSpatialNavigation() {
       // Inside a text input: left/right move the cursor — don't hijack them.
       // Up/down have no in-input meaning so let them navigate away.
       if ((tag === 'INPUT' || tag === 'TEXTAREA') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return
+      // Range inputs (e.g. volume slider): all arrow keys adjust the value natively — don't intercept.
+      if (tag === 'INPUT' && (e.target as HTMLInputElement).type === 'range') return
 
       const dirMap: Record<string, Direction> = {
         ArrowUp: 'up',
@@ -130,9 +132,10 @@ export function useSpatialNavigation() {
       // controls (e.g. Shaka control bar buttons) and prevents the seek bar — which sits
       // just above and spans the full width — from intercepting left/right moves.
       if (dir === 'left' || dir === 'right') {
-        const sameRow = candidates.filter(c =>
-          c.rect.bottom > focusedRect.top && c.rect.top < focusedRect.bottom
-        )
+        const sameRow = candidates.filter(c => {
+          const cy = c.rect.top + c.rect.height / 2
+          return cy >= focusedRect.top && cy <= focusedRect.bottom
+        })
         if (sameRow.length > 0) {
           nearest = findNearest(focusedRect, sameRow, dir)
         }

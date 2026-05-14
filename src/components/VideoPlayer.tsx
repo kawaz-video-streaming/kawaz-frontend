@@ -366,7 +366,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
         // On TV: buttons exist now — focus the play button so D-pad is immediately usable.
         if (isTV) {
           requestAnimationFrame(() => {
-            const playBtn = container.querySelector<HTMLButtonElement>('.shaka-play-pause-button, .shaka-controls-container button');
+            const playBtn = container.querySelector<HTMLButtonElement>('.shaka-play-pause-button');
             dbg(`FOCUS_PLAY: found=${!!playBtn} class=${playBtn?.className?.slice(0, 40) ?? 'none'}`)
             playBtn?.focus();
           });
@@ -491,7 +491,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       // On TV: focus a Shaka button on both enter and exit fullscreen so D-pad stays in the player
       if (isTV) {
         requestAnimationFrame(() => {
-          const playBtn = containerRef.current?.querySelector<HTMLButtonElement>('.shaka-play-pause-button, .shaka-small-play-button, .shaka-controls-container button');
+          const playBtn = containerRef.current?.querySelector<HTMLButtonElement>('.shaka-play-pause-button');
           playBtn?.focus();
         });
       }
@@ -505,22 +505,15 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
     if (!Capacitor.isNativePlatform()) return;
 
     if (isTV) {
-      // Set our own fullscreen state and push a history entry immediately — do NOT wait for
-      // fullscreenchange, because requestFullscreen() often fails silently in Capacitor WebView
+      // Set our own fullscreen state immediately — do NOT wait for fullscreenchange,
+      // because requestFullscreen() often fails silently in Capacitor WebView
       // (the activity is already fullscreen at the Android level), so that event never fires.
-      dbg('TV_MOUNT: setFsRef=true + pushState')
+      dbg('TV_MOUNT: setFsRef=true')
       isFullscreenRef.current = true;
-      history.pushState({ kawazTVPlayer: true }, '');
-      dbg(`TV_MOUNT: histState=${JSON.stringify(history.state)}`)
       void containerRef.current?.requestFullscreen().catch((err) => {
         dbg(`FS_REQ_ERR: ${err}`)
       });
-      return () => {
-        dbg('TV_UNMOUNT')
-        // If the component unmounts without the user pressing back (e.g. navigated away via
-        // React Router), replace the fake state so it doesn't litter the history stack.
-        if (history.state?.kawazTVPlayer) history.replaceState(null, '');
-      };
+      return () => { dbg('TV_UNMOUNT') };
     }
 
     // Mobile: keep fullscreen in sync with orientation
