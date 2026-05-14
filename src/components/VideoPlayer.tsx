@@ -1,10 +1,12 @@
 import 'shaka-player/dist/controls.css';
-import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { isTV } from '../lib/platform';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import { SystemBars } from '../plugins/systemBars';
+import { prefetchFirstSegments, formatVideoError } from '../lib/videoUtils';
+import { useTVControls } from '../hooks/useTVControls';
+import { useVideoKeyboard } from '../hooks/useVideoKeyboard';
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
 
@@ -13,46 +15,6 @@ declare global {
     shakaPlayer?: any;
   }
 }
-
-const prefetchFirstSegments = async (manifestUrl: string, special: boolean) => {
-  try {
-    const res = await fetch(manifestUrl, { credentials: 'include' });
-    if (!res.ok) return;
-    const text = await res.text();
-    const manifestPath = manifestUrl.includes('?')
-      ? manifestUrl.slice(0, manifestUrl.indexOf('?'))
-      : manifestUrl;
-    const base = manifestPath.slice(0, manifestPath.lastIndexOf('/') + 1);
-    const sp = special ? '?special=true' : '';
-
-    const repIds: string[] = [];
-    let initTemplate: string | undefined;
-    let mediaTemplate: string | undefined;
-    for (const block of text.split('</AdaptationSet>')) {
-      const init = block.match(/initialization="([^"]+)"/)?.[1];
-      const media = block.match(/\bmedia="([^"]+)"/)?.[1];
-      if (!init || !media) continue;
-      if (!initTemplate) { initTemplate = init; mediaTemplate = media; }
-      for (const m of block.matchAll(/<Representation\b[^>]*\s+id="(\d+)"/g)) repIds.push(m[1]);
-    }
-    const startNum = parseInt(text.match(/startNumber="(\d+)"/)?.[1] ?? '1');
-
-    if (!initTemplate || !mediaTemplate || repIds.length === 0) return;
-
-    const urls: string[] = [];
-    for (const id of repIds) {
-      urls.push(base + initTemplate.replace(/\$RepresentationID\$/g, id) + sp);
-      const firstSeg = mediaTemplate
-        .replace(/\$RepresentationID\$/g, id)
-        .replace(/\$Number%0(\d+)d\$/, (_, w) => String(startNum).padStart(Number(w), '0'));
-      urls.push(base + firstSeg + sp);
-    }
-
-    await Promise.all(urls.map(u => fetch(u, { credentials: 'include' })));
-  } catch {
-    // best-effort
-  }
-};
 
 interface VideoPlayerProps {
   manifestUrl: string;
@@ -69,27 +31,23 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   const destroyPromiseRef = useRef<Promise<void>>(Promise.resolve());
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
-  const [volumeDisplay, setVolumeDisplay] = useState<number | null>(null);
-  const volumeHideTimer = useRef<number | null>(null);
   const isFullscreenRef = useRef(false);
 
-  const formatVideoError = () => {
-    const error = videoRef.current?.error;
-    if (!error) return 'Playback failed during buffering.';
+  const [, setDebugRev] = useState(0)
+  const debugLogsRef = useRef<string[]>([])
+  const dbg = (msg: string) => {
+    const ts = new Date().toTimeString().slice(0, 8)
+    debugLogsRef.current = [...debugLogsRef.current.slice(-28), `${ts} ${msg}`]
+    setDebugRev(v => v + 1)
+  }
 
-    switch (error.code) {
-      case MediaError.MEDIA_ERR_ABORTED:
-        return 'Playback was aborted.';
-      case MediaError.MEDIA_ERR_NETWORK:
-        return 'A network error interrupted playback.';
-      case MediaError.MEDIA_ERR_DECODE:
-        return 'This video could not be decoded by the browser.';
-      case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-        return 'This video format or manifest is not supported by the browser.';
-      default:
-        return 'Playback failed during buffering.';
-    }
-  };
+  useTVControls(isFullscreenRef, containerRef, dbg)
+  const { volumeDisplay } = useVideoKeyboard(videoRef, containerRef)
+
+  useEffect(() => {
+    dbg(`INIT isTV=${isTV} isNative=${Capacitor.isNativePlatform()}`)
+    dbg(`UA: ${navigator.userAgent}`)
+  }, [])
 
   useEffect(() => {
     let isDisposed = false;
@@ -303,7 +261,6 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           },
         });
 
-
         const handleTracksChanged = () => scheduleChapterMarkersRender();
         const handleDurationChange = () => scheduleChapterMarkersRender();
         const handlePlayerError = (event: Event) => {
@@ -313,9 +270,8 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           setPlayerError(`Could not play this video stream.${code}`);
         };
         const handleVideoError = () => {
-          const message = formatVideoError();
           console.error('HTML video error', video.error);
-          setPlayerError(message);
+          setPlayerError(formatVideoError(video));
         };
         const handlePotentialStall = () => {
           clearStallRecoveryTimer();
@@ -339,25 +295,33 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
         await player.load(manifestUrl);
         if (isDisposed) return;
+        dbg('PLAYER_LOADED')
 
         uiOverlay = new shaka.ui.Overlay(player, container, video);
+        dbg('UI_OVERLAY_CREATED')
 
         let currentCompact: boolean | null = null;
 
         const ensureShakaButtonsFocusable = () => {
           // Buttons (control bar + overflow/settings menus) and range inputs (seek bar,
           // volume slider) all need tabindex="0" so D-pad spatial nav can reach them.
-          container.querySelectorAll<HTMLElement>(
+          const els = container.querySelectorAll<HTMLElement>(
             '.shaka-controls-container button, .shaka-controls-container input[type="range"]'
-          ).forEach(el => {
+          )
+          els.forEach(el => {
             if (el.getAttribute('tabindex') !== '0') el.setAttribute('tabindex', '0');
           });
+          const hasCtrl = !!container.querySelector('.shaka-controls-container')
+          dbg(`SHAKA_BTNS: ${els.length} found, hasCtrl=${hasCtrl}`)
         };
 
         // Observe the container itself, not .shaka-controls-container — Shaka replaces
         // the entire controls container element on each uiOverlay.configure() call, which
         // would silently detach a more-specific observer from the new element.
-        const buttonObserver = new MutationObserver(ensureShakaButtonsFocusable);
+        const buttonObserver = new MutationObserver(() => {
+          dbg('DOM_MUTATE')
+          ensureShakaButtonsFocusable()
+        });
         buttonObserver.observe(container, { childList: true, subtree: true });
 
         ensureShakaButtonsFocusable();
@@ -399,11 +363,10 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
         }
 
         // On TV: buttons exist now — focus the play button so D-pad is immediately usable.
-        // The fullscreenchange handler handles re-focus on fullscreen enter/exit, but it fires
-        // before Shaka has finished building its controls, so this is the reliable anchor.
         if (isTV) {
           requestAnimationFrame(() => {
             const playBtn = container.querySelector<HTMLButtonElement>('.shaka-play-pause-button, .shaka-controls-container button');
+            dbg(`FOCUS_PLAY: found=${!!playBtn} class=${playBtn?.className?.slice(0, 40) ?? 'none'}`)
             playBtn?.focus();
           });
         }
@@ -423,8 +386,6 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           const clientX = rect.left + fraction * rect.width;
           const clientY = rect.top + rect.height / 2;
           const moveEvent = () => new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX, clientY });
-          // Dispatch on the input, its parent, and the full container — different Shaka
-          // versions listen on different elements for the thumbnail preview logic.
           seekBar.dispatchEvent(moveEvent());
           seekBar.parentElement?.dispatchEvent(moveEvent());
           container.dispatchEvent(moveEvent());
@@ -516,6 +477,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   useEffect(() => {
     const handleFullscreenChange = async () => {
       const inFullscreen = !!document.fullscreenElement;
+      dbg(`FSCHANGE inFS=${inFullscreen} el=${document.fullscreenElement?.tagName ?? 'null'}`)
       isFullscreenRef.current = inFullscreen;
       containerRef.current?.classList.toggle('kawaz-fullscreen', inFullscreen);
       if (Capacitor.isNativePlatform()) {
@@ -545,10 +507,15 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       // Set our own fullscreen state and push a history entry immediately — do NOT wait for
       // fullscreenchange, because requestFullscreen() often fails silently in Capacitor WebView
       // (the activity is already fullscreen at the Android level), so that event never fires.
+      dbg('TV_MOUNT: setFsRef=true + pushState')
       isFullscreenRef.current = true;
       history.pushState({ kawazTVPlayer: true }, '');
-      void containerRef.current?.requestFullscreen().catch(() => {});
+      dbg(`TV_MOUNT: histState=${JSON.stringify(history.state)}`)
+      void containerRef.current?.requestFullscreen().catch((err) => {
+        dbg(`FS_REQ_ERR: ${err}`)
+      });
       return () => {
+        dbg('TV_UNMOUNT')
         // If the component unmounts without the user pressing back (e.g. navigated away via
         // React Router), replace the fake state so it doesn't litter the history stack.
         if (history.state?.kawazTVPlayer) history.replaceState(null, '');
@@ -574,127 +541,6 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
     return () => mq.removeEventListener('change', handleOrientation);
   }, []);
 
-  useEffect(() => {
-    if (!isTV) return;
-
-    let isExiting = false;
-    const exitFullscreen = (popHistory = true) => {
-      // Guard against double-exit: both App.addListener and keydown Escape can fire
-      // for the same hardware back press on some remotes, which would call history.back() twice.
-      if (isExiting || !isFullscreenRef.current) return;
-      isExiting = true;
-      isFullscreenRef.current = false;
-      void document.exitFullscreen().catch(() => {});
-      // Pop the fake history entry we pushed on mount so the next back press goes to the
-      // actual previous page (not the same URL again). Skip when called from popstate because
-      // the browser already popped it.
-      if (popHistory) history.back();
-    };
-
-    const keyHandler = (e: KeyboardEvent) => {
-      // Show Shaka controls on any key press
-      containerRef.current?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true }));
-
-      // Center/Select on the remote sends Enter. Scope this ONLY to buttons — calling
-      // click() on a range input is a no-op at best, confusing at worst. Must stop
-      // propagation so Shaka's own Enter handler (which toggles play/pause) doesn't
-      // also fire after we've already handled the focused button.
-      if (e.key === 'Enter' && document.activeElement instanceof HTMLButtonElement) {
-        e.preventDefault();
-        e.stopPropagation();
-        // Dispatch a non-bubbling click so the button's own handler runs but the event
-        // doesn't bubble up to Shaka's video container click handler (which toggles play/pause).
-        document.activeElement.dispatchEvent(new MouseEvent('click', { bubbles: false, cancelable: false }));
-      }
-
-      // Keyboard Escape fallback (some devices/keyboards send this for back)
-      if ((e.key === 'Escape' || e.key === 'GoBack') && isFullscreenRef.current) {
-        e.preventDefault();
-        exitFullscreen(true);
-      }
-    };
-    window.addEventListener('keydown', keyHandler, { capture: true });
-
-    // Capacitor: hardware back button fires this event and (when listeners are registered)
-    // does NOT trigger WebView history.back() automatically.
-    const backHandlePromise = App.addListener('backButton', () => {
-      if (isFullscreenRef.current) {
-        exitFullscreen(true); // pop the fake history entry we pushed on mount
-      } else {
-        window.history.back();
-      }
-    });
-
-    // Fallback: if App.addListener doesn't prevent WebView navigation, the browser pops the
-    // fake history entry we pushed on mount and fires popstate. The state is already gone, so
-    // don't call history.back() — just exit fullscreen and let React Router stay on this URL.
-    const onPopState = () => {
-      if (isFullscreenRef.current) exitFullscreen(false);
-    };
-    window.addEventListener('popstate', onPopState);
-
-    return () => {
-      window.removeEventListener('keydown', keyHandler, { capture: true });
-      window.removeEventListener('popstate', onPopState);
-      void backHandlePromise.then(h => h.remove());
-    };
-  }, []);
-
-  useEffect(() => {
-    // On TV: spatial navigation owns arrow keys for page navigation,
-    // and Shaka's built-in controls handle playback. Hardware volume
-    // buttons on the remote control TV volume directly.
-    if (isTV) return;
-
-    const showVolume = (vol: number) => {
-      setVolumeDisplay(Math.round(vol * 100));
-      if (volumeHideTimer.current !== null) window.clearTimeout(volumeHideTimer.current);
-      volumeHideTimer.current = window.setTimeout(() => setVolumeDisplay(null), 1500);
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const video = videoRef.current;
-      if (!video) return;
-      const active = document.activeElement;
-      const playerFocused =
-        active === document.body ||
-        active === document.documentElement ||
-        !!containerRef.current?.contains(active);
-      if (!playerFocused) return;
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (video.paused) video.play().catch(() => { });
-        else video.pause();
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        e.stopPropagation();
-        video.currentTime = Math.max(0, video.currentTime - 5);
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        e.stopPropagation();
-        video.currentTime = Math.min(video.duration || 0, video.currentTime + 5);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        e.stopPropagation();
-        const next = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
-        video.volume = next;
-        showVolume(next);
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        e.stopPropagation();
-        const next = Math.max(0, Math.round((video.volume - 0.1) * 10) / 10);
-        video.volume = next;
-        showVolume(next);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown, { capture: true });
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown, { capture: true });
-      if (volumeHideTimer.current !== null) window.clearTimeout(volumeHideTimer.current);
-    };
-  }, []);
-
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
       <div ref={containerRef} data-spatial-root={isTV ? '' : undefined} className={cn('relative w-full', Capacitor.isNativePlatform() && !isTV && 'landscape:max-h-[50vh]', isTV && 'kawaz-tv-player')}>
@@ -709,6 +555,19 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
         <p className="mt-2 text-sm text-muted-foreground">Loading player...</p>
       )}
       {playerError && <p className="mt-2 text-sm text-destructive">{playerError}</p>}
+      {isTV && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)', color: '#0f0', fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.4', padding: '6px 10px', pointerEvents: 'none', maxHeight: '45vh', overflow: 'hidden' }}>
+          <div style={{ color: '#ff0', fontWeight: 'bold', marginBottom: '2px', fontSize: '11px' }}>
+            {`TV=${isTV} NATIVE=${Capacitor.isNativePlatform()} fsRef=${isFullscreenRef.current} hist=${JSON.stringify(history.state)?.slice(0, 50)}`}
+          </div>
+          <div style={{ color: '#0ff', marginBottom: '3px', fontSize: '10px', wordBreak: 'break-all' }}>
+            {`UA: ${navigator.userAgent.slice(0, 120)}`}
+          </div>
+          {debugLogsRef.current.map((line, i) => (
+            <div key={i} style={{ fontSize: '11px' }}>{line}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
