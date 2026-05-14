@@ -45,7 +45,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   const { volumeDisplay } = useVideoKeyboard(videoRef, containerRef)
 
   useEffect(() => {
-    dbg(`INIT isTV=${isTV} isNative=${Capacitor.isNativePlatform()}`)
+    dbg(`INIT isTV=${isTV} isNative=${Capacitor.isNativePlatform()} touchPts=${navigator.maxTouchPoints}`)
     dbg(`UA: ${navigator.userAgent}`)
   }, [])
 
