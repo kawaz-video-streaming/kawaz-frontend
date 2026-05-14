@@ -118,25 +118,39 @@ export function useSpatialNavigation() {
       }
 
       const scrollAncestor = getScrollableAncestor(focused)
+      const focusedRect = focused.getBoundingClientRect()
       let nearest: Element | null = null
+
+      // Phase 0 (left/right only): prefer elements whose bounding box overlaps the focused
+      // element's vertical range. This keeps horizontal D-pad navigation within a row of
+      // controls (e.g. Shaka control bar buttons) and prevents the seek bar — which sits
+      // just above and spans the full width — from intercepting left/right moves.
+      if (dir === 'left' || dir === 'right') {
+        const sameRow = candidates.filter(c =>
+          c.rect.bottom > focusedRect.top && c.rect.top < focusedRect.bottom
+        )
+        if (sameRow.length > 0) {
+          nearest = findNearest(focusedRect, sameRow, dir)
+        }
+      }
 
       // Phase 1 (up/down only): stay inside the same scrollable container first.
       // This lets D-pad navigate through all sections before escaping to the filter
       // buttons or navbar above/below the scroll zone.
-      if ((dir === 'up' || dir === 'down') && scrollAncestor && !isInNavbar(focused)) {
+      if (!nearest && (dir === 'up' || dir === 'down') && scrollAncestor && !isInNavbar(focused)) {
         const inScrollZone = candidates.filter(c => scrollAncestor.contains(c.el))
-        nearest = findNearest(focused.getBoundingClientRect(), inScrollZone, dir)
+        nearest = findNearest(focusedRect, inScrollZone, dir)
       }
 
       // Phase 2 (up only): scroll zone exhausted — prefer page content over navbar.
       if (!nearest && dir === 'up' && !isInNavbar(focused)) {
         const pageContent = candidates.filter(c => !isInNavbar(c.el))
-        nearest = findNearest(focused.getBoundingClientRect(), pageContent, dir)
+        nearest = findNearest(focusedRect, pageContent, dir)
       }
 
       // Phase 3: all candidates (navbar reachable as last resort on up).
       if (!nearest) {
-        nearest = findNearest(focused.getBoundingClientRect(), candidates, dir)
+        nearest = findNearest(focusedRect, candidates, dir)
       }
 
       if (nearest) {

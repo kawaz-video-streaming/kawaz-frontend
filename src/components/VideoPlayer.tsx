@@ -71,6 +71,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
   const [volumeDisplay, setVolumeDisplay] = useState<number | null>(null);
   const volumeHideTimer = useRef<number | null>(null);
+  const isFullscreenRef = useRef(false);
 
   const formatVideoError = () => {
     const error = videoRef.current?.error;
@@ -407,10 +408,32 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           });
         }
 
+        // On TV with thumbnails: Shaka only shows the thumbnail preview on mousemove events.
+        // Keyboard scrubbing fires `input` events on the range, not mouse events, so thumbnails
+        // never appear. Dispatch a synthetic mousemove at the position matching the current
+        // range value so Shaka's thumbnail logic runs normally.
+        const seekSyncHandler = (evt: Event) => {
+          const seekBar = evt.target as HTMLInputElement;
+          if (!seekBar.classList.contains('shaka-seek-bar')) return;
+          const rect = seekBar.getBoundingClientRect();
+          if (rect.width === 0) return;
+          const min = parseFloat(seekBar.min || '0');
+          const max = parseFloat(seekBar.max || String(video.duration || 1));
+          const fraction = max > min ? (parseFloat(seekBar.value) - min) / (max - min) : 0;
+          seekBar.dispatchEvent(new MouseEvent('mousemove', {
+            bubbles: true,
+            cancelable: true,
+            clientX: rect.left + fraction * rect.width,
+            clientY: rect.top + rect.height / 2,
+          }));
+        };
+        container.addEventListener('input', seekSyncHandler);
+
         return () => {
           resizeObserver?.disconnect();
           resizeObserver = null;
           buttonObserver.disconnect();
+          container.removeEventListener('input', seekSyncHandler);
           clearStallRecoveryTimer();
           player?.removeEventListener('trackschanged', handleTracksChanged);
           player?.removeEventListener('error', handlePlayerError);
@@ -489,7 +512,11 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   useEffect(() => {
     const handleFullscreenChange = async () => {
       const inFullscreen = !!document.fullscreenElement;
+      isFullscreenRef.current = inFullscreen;
       containerRef.current?.classList.toggle('kawaz-fullscreen', inFullscreen);
+      // Push a synthetic history entry when entering fullscreen on TV so the hardware back
+      // button navigates the browser history (firing popstate) rather than leaving the page.
+      if (inFullscreen && isTV) history.pushState({ kawazFullscreen: true }, '');
       if (Capacitor.isNativePlatform()) {
         if (inFullscreen) {
           await SystemBars.hide();
@@ -540,40 +567,54 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   useEffect(() => {
     if (!isTV) return;
 
+    const exitFullscreen = () => {
+      isFullscreenRef.current = false;
+      void document.exitFullscreen().catch(() => {});
+    };
+
     const keyHandler = (e: KeyboardEvent) => {
       // Show Shaka controls on any key press
       containerRef.current?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true }));
 
-      // Center/Select on the remote sends Enter. Some Android TV WebViews don't auto-fire
-      // click on dynamically-created buttons with forced tabindex, so trigger it explicitly.
-      if (e.key === 'Enter') {
-        const active = document.activeElement;
-        if (active instanceof HTMLButtonElement || active instanceof HTMLInputElement) {
-          active.click();
-        }
+      // Center/Select on the remote sends Enter. Scope this ONLY to buttons — calling
+      // click() on a range input is a no-op at best, confusing at worst. Must stop
+      // propagation so Shaka's own Enter handler (which toggles play/pause) doesn't
+      // also fire after we've already handled the focused button.
+      if (e.key === 'Enter' && document.activeElement instanceof HTMLButtonElement) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.activeElement.click();
       }
 
       // Keyboard Escape fallback (some devices/keyboards send this for back)
-      if ((e.key === 'Escape' || e.key === 'GoBack') && document.fullscreenElement) {
+      if ((e.key === 'Escape' || e.key === 'GoBack') && isFullscreenRef.current) {
         e.preventDefault();
-        void document.exitFullscreen();
+        exitFullscreen();
       }
     };
     window.addEventListener('keydown', keyHandler, { capture: true });
 
-    // Hardware back button on Android TV — Capacitor fires this instead of generating
-    // a keydown event, so the Escape handler above never runs. Adding ANY listener here
-    // takes over full control of the back button, so we must also handle the normal case.
+    // Capacitor: hardware back button fires this event and (when listeners are registered)
+    // does NOT trigger WebView history.back() automatically.
     const backHandlePromise = App.addListener('backButton', () => {
-      if (document.fullscreenElement) {
-        void document.exitFullscreen();
+      if (isFullscreenRef.current) {
+        exitFullscreen();
       } else {
         window.history.back();
       }
     });
 
+    // Fallback: if App.addListener doesn't intercept the WebView navigation, the browser
+    // fires popstate (because we pushed a synthetic entry on fullscreen enter). Exit fullscreen
+    // without re-pushing — same URL means React Router won't navigate.
+    const onPopState = () => {
+      if (isFullscreenRef.current) exitFullscreen();
+    };
+    window.addEventListener('popstate', onPopState);
+
     return () => {
       window.removeEventListener('keydown', keyHandler, { capture: true });
+      window.removeEventListener('popstate', onPopState);
       void backHandlePromise.then(h => h.remove());
     };
   }, []);
