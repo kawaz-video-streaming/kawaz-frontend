@@ -490,9 +490,10 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       dbg('TV_MOUNT: setFsRef=true')
       isFullscreenRef.current = true;
       containerRef.current?.classList.add('kawaz-fullscreen');
-      void containerRef.current?.requestFullscreen().catch((err) => {
-        dbg(`FS_REQ_ERR: ${err}`)
-      });
+      // Do NOT call requestFullscreen() on TV: if it succeeds, Android WebView fires
+      // fullscreenchange (→ isFullscreenRef=false) BEFORE Capacitor's backButton event,
+      // so the back handler sees isFullscreenRef=false and calls history.back().
+      // The Activity is already fullscreen at the Android level; CSS class is sufficient.
       return () => {
         dbg('TV_UNMOUNT')
         containerRef.current?.classList.remove('kawaz-fullscreen');

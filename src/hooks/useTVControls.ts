@@ -48,10 +48,9 @@ export function useTVControls(
       ) {
         const rect = activeEl.getBoundingClientRect();
         if (rect.width > 0) {
-          // Shaka sets video.currentTime synchronously in its keydown handler.
-          // By the next animation frame the seek is applied; read currentTime then
-          // so the thumbnail preview matches where Shaka actually jumped to.
-          requestAnimationFrame(() => {
+          // Double rAF: first frame lets Shaka's own rAF-scheduled seek complete,
+          // second frame reads the settled video.currentTime for the thumbnail position.
+          requestAnimationFrame(() => requestAnimationFrame(() => {
             const video = containerRef.current?.querySelector('video')
             const duration = video?.duration || parseFloat(activeEl.max || '100')
             const time = video?.currentTime ?? parseFloat(activeEl.value)
@@ -60,7 +59,7 @@ export function useTVControls(
             const clientX = rect.left + 6 + fraction * (rect.width - 12)
             const clientY = rect.top + rect.height / 2
             activeEl.dispatchEvent(new MouseEvent('mousemove', { bubbles: false, cancelable: true, clientX, clientY }))
-          })
+          }))
         }
       }
 
