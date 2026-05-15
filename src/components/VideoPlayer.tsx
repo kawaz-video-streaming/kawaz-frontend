@@ -489,10 +489,14 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       // (the activity is already fullscreen at the Android level), so that event never fires.
       dbg('TV_MOUNT: setFsRef=true')
       isFullscreenRef.current = true;
+      containerRef.current?.classList.add('kawaz-fullscreen');
       void containerRef.current?.requestFullscreen().catch((err) => {
         dbg(`FS_REQ_ERR: ${err}`)
       });
-      return () => { dbg('TV_UNMOUNT') };
+      return () => {
+        dbg('TV_UNMOUNT')
+        containerRef.current?.classList.remove('kawaz-fullscreen');
+      };
     }
 
     // Mobile: keep fullscreen in sync with orientation

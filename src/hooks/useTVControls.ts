@@ -6,7 +6,7 @@ import { isTV } from '../lib/platform'
 export function useTVControls(
   isFullscreenRef: RefObject<boolean>,
   containerRef: RefObject<HTMLDivElement | null>,
-  dbg: (msg: string) => void = () => {},
+  dbg: (msg: string) => void = () => { },
 ) {
   useEffect(() => {
     if (!isTV) return;
@@ -24,9 +24,13 @@ export function useTVControls(
       if (isExiting || !isFullscreenRef.current) return;
       isExiting = true;
       isFullscreenRef.current = false;
-      void document.exitFullscreen().catch(() => {});
-      // Reset after fullscreen animation so a subsequent intentional back press can navigate.
-      setTimeout(() => { isExiting = false; }, 600);
+      // Do NOT call document.exitFullscreen() on TV: on Android WebView, the Fullscreen API
+      // is tied to Android's history stack. exitFullscreen() pops a history entry, which
+      // React Router treats as a popstate navigation event → user lands on the previous page.
+      // On TV the Activity is already fullscreen at the Android level (requestFullscreen fails
+      // silently), so we manage fullscreen state via the CSS class only.
+      containerRef.current?.classList.remove('kawaz-fullscreen');
+      setTimeout(() => { isExiting = false; }, 1000);
     };
 
     const keyHandler = (e: KeyboardEvent) => {
@@ -44,18 +48,19 @@ export function useTVControls(
       ) {
         const rect = activeEl.getBoundingClientRect();
         if (rect.width > 0) {
-          const min = parseFloat(activeEl.min || '0');
-          const max = parseFloat(activeEl.max || '100');
-          const step = parseFloat(activeEl.step || '1') || 1;
-          const cur = parseFloat(activeEl.value);
-          const next = e.key === 'ArrowRight'
-            ? Math.min(max, cur + step)
-            : Math.max(min, cur - step);
-          dbg(`SEEK step=${activeEl.step} cur=${cur.toFixed(1)} next=${next.toFixed(1)}`)
-          const fraction = max > min ? (next - min) / (max - min) : 0;
-          const clientX = rect.left + 6 + fraction * (rect.width - 12);
-          const clientY = rect.top + rect.height / 2;
-          activeEl.dispatchEvent(new MouseEvent('mousemove', { bubbles: false, cancelable: true, clientX, clientY }));
+          // Shaka sets video.currentTime synchronously in its keydown handler.
+          // By the next animation frame the seek is applied; read currentTime then
+          // so the thumbnail preview matches where Shaka actually jumped to.
+          requestAnimationFrame(() => {
+            const video = containerRef.current?.querySelector('video')
+            const duration = video?.duration || parseFloat(activeEl.max || '100')
+            const time = video?.currentTime ?? parseFloat(activeEl.value)
+            dbg(`SEEK time=${time.toFixed(1)} dur=${duration.toFixed(0)}`)
+            const fraction = duration > 0 ? time / duration : 0
+            const clientX = rect.left + 6 + fraction * (rect.width - 12)
+            const clientY = rect.top + rect.height / 2
+            activeEl.dispatchEvent(new MouseEvent('mousemove', { bubbles: false, cancelable: true, clientX, clientY }))
+          })
         }
       }
 
