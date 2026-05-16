@@ -36,10 +36,18 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   const [, setDebugRev] = useState(0)
   const debugLogsRef = useRef<string[]>([])
   const lastSeekRef = useRef<string>('')
+  const [savedLogs] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('kawaz_dbg') || '[]') } catch { return [] }
+  })
   const dbg = (msg: string) => {
     const ts = new Date().toTimeString().slice(0, 8)
-    if (msg.startsWith('SEEK ')) lastSeekRef.current = msg
-    debugLogsRef.current = [...debugLogsRef.current.slice(-28), `${ts} ${msg}`]
+    if (msg.startsWith('SEEK_RAF')) lastSeekRef.current = msg
+    const entry = `${ts} ${msg}`
+    debugLogsRef.current = [...debugLogsRef.current.slice(-28), entry]
+    try {
+      const prev: string[] = JSON.parse(localStorage.getItem('kawaz_dbg') || '[]')
+      localStorage.setItem('kawaz_dbg', JSON.stringify([...prev.slice(-29), entry]))
+    } catch {}
     setDebugRev(v => v + 1)
   }
 
@@ -457,7 +465,13 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
     const handleFullscreenChange = async () => {
       const inFullscreen = !!document.fullscreenElement;
       dbg(`FSCHANGE inFS=${inFullscreen} el=${document.fullscreenElement?.tagName ?? 'null'} fsRefBefore=${isFullscreenRef.current}`)
-      isFullscreenRef.current = inFullscreen;
+      // On TV: only update isFullscreenRef when ENTERING fullscreen. Exiting is handled
+      // exclusively by exitFullscreen() in useTVControls — if fullscreenchange(false) fires
+      // before Capacitor's backButton event (which it does), setting isFullscreenRef=false
+      // here causes the back handler to see false and call history.back().
+      if (!isTV || inFullscreen) {
+        isFullscreenRef.current = inFullscreen;
+      }
       dbg(`FSCHANGE fsRefAfter=${isFullscreenRef.current}`)
       containerRef.current?.classList.toggle('kawaz-fullscreen', inFullscreen);
       if (Capacitor.isNativePlatform()) {
@@ -490,10 +504,9 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       dbg('TV_MOUNT: setFsRef=true')
       isFullscreenRef.current = true;
       containerRef.current?.classList.add('kawaz-fullscreen');
-      // Do NOT call requestFullscreen() on TV: if it succeeds, Android WebView fires
-      // fullscreenchange (→ isFullscreenRef=false) BEFORE Capacitor's backButton event,
-      // so the back handler sees isFullscreenRef=false and calls history.back().
-      // The Activity is already fullscreen at the Android level; CSS class is sufficient.
+      void containerRef.current?.requestFullscreen().catch((err) => {
+        dbg(`FS_REQ_ERR: ${err}`)
+      });
       return () => {
         dbg('TV_UNMOUNT')
         containerRef.current?.classList.remove('kawaz-fullscreen');
@@ -541,6 +554,12 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
             <div style={{ color: '#0ff', marginBottom: '3px', fontSize: '10px', wordBreak: 'break-all' }}>
               {`UA: ${navigator.userAgent.slice(0, 120)}`}
             </div>
+            {savedLogs.length > 0 && (
+              <div style={{ color: '#f66', fontSize: '10px', marginBottom: '2px' }}>PREV SESSION:</div>
+            )}
+            {savedLogs.map((line, i) => (
+              <div key={`s${i}`} style={{ fontSize: '10px', color: '#f99' }}>{line}</div>
+            ))}
             {debugLogsRef.current.map((line, i) => (
               <div key={i} style={{ fontSize: '11px' }}>{line}</div>
             ))}

@@ -48,13 +48,17 @@ export function useTVControls(
       ) {
         const rect = activeEl.getBoundingClientRect();
         if (rect.width > 0) {
+          const valAtKeydown = parseFloat(activeEl.value)
+          dbg(`SEEK_KEY val=${valAtKeydown.toFixed(1)} step=${activeEl.step}`)
           // Double rAF: first frame lets Shaka's own rAF-scheduled seek complete,
           // second frame reads the settled video.currentTime for the thumbnail position.
           requestAnimationFrame(() => requestAnimationFrame(() => {
             const video = containerRef.current?.querySelector('video')
             const duration = video?.duration || parseFloat(activeEl.max || '100')
-            const time = video?.currentTime ?? parseFloat(activeEl.value)
-            dbg(`SEEK time=${time.toFixed(1)} dur=${duration.toFixed(0)}`)
+            const ctTime = video?.currentTime
+            const barVal = parseFloat(activeEl.value)
+            const time = ctTime ?? barVal
+            dbg(`SEEK_RAF ct=${ctTime?.toFixed(1) ?? 'null'} bar=${barVal.toFixed(1)} dur=${duration.toFixed(0)}`)
             const fraction = duration > 0 ? time / duration : 0
             const clientX = rect.left + 6 + fraction * (rect.width - 12)
             const clientY = rect.top + rect.height / 2
