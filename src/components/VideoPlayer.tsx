@@ -36,23 +36,12 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   const [, setDebugRev] = useState(0)
   const debugLogsRef = useRef<string[]>([])
   const lastSeekRef = useRef<string>('')
-  const lastBackRef = useRef<string>(
-    [...(JSON.parse(localStorage.getItem('kawaz_dbg') || '[]') as string[])].reverse()
-      .find(l => l.includes('BACK_BTN') || l.includes('KEY[GoBack') || l.includes('KEY[Escape')) ?? ''
-  )
-  const [savedLogs] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('kawaz_dbg') || '[]') } catch { return [] }
-  })
+  const lastBackRef = useRef<string>('')
   const dbg = (msg: string) => {
     const ts = new Date().toTimeString().slice(0, 8)
     if (msg.startsWith('SEEK_RAF')) lastSeekRef.current = msg
-    if (msg.startsWith('BACK_BTN') || msg.startsWith('KEY[GoBack') || msg.startsWith('KEY[Escape')) lastBackRef.current = msg
-    const entry = `${ts} ${msg}`
-    debugLogsRef.current = [...debugLogsRef.current.slice(-28), entry]
-    try {
-      const prev: string[] = JSON.parse(localStorage.getItem('kawaz_dbg') || '[]')
-      localStorage.setItem('kawaz_dbg', JSON.stringify([...prev.slice(-29), entry]))
-    } catch {}
+    if (msg.startsWith('BACK_BTN') || msg.startsWith('EXIT')) lastBackRef.current = msg
+    debugLogsRef.current = [...debugLogsRef.current.slice(-9), `${ts} ${msg}`]
     setDebugRev(v => v + 1)
   }
 
@@ -60,8 +49,7 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   const { volumeDisplay } = useVideoKeyboard(videoRef, containerRef)
 
   useEffect(() => {
-    dbg(`INIT isTV=${isTV} isNative=${Capacitor.isNativePlatform()} touchPts=${navigator.maxTouchPoints}`)
-    dbg(`UA: ${navigator.userAgent}`)
+    dbg(`INIT isTV=${isTV} native=${Capacitor.isNativePlatform()}`)
   }, [])
 
   useEffect(() => {
@@ -310,13 +298,10 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
         await player.load(manifestUrl);
         if (isDisposed) return;
-        dbg('PLAYER_LOADED')
 
         uiOverlay = new shaka.ui.Overlay(player, container, video);
-        dbg('UI_OVERLAY_CREATED')
 
         let currentCompact: boolean | null = null;
-        let lastBtnCount = -1;
 
         const ensureShakaButtonsFocusable = () => {
           // Buttons (control bar + overflow/settings menus) and range inputs (seek bar,
@@ -327,11 +312,6 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           els.forEach(el => {
             if (el.getAttribute('tabindex') !== '0') el.setAttribute('tabindex', '0');
           });
-          if (els.length !== lastBtnCount) {
-            lastBtnCount = els.length
-            const hasCtrl = !!container.querySelector('.shaka-controls-container')
-            dbg(`SHAKA_BTNS: ${els.length} found, hasCtrl=${hasCtrl}`)
-          }
         };
 
         // Observe the container itself, not .shaka-controls-container — Shaka replaces
@@ -378,12 +358,10 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           }
         }
 
-        // On TV: buttons exist now — focus the play button so D-pad is immediately usable.
+        // On TV: focus the play button so D-pad is immediately usable.
         if (isTV) {
           requestAnimationFrame(() => {
-            const playBtn = container.querySelector<HTMLButtonElement>('.shaka-play-button');
-            dbg(`FOCUS_PLAY: found=${!!playBtn} class=${playBtn?.className?.slice(0, 40) ?? 'none'}`)
-            playBtn?.focus();
+            container.querySelector<HTMLButtonElement>('.shaka-play-button')?.focus();
           });
         }
 
@@ -469,15 +447,9 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   useEffect(() => {
     const handleFullscreenChange = async () => {
       const inFullscreen = !!document.fullscreenElement;
-      dbg(`FSCHANGE inFS=${inFullscreen} el=${document.fullscreenElement?.tagName ?? 'null'} fsRefBefore=${isFullscreenRef.current}`)
-      // On TV: only update isFullscreenRef when ENTERING fullscreen. Exiting is handled
-      // exclusively by exitFullscreen() in useTVControls — if fullscreenchange(false) fires
-      // before Capacitor's backButton event (which it does), setting isFullscreenRef=false
-      // here causes the back handler to see false and call history.back().
       if (!isTV || inFullscreen) {
         isFullscreenRef.current = inFullscreen;
       }
-      dbg(`FSCHANGE fsRefAfter=${isFullscreenRef.current}`)
       containerRef.current?.classList.toggle('kawaz-fullscreen', inFullscreen);
       if (Capacitor.isNativePlatform()) {
         if (inFullscreen) {
@@ -546,29 +518,12 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
           </div>
         )}
         {Capacitor.isNativePlatform() && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)', color: '#0f0', fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.4', padding: '6px 10px', pointerEvents: 'none', maxHeight: '45vh', overflow: 'hidden' }}>
-            {lastSeekRef.current ? (
-              <div style={{ color: '#f80', marginBottom: '2px', fontSize: '11px' }}>
-                {`LAST SEEK: ${lastSeekRef.current}`}
-              </div>
-            ) : null}
-            {lastBackRef.current ? (
-              <div style={{ color: '#f0f', marginBottom: '2px', fontSize: '11px' }}>
-                {`LAST BACK: ${lastBackRef.current}`}
-              </div>
-            ) : null}
-            {(() => {
-              const MAX = 15;
-              const curr = debugLogsRef.current.slice(-MAX).map(l => ({ l, prev: false }));
-              const prev = savedLogs.slice(-(MAX - curr.length)).map(l => ({ l, prev: true }));
-              const combined = [...prev, ...curr];
-              return <>
-                {prev.length > 0 && <div style={{ color: '#f66', fontSize: '10px', marginBottom: '2px' }}>PREV SESSION:</div>}
-                {combined.map(({ l, prev: isPrev }, i) => (
-                  <div key={i} style={{ fontSize: '10px', color: isPrev ? '#f99' : '#fff' }}>{l}</div>
-                ))}
-              </>;
-            })()}
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', fontFamily: 'monospace', lineHeight: '1.4', padding: '6px 10px', pointerEvents: 'none' }}>
+            {lastSeekRef.current ? <div style={{ color: '#f80', fontSize: '11px' }}>SEEK: {lastSeekRef.current}</div> : null}
+            {lastBackRef.current ? <div style={{ color: '#f0f', fontSize: '11px' }}>BACK: {lastBackRef.current}</div> : null}
+            {debugLogsRef.current.slice(-5).map((l, i) => (
+              <div key={i} style={{ color: '#aaa', fontSize: '10px' }}>{l}</div>
+            ))}
           </div>
         )}
       </div>

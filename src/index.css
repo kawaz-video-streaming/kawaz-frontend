@@ -252,6 +252,15 @@ a:focus-visible,
   }
 }
 
+/* CSS-based fullscreen: makes the player container fill the entire viewport without
+   using the browser Fullscreen API (which pushes a history entry on Android WebView). */
+.kawaz-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  background: black;
+}
+
 /* In fullscreen, let Shaka control video sizing — remove aspect-ratio and object-cover constraints.
    .kawaz-fullscreen is toggled via JS (fullscreenchange) because `:fullscreen` is unreliable in Capacitor WebView. */
 :fullscreen video,

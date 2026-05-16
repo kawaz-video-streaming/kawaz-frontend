@@ -85,7 +85,10 @@ export function useSpatialNavigation() {
       // Range inputs (e.g. volume/seekbar): left/right adjust the value natively — don't intercept.
       // Up/down still run spatial navigation so the user can escape the slider with the D-pad.
       if (tag === 'INPUT' && (e.target as HTMLInputElement).type === 'range' &&
-          (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return
+          (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.stopPropagation();
+        return;
+      }
 
       const dirMap: Record<string, Direction> = {
         ArrowUp: 'up',
