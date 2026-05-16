@@ -36,12 +36,17 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
   const [, setDebugRev] = useState(0)
   const debugLogsRef = useRef<string[]>([])
   const lastSeekRef = useRef<string>('')
+  const lastBackRef = useRef<string>(
+    [...(JSON.parse(localStorage.getItem('kawaz_dbg') || '[]') as string[])].reverse()
+      .find(l => l.includes('BACK_BTN') || l.includes('KEY[GoBack') || l.includes('KEY[Escape')) ?? ''
+  )
   const [savedLogs] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('kawaz_dbg') || '[]') } catch { return [] }
   })
   const dbg = (msg: string) => {
     const ts = new Date().toTimeString().slice(0, 8)
     if (msg.startsWith('SEEK_RAF')) lastSeekRef.current = msg
+    if (msg.startsWith('BACK_BTN') || msg.startsWith('KEY[GoBack') || msg.startsWith('KEY[Escape')) lastBackRef.current = msg
     const entry = `${ts} ${msg}`
     debugLogsRef.current = [...debugLogsRef.current.slice(-28), entry]
     try {
@@ -543,26 +548,28 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
         )}
         {Capacitor.isNativePlatform() && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)', color: '#0f0', fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.4', padding: '6px 10px', pointerEvents: 'none', maxHeight: '45vh', overflow: 'hidden' }}>
-            <div style={{ color: '#ff0', fontWeight: 'bold', marginBottom: '2px', fontSize: '11px' }}>
-              {`TV=${isTV} NATIVE=${Capacitor.isNativePlatform()} fsRef=${isFullscreenRef.current} hist=${JSON.stringify(history.state)?.slice(0, 50)}`}
-            </div>
             {lastSeekRef.current ? (
               <div style={{ color: '#f80', marginBottom: '2px', fontSize: '11px' }}>
-                {`LAST: ${lastSeekRef.current}`}
+                {`LAST SEEK: ${lastSeekRef.current}`}
               </div>
             ) : null}
-            <div style={{ color: '#0ff', marginBottom: '3px', fontSize: '10px', wordBreak: 'break-all' }}>
-              {`UA: ${navigator.userAgent.slice(0, 120)}`}
-            </div>
-            {savedLogs.length > 0 && (
-              <div style={{ color: '#f66', fontSize: '10px', marginBottom: '2px' }}>PREV SESSION:</div>
-            )}
-            {savedLogs.map((line, i) => (
-              <div key={`s${i}`} style={{ fontSize: '10px', color: '#f99' }}>{line}</div>
-            ))}
-            {debugLogsRef.current.map((line, i) => (
-              <div key={i} style={{ fontSize: '11px' }}>{line}</div>
-            ))}
+            {lastBackRef.current ? (
+              <div style={{ color: '#f0f', marginBottom: '2px', fontSize: '11px' }}>
+                {`LAST BACK: ${lastBackRef.current}`}
+              </div>
+            ) : null}
+            {(() => {
+              const MAX = 15;
+              const curr = debugLogsRef.current.slice(-MAX).map(l => ({ l, prev: false }));
+              const prev = savedLogs.slice(-(MAX - curr.length)).map(l => ({ l, prev: true }));
+              const combined = [...prev, ...curr];
+              return <>
+                {prev.length > 0 && <div style={{ color: '#f66', fontSize: '10px', marginBottom: '2px' }}>PREV SESSION:</div>}
+                {combined.map(({ l, prev: isPrev }, i) => (
+                  <div key={i} style={{ fontSize: '10px', color: isPrev ? '#f99' : '#fff' }}>{l}</div>
+                ))}
+              </>;
+            })()}
           </div>
         )}
       </div>

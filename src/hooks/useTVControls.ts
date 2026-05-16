@@ -46,8 +46,7 @@ export function useTVControls(
         activeEl.type === 'range' &&
         (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
       ) {
-        const rect = activeEl.getBoundingClientRect();
-        if (rect.width > 0) {
+        if (activeEl.getBoundingClientRect().width > 0) {
           const valAtKeydown = parseFloat(activeEl.value)
           dbg(`SEEK_KEY val=${valAtKeydown.toFixed(1)} step=${activeEl.step}`)
           // Double rAF: first frame lets Shaka's own rAF-scheduled seek complete,
@@ -57,9 +56,10 @@ export function useTVControls(
             const duration = video?.duration || parseFloat(activeEl.max || '100')
             const ctTime = video?.currentTime
             const barVal = parseFloat(activeEl.value)
-            const time = ctTime ?? barVal
             dbg(`SEEK_RAF ct=${ctTime?.toFixed(1) ?? 'null'} bar=${barVal.toFixed(1)} dur=${duration.toFixed(0)}`)
-            const fraction = duration > 0 ? time / duration : 0
+            const fraction = duration > 0 ? barVal / duration : 0
+            // Read rect fresh at dispatch time so it matches what Shaka reads inside hI()
+            const rect = activeEl.getBoundingClientRect()
             const clientX = rect.left + 6 + fraction * (rect.width - 12)
             const clientY = rect.top + rect.height / 2
             activeEl.dispatchEvent(new MouseEvent('mousemove', { bubbles: false, cancelable: true, clientX, clientY }))
