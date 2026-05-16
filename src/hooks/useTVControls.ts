@@ -53,16 +53,26 @@ export function useTVControls(
           // second frame reads the settled video.currentTime for the thumbnail position.
           requestAnimationFrame(() => requestAnimationFrame(() => {
             const video = containerRef.current?.querySelector('video')
-            const duration = video?.duration || parseFloat(activeEl.max || '100')
             const ctTime = video?.currentTime
             const barVal = parseFloat(activeEl.value)
-            dbg(`SEEK_RAF ct=${ctTime?.toFixed(1) ?? 'null'} bar=${barVal.toFixed(1)} dur=${duration.toFixed(0)}`)
-            const fraction = duration > 0 ? barVal / duration : 0
-            // Read rect fresh at dispatch time so it matches what Shaka reads inside hI()
-            const rect = activeEl.getBoundingClientRect()
-            const clientX = rect.left + 6 + fraction * (rect.width - 12)
-            const clientY = rect.top + rect.height / 2
-            activeEl.dispatchEvent(new MouseEvent('mousemove', { bubbles: false, cancelable: true, clientX, clientY }))
+            // Use bar.min/bar.max directly — Shaka sets bar.max = seekRange.end (not video.duration)
+            // and hI() uses bar.max, so our fraction must match exactly.
+            const barMin = parseFloat(activeEl.min) || 0
+            const barMax = parseFloat(activeEl.max) || (video?.duration ?? 100)
+            const fraction = barMax > barMin ? (barVal - barMin) / (barMax - barMin) : 0
+            dbg(`SEEK_RAF ct=${ctTime?.toFixed(1) ?? 'null'} bar=${barVal.toFixed(1)} min=${barMin.toFixed(0)} max=${barMax.toFixed(0)}`)
+            const dispatchHover = () => {
+              // Read rect fresh each time so it matches what Shaka reads inside hI()
+              const rect = activeEl.getBoundingClientRect()
+              const clientX = rect.left + 6 + fraction * (rect.width - 12)
+              const clientY = rect.top + rect.height / 2
+              activeEl.dispatchEvent(new MouseEvent('mousemove', { bubbles: false, cancelable: true, clientX, clientY }))
+            }
+            dispatchHover()
+            // Re-dispatch after 80ms: Shaka's input event (fired by some Android WebViews on
+            // programmatic bar.value changes) can call onChange→oI with the old value and
+            // overwrite our hover. The delayed re-dispatch always wins.
+            setTimeout(dispatchHover, 80)
           }))
         }
       }

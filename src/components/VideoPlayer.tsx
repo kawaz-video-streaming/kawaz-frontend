@@ -509,9 +509,8 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
       dbg('TV_MOUNT: setFsRef=true')
       isFullscreenRef.current = true;
       containerRef.current?.classList.add('kawaz-fullscreen');
-      void containerRef.current?.requestFullscreen().catch((err) => {
-        dbg(`FS_REQ_ERR: ${err}`)
-      });
+      // Do NOT call requestFullscreen() on TV: it pushes a browser history entry and
+      // the popstate on back press navigates away even when our back handler runs first.
       return () => {
         dbg('TV_UNMOUNT')
         containerRef.current?.classList.remove('kawaz-fullscreen');
