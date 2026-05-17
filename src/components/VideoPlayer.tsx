@@ -67,8 +67,9 @@ export const VideoPlayer = ({
   const pausedRef = useRef(true);
   const hideTimerRef = useRef<number | null>(null);
   const thumbHideTimerRef = useRef<number | null>(null);
+  const seekDebounceRef = useRef<number | null>(null);
   const seekbarRef = useRef<HTMLInputElement>(null);
-  const showControlsRef = useRef<() => void>(() => {});
+  const showControlsRef = useRef<() => void>(() => { });
 
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
@@ -102,19 +103,6 @@ export const VideoPlayer = ({
   // Scrub position: non-null while user is dragging the seekbar (visual-only, no actual seek)
   const [scrubTime, setScrubTime] = useState<number | null>(null);
 
-  // Debug (kept during active TV debugging)
-  const [, setDebugRev] = useState(0);
-  const debugLogsRef = useRef<string[]>([]);
-  const lastSeekRef = useRef('');
-  const lastBackRef = useRef('');
-  const dbg = useCallback((msg: string) => {
-    const ts = new Date().toTimeString().slice(0, 8);
-    if (msg.startsWith('SEEK_RAF')) lastSeekRef.current = msg;
-    if (msg.startsWith('BACK_BTN') || msg.startsWith('EXIT')) lastBackRef.current = msg;
-    debugLogsRef.current = [...debugLogsRef.current.slice(-9), `${ts} ${msg}`];
-    setDebugRev(v => v + 1);
-  }, []);
-
   const scheduleHide = useCallback(() => {
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     if (!pausedRef.current) {
@@ -130,7 +118,7 @@ export const VideoPlayer = ({
   // Keep a stable ref so useTVControls can call showControls without dep-array churn
   showControlsRef.current = showControls;
 
-  useTVControls(isFullscreenRef, containerRef, showControlsRef, setIsFullscreen, dbg);
+  useTVControls(isFullscreenRef, containerRef, showControlsRef, setIsFullscreen);
   const { volumeDisplay } = useVideoKeyboard(videoRef, containerRef);
 
   // Video element event listeners (mounted once; videoRef never changes)
@@ -420,14 +408,13 @@ export const VideoPlayer = ({
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     if (isTV) {
-      dbg('TV_MOUNT: setFsRef=true');
       isFullscreenRef.current = true;
       containerRef.current?.classList.add('kawaz-fullscreen');
-      return () => { dbg('TV_UNMOUNT'); containerRef.current?.classList.remove('kawaz-fullscreen'); };
+      return () => { containerRef.current?.classList.remove('kawaz-fullscreen'); };
     }
     const handleOrientation = async (e: MediaQueryList | MediaQueryListEvent) => {
-      if (e.matches) { if (!document.fullscreenElement) await containerRef.current?.requestFullscreen().catch(() => {}); }
-      else { if (document.fullscreenElement) await document.exitFullscreen().catch(() => {}); }
+      if (e.matches) { if (!document.fullscreenElement) await containerRef.current?.requestFullscreen().catch(() => { }); }
+      else { if (document.fullscreenElement) await document.exitFullscreen().catch(() => { }); }
     };
     const mq = window.matchMedia('(orientation: landscape)');
     void handleOrientation(mq);
@@ -441,7 +428,7 @@ export const VideoPlayer = ({
     const video = videoRef.current;
     if (!video) return;
     showControls();
-    if (video.paused) video.play().catch(() => {});
+    if (video.paused) video.play().catch(() => { });
     else video.pause();
   };
 
@@ -504,15 +491,17 @@ export const VideoPlayer = ({
     const video = videoRef.current;
     if (!video || !duration) return;
     const step = 10;
-    const newTime = Math.max(0, Math.min(duration, video.currentTime + (e.key === 'ArrowRight' ? step : -step)));
-    seek(newTime);
+    const base = scrubTime ?? video.currentTime;
+    const newTime = Math.max(0, Math.min(duration, base + (e.key === 'ArrowRight' ? step : -step)));
+    setScrubTime(newTime);
     const rect = seekbarRef.current?.getBoundingClientRect();
     const cRect = containerRef.current?.getBoundingClientRect();
     const clientX = rect && cRect ? rect.left + (newTime / duration) * rect.width : 0;
     updateHoverThumb(newTime, clientX);
     if (thumbHideTimerRef.current) window.clearTimeout(thumbHideTimerRef.current);
     thumbHideTimerRef.current = window.setTimeout(clearHoverThumb, 2000);
-    dbg(`SEEK_RAF ct=${video.currentTime.toFixed(1)} new=${newTime.toFixed(1)}`);
+    if (seekDebounceRef.current) window.clearTimeout(seekDebounceRef.current);
+    seekDebounceRef.current = window.setTimeout(() => { seek(newTime); setScrubTime(null); }, 300);
   };
 
   const handleSelectAudio = (index: number) => {
@@ -553,8 +542,8 @@ export const VideoPlayer = ({
         });
       }
     } else {
-      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
-      else await containerRef.current?.requestFullscreen().catch(() => {});
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => { });
+      else await containerRef.current?.requestFullscreen().catch(() => { });
     }
     showControls();
   };
@@ -697,8 +686,8 @@ export const VideoPlayer = ({
                     thumbHideTimerRef.current = window.setTimeout(clearHoverThumb, 1500);
                   }
                 }}
-                onMouseUp={e => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } }}
-                onTouchEnd={e => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } else clearHoverThumb(); }}
+                onMouseUp={_e => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } }}
+                onTouchEnd={_e => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } else clearHoverThumb(); }}
                 onMouseMove={handleSeekbarMouseMove}
                 onMouseLeave={clearHoverThumb}
                 onKeyDown={handleSeekbarKeyDown}
@@ -866,16 +855,7 @@ export const VideoPlayer = ({
           </div>
         )}
 
-        {/* Debug overlay (native only) */}
-        {Capacitor.isNativePlatform() && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', fontFamily: 'monospace', lineHeight: '1.4', padding: '6px 10px', pointerEvents: 'none' }}>
-            {lastSeekRef.current && <div style={{ color: '#f80', fontSize: '11px' }}>SEEK: {lastSeekRef.current}</div>}
-            {lastBackRef.current && <div style={{ color: '#f0f', fontSize: '11px' }}>BACK: {lastBackRef.current}</div>}
-            {debugLogsRef.current.slice(-5).map((l, i) => (
-              <div key={i} style={{ color: '#aaa', fontSize: '10px' }}>{l}</div>
-            ))}
-          </div>
-        )}
+
       </div>
 
       {isLoadingPlayer && <p className="mt-2 text-sm text-muted-foreground">Loading player...</p>}

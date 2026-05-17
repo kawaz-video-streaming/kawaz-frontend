@@ -9,7 +9,6 @@ export function useTVControls(
   containerRef: RefObject<HTMLDivElement | null>,
   onWakeRef: RefObject<() => void>,
   onFullscreenChange: (isFs: boolean) => void,
-  dbg: (msg: string) => void = () => {},
 ) {
   useEffect(() => {
     if (!isTV) return;
@@ -19,7 +18,6 @@ export function useTVControls(
 
     let isExiting = false;
     const exitFullscreen = () => {
-      dbg(`EXIT exiting=${isExiting} fsRef=${isFullscreenRef.current}`)
       if (isExiting || !isFullscreenRef.current) return;
       isExiting = true;
       isFullscreenRef.current = false;
@@ -54,7 +52,6 @@ export function useTVControls(
     // Registering any Capacitor backButton listener disables auto-navigation —
     // we must handle both fullscreen-exit and page-back explicitly.
     const backHandlePromise = App.addListener('backButton', ({ canGoBack }) => {
-      dbg(`BACK_BTN fsRef=${isFullscreenRef.current} canGoBack=${canGoBack} exiting=${isExiting}`)
       if (isFullscreenRef.current) {
         exitFullscreen();
       } else if (canGoBack && !isExiting) {
