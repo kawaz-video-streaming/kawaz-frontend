@@ -32,10 +32,14 @@ if (Capacitor.isNativePlatform()) {
 
   SplashScreen.hide();
 
-  CapacitorApp.addListener('backButton', ({ canGoBack }) => {
-    if (canGoBack) window.history.back();
-    else CapacitorApp.exitApp();
-  });
+  // TV back button is handled entirely by useTVControls (must manage fullscreen-exit too).
+  // Registering a second handler here would cause double navigation on TV.
+  if (!isTV) {
+    CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      if (canGoBack) window.history.back();
+      else CapacitorApp.exitApp();
+    });
+  }
 }
 
 const queryClient = new QueryClient({

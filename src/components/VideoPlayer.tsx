@@ -269,7 +269,8 @@ export const VideoPlayer = ({
           if (!isOwn) {
             request.allowCrossSiteCredentials = false;
           } else {
-            if (!uri.startsWith('/') && !uri.startsWith(window.location.origin)) request.allowCrossSiteCredentials = true;
+            // Backend URIs (absolute BACKEND_BASE URLs) need credentials enabled explicitly
+            if (BACKEND_BASE !== '' && uri.startsWith(BACKEND_BASE)) request.allowCrossSiteCredentials = true;
             if (special && !uri.includes('special=true')) {
               request.uris = request.uris.map(u => u + (u.includes('?') ? '&special=true' : '?special=true'));
             }
@@ -420,6 +421,12 @@ export const VideoPlayer = ({
     void handleOrientation(mq);
     mq.addEventListener('change', handleOrientation);
     return () => mq.removeEventListener('change', handleOrientation);
+  }, []);
+
+  // Clear pending seek/thumb timers on unmount
+  useEffect(() => () => {
+    if (seekDebounceRef.current !== null) window.clearTimeout(seekDebounceRef.current);
+    if (thumbHideTimerRef.current !== null) window.clearTimeout(thumbHideTimerRef.current);
   }, []);
 
   // --- Controls actions ---
@@ -686,8 +693,8 @@ export const VideoPlayer = ({
                     thumbHideTimerRef.current = window.setTimeout(clearHoverThumb, 1500);
                   }
                 }}
-                onMouseUp={_e => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } }}
-                onTouchEnd={_e => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } else clearHoverThumb(); }}
+                onMouseUp={() => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } }}
+                onTouchEnd={() => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } else clearHoverThumb(); }}
                 onMouseMove={handleSeekbarMouseMove}
                 onMouseLeave={clearHoverThumb}
                 onKeyDown={handleSeekbarKeyDown}

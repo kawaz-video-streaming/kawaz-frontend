@@ -17,6 +17,7 @@ export function useTVControls(
     const wakeTimer = setTimeout(() => onWakeRef.current(), 500);
 
     let isExiting = false;
+    let exitingTimer: ReturnType<typeof setTimeout> | null = null;
     const exitFullscreen = () => {
       if (isExiting || !isFullscreenRef.current) return;
       isExiting = true;
@@ -28,7 +29,7 @@ export function useTVControls(
         const h = document.querySelector('h1');
         if (h) { h.setAttribute('tabindex', '-1'); (h as HTMLElement).focus(); }
       });
-      setTimeout(() => { isExiting = false; }, 600);
+      exitingTimer = setTimeout(() => { isExiting = false; exitingTimer = null; }, 600);
     };
 
     const keyHandler = (e: KeyboardEvent) => {
@@ -61,6 +62,7 @@ export function useTVControls(
 
     return () => {
       clearTimeout(wakeTimer);
+      if (exitingTimer !== null) clearTimeout(exitingTimer);
       window.removeEventListener('keydown', keyHandler, { capture: true });
       void backHandlePromise.then(h => h.remove());
     };
