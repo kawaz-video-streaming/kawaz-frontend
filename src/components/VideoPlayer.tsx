@@ -99,6 +99,9 @@ export const VideoPlayer = ({
   const [hoverX, setHoverX] = useState(0);
   const [hoverThumb, setHoverThumb] = useState<import('shaka-player').ThumbnailData | null>(null);
 
+  // Scrub position: non-null while user is dragging the seekbar (visual-only, no actual seek)
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
+
   // Debug (kept during active TV debugging)
   const [, setDebugRev] = useState(0);
   const debugLogsRef = useRef<string[]>([]);
@@ -557,7 +560,7 @@ export const VideoPlayer = ({
   };
 
   // Computed values for seekbar / volume slider styling
-  const playedPct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const playedPct = duration > 0 ? ((scrubTime ?? currentTime) / duration) * 100 : 0;
   const bufferedPct = duration > 0 ? (bufferedEnd / duration) * 100 : 0;
   const volPct = muted ? 0 : volume * 100;
 
@@ -682,10 +685,10 @@ export const VideoPlayer = ({
                 min={0}
                 max={duration || 100}
                 step={0.5}
-                value={currentTime}
+                value={scrubTime ?? currentTime}
                 onChange={e => {
                   const time = Number(e.target.value);
-                  seek(time);
+                  setScrubTime(time);
                   if (duration > 0) {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const clientX = rect.left + (time / duration) * rect.width;
@@ -694,9 +697,10 @@ export const VideoPlayer = ({
                     thumbHideTimerRef.current = window.setTimeout(clearHoverThumb, 1500);
                   }
                 }}
+                onMouseUp={e => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } }}
+                onTouchEnd={e => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } else clearHoverThumb(); }}
                 onMouseMove={handleSeekbarMouseMove}
                 onMouseLeave={clearHoverThumb}
-                onTouchEnd={clearHoverThumb}
                 onKeyDown={handleSeekbarKeyDown}
                 onFocus={showControls}
               />
