@@ -1,56 +1,45 @@
-import 'shaka-player/dist/controls.css';
 import { Capacitor } from '@capacitor/core';
 import { isTV } from '../lib/platform';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import { SystemBars } from '../plugins/systemBars';
+import { prefetchFirstSegments, formatVideoError } from '../lib/videoUtils';
+import { useTVControls } from '../hooks/useTVControls';
+import { useVideoKeyboard } from '../hooks/useVideoKeyboard';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List } from 'lucide-react';
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
 
-declare global {
-  interface Window {
-    shakaPlayer?: any;
-  }
-}
+const formatTime = (s: number): string => {
+  if (!Number.isFinite(s) || s < 0) return '0:00';
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+};
 
-const prefetchFirstSegments = async (manifestUrl: string, special: boolean) => {
+const displayLanguageNative = (code: string): string => {
   try {
-    const res = await fetch(manifestUrl, { credentials: 'include' });
-    if (!res.ok) return;
-    const text = await res.text();
-    const manifestPath = manifestUrl.includes('?')
-      ? manifestUrl.slice(0, manifestUrl.indexOf('?'))
-      : manifestUrl;
-    const base = manifestPath.slice(0, manifestPath.lastIndexOf('/') + 1);
-    const sp = special ? '?special=true' : '';
+    const dn = new Intl.DisplayNames([code, 'en'], { type: 'language' });
+    return dn.of(code) ?? code.toUpperCase();
+  } catch { return code.toUpperCase(); }
+};
 
-    const repIds: string[] = [];
-    let initTemplate: string | undefined;
-    let mediaTemplate: string | undefined;
-    for (const block of text.split('</AdaptationSet>')) {
-      const init = block.match(/initialization="([^"]+)"/)?.[1];
-      const media = block.match(/\bmedia="([^"]+)"/)?.[1];
-      if (!init || !media) continue;
-      if (!initTemplate) { initTemplate = init; mediaTemplate = media; }
-      for (const m of block.matchAll(/<Representation\b[^>]*\s+id="(\d+)"/g)) repIds.push(m[1]);
-    }
-    const startNum = parseInt(text.match(/startNumber="(\d+)"/)?.[1] ?? '1');
+const audioChannelLabel = (track: import('shaka-player').AudioTrack): string => {
+  if (track.spatialAudio) return 'Spatial';
+  const ch = track.channelsCount;
+  if (!ch) return '';
+  if (ch <= 1) return 'Mono';
+  if (ch === 2) return 'Stereo';
+  if (ch <= 6) return '5.1';
+  return '7.1';
+};
 
-    if (!initTemplate || !mediaTemplate || repIds.length === 0) return;
-
-    const urls: string[] = [];
-    for (const id of repIds) {
-      urls.push(base + initTemplate.replace(/\$RepresentationID\$/g, id) + sp);
-      const firstSeg = mediaTemplate
-        .replace(/\$RepresentationID\$/g, id)
-        .replace(/\$Number%0(\d+)d\$/, (_, w) => String(startNum).padStart(Number(w), '0'));
-      urls.push(base + firstSeg + sp);
-    }
-
-    await Promise.all(urls.map(u => fetch(u, { credentials: 'include' })));
-  } catch {
-    // best-effort
-  }
+const audioTrackLabel = (track: import('shaka-player').AudioTrack): string => {
+  const lang = track.label ?? displayLanguageNative(track.language);
+  const ch = audioChannelLabel(track);
+  return ch ? `${lang} · ${ch}` : lang;
 };
 
 interface VideoPlayerProps {
@@ -62,201 +51,226 @@ interface VideoPlayerProps {
   className?: string;
 }
 
-export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl, special = false, className }: VideoPlayerProps) => {
+export const VideoPlayer = ({
+  manifestUrl,
+  chaptersUrl,
+  thumbnailsUrl,
+  posterUrl,
+  special = false,
+  className,
+}: VideoPlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<import('shaka-player').Player | null>(null);
   const destroyPromiseRef = useRef<Promise<void>>(Promise.resolve());
+  const isFullscreenRef = useRef(isTV && Capacitor.isNativePlatform());
+  const pausedRef = useRef(true);
+  const hideTimerRef = useRef<number | null>(null);
+  const thumbHideTimerRef = useRef<number | null>(null);
+  const seekDebounceRef = useRef<number | null>(null);
+  const seekbarRef = useRef<HTMLInputElement>(null);
+  const showControlsRef = useRef<() => void>(() => { });
+
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
-  const [volumeDisplay, setVolumeDisplay] = useState<number | null>(null);
-  const volumeHideTimer = useRef<number | null>(null);
 
-  const formatVideoError = () => {
-    const error = videoRef.current?.error;
-    if (!error) return 'Playback failed during buffering.';
+  // Playback state (driven by video element events)
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [paused, setPaused] = useState(true);
+  const [bufferedEnd, setBufferedEnd] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
 
-    switch (error.code) {
-      case MediaError.MEDIA_ERR_ABORTED:
-        return 'Playback was aborted.';
-      case MediaError.MEDIA_ERR_NETWORK:
-        return 'A network error interrupted playback.';
-      case MediaError.MEDIA_ERR_DECODE:
-        return 'This video could not be decoded by the browser.';
-      case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-        return 'This video format or manifest is not supported by the browser.';
-      default:
-        return 'Playback failed during buffering.';
+  // Controls visibility
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(isTV && Capacitor.isNativePlatform());
+
+  // Player features (populated after load)
+  const [chapters, setChapters] = useState<import('shaka-player').Chapter[]>([]);
+  const [audioTracks, setAudioTracks] = useState<import('shaka-player').AudioTrack[]>([]);
+  const [captionTracks, setCaptionTracks] = useState<import('shaka-player').TextTrack[]>([]);
+  const [activeCaptionId, setActiveCaptionId] = useState<number | null>(null);
+  const [chaptersMenuOpen, setChaptersMenuOpen] = useState(false);
+  const [audioMenuOpen, setAudioMenuOpen] = useState(false);
+  const [captionsMenuOpen, setCaptionsMenuOpen] = useState(false);
+
+  // Thumbnail hover/seek preview
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
+  const [hoverX, setHoverX] = useState(0);
+  const [hoverThumb, setHoverThumb] = useState<import('shaka-player').ThumbnailData | null>(null);
+
+  // Scrub position: non-null while user is dragging the seekbar (visual-only, no actual seek)
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
+
+  const scheduleHide = useCallback(() => {
+    if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+    if (!pausedRef.current) {
+      hideTimerRef.current = window.setTimeout(() => setControlsVisible(false), 3500);
     }
-  };
+  }, []);
 
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    scheduleHide();
+  }, [scheduleHide]);
+
+  // Keep a stable ref so useTVControls can call showControls without dep-array churn
+  showControlsRef.current = showControls;
+
+  useTVControls(isFullscreenRef, containerRef, showControlsRef, setIsFullscreen);
+  const { volumeDisplay } = useVideoKeyboard(videoRef, containerRef);
+
+  // Video element event listeners (mounted once; videoRef never changes)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const onTimeUpdate = () => setCurrentTime(video.currentTime);
+    const onProgress = () => {
+      if (video.buffered.length > 0) setBufferedEnd(video.buffered.end(video.buffered.length - 1));
+    };
+    const onDurationChange = () => setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+    const onPause = () => {
+      pausedRef.current = true;
+      setPaused(true);
+      setControlsVisible(true);
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+    };
+    const onPlay = () => {
+      pausedRef.current = false;
+      setPaused(false);
+      scheduleHide();
+    };
+    const onVolumeChange = () => {
+      setVolume(video.volume);
+      setMuted(video.muted);
+    };
+
+    video.addEventListener('timeupdate', onTimeUpdate);
+    video.addEventListener('progress', onProgress);
+    video.addEventListener('durationchange', onDurationChange);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('play', onPlay);
+    video.addEventListener('volumechange', onVolumeChange);
+    return () => {
+      video.removeEventListener('timeupdate', onTimeUpdate);
+      video.removeEventListener('progress', onProgress);
+      video.removeEventListener('durationchange', onDurationChange);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('volumechange', onVolumeChange);
+    };
+  }, [scheduleHide]);
+
+  // Shaka player lifecycle
   useEffect(() => {
     let isDisposed = false;
     let player: import('shaka-player').Player | null = null;
-    let uiOverlay: { configure(config: object): void; destroy(): Promise<void>; } | null = null;
     let markerRenderRetryTimer: number | null = null;
     let stallRecoveryTimer: number | null = null;
-    let resizeObserver: ResizeObserver | null = null;
-    let chapterRenderGeneration = 0;
 
-    const removeChapterMarkers = () => {
-      const seekBarContainer = containerRef.current?.querySelector<HTMLElement>('.shaka-seek-bar-container');
-      seekBarContainer?.querySelector('.kawaz-chapter-markers')?.remove();
-      seekBarContainer?.querySelector('.kawaz-chapter-hover-targets')?.remove();
-      seekBarContainer?.classList.remove('kawaz-chapter-seekbar');
-    };
-
-    const getPlayerChapters = async () => {
-      if (!player) return [] as import('shaka-player').Chapter[];
-      const tracks = player.getChaptersTracks();
-      const languages = new Set(tracks.map(track => track.language || 'und'));
-      if (languages.size === 0) languages.add('und');
-      for (const language of languages) {
-        const chapters = await player.getChaptersAsync(language);
-        if (chapters.length > 0) return chapters;
-      }
-      return [] as import('shaka-player').Chapter[];
-    };
-
-    const renderChapterMarkers = async (attempt = 0) => {
-      const generation = ++chapterRenderGeneration;
-      if (isDisposed || !player || !containerRef.current || !videoRef.current) return;
-
-      const seekBarContainer = containerRef.current.querySelector<HTMLElement>('.shaka-seek-bar-container');
-      const duration = videoRef.current.duration;
-
-      if (!seekBarContainer || !Number.isFinite(duration) || duration <= 0) {
-        if (attempt < 20) {
-          markerRenderRetryTimer = window.setTimeout(() => void renderChapterMarkers(attempt + 1), 150);
-        }
-        return;
-      }
-
-      const chapters = await getPlayerChapters();
-      if (generation !== chapterRenderGeneration || isDisposed) return;
-      removeChapterMarkers();
-      if (chapters.length === 0) return;
-
-      // Sort then deduplicate chapters within 1s of each other.
-      // Some videos have chapter data from both the DASH manifest and the external
-      // VTT file; Shaka's getChaptersAsync combines all matching TextTracks, so the
-      // same chapter can appear twice with slightly different timestamps.
-      const sorted = chapters
-        .filter(c => c.startTime >= 0 && c.startTime < duration)
-        .sort((a, b) => a.startTime - b.startTime);
-      const deduped: import('shaka-player').Chapter[] = [];
-      for (const chapter of sorted) {
-        const last = deduped[deduped.length - 1];
-        if (!last || chapter.startTime - last.startTime > 1) deduped.push(chapter);
-      }
-      if (deduped.length === 0) return;
-
-      const markerContainer = document.createElement('div');
-      markerContainer.className = 'kawaz-chapter-markers';
-      const hoverTargetsContainer = document.createElement('div');
-      hoverTargetsContainer.className = 'kawaz-chapter-hover-targets';
-
-      for (const chapter of deduped) {
-        const leftPct = `${(chapter.startTime / duration) * 100}%`;
-
-        const mark = document.createElement('div');
-        mark.className = 'kawaz-chapter-mark';
-        mark.style.left = leftPct;
-        markerContainer.appendChild(mark);
-
-        const hoverTarget = document.createElement('button');
-        hoverTarget.type = 'button';
-        hoverTarget.tabIndex = -1;
-        hoverTarget.className = 'kawaz-chapter-hover-target';
-        hoverTarget.style.left = leftPct;
-        hoverTarget.setAttribute('data-title', chapter.title);
-        hoverTarget.setAttribute('aria-label', `Chapter: ${chapter.title}`);
-        hoverTarget.addEventListener('click', event => {
-          event.preventDefault();
-          event.stopPropagation();
-          if (videoRef.current) videoRef.current.currentTime = chapter.startTime;
-        });
-        hoverTargetsContainer.appendChild(hoverTarget);
-      }
-
-      seekBarContainer.classList.add('kawaz-chapter-seekbar');
-      seekBarContainer.insertBefore(markerContainer, seekBarContainer.firstChild);
-      seekBarContainer.appendChild(hoverTargetsContainer);
-    };
-
-    const scheduleChapterMarkersRender = () => {
-      if (markerRenderRetryTimer !== null) window.clearTimeout(markerRenderRetryTimer);
-      void renderChapterMarkers();
-    };
-
-    const clearStallRecoveryTimer = () => {
-      if (stallRecoveryTimer !== null) {
-        window.clearTimeout(stallRecoveryTimer);
-        stallRecoveryTimer = null;
-      }
+    const clearStallRecovery = () => {
+      if (stallRecoveryTimer !== null) { window.clearTimeout(stallRecoveryTimer); stallRecoveryTimer = null; }
     };
 
     const attemptPlaybackRecovery = () => {
       const video = videoRef.current;
       if (!video || !player || isDisposed) return;
-
-      try {
-        ; (player as import('shaka-player').Player & { retryStreaming?: () => boolean; }).retryStreaming?.();
-      } catch (e) {
-        console.warn('Failed to retry Shaka streaming:', e);
-      }
-
+      try { (player as any).retryStreaming?.(); } catch (e) { console.warn('retryStreaming failed:', e); }
       if (video.readyState < 3 && video.currentTime < 0.25) {
-        try {
-          video.currentTime = 0.1;
-        } catch {
-          // Ignore seek recovery failures.
-        }
+        try { video.currentTime = 0.1; } catch { /* ignore */ }
       }
     };
 
-    const setupPlayer = async (): Promise<(() => void) | undefined> => {
+    const getPlayerChapters = async (): Promise<import('shaka-player').Chapter[]> => {
+      if (!player) return [];
+      const tracks = player.getChaptersTracks();
+      const langs = new Set(tracks.map(t => t.language || 'und'));
+      if (langs.size === 0) langs.add('und');
+      for (const lang of langs) {
+        const chapters = await player.getChaptersAsync(lang);
+        if (chapters.length > 0) return chapters;
+      }
+      return [];
+    };
+
+    const refreshChapters = async (attempt = 0) => {
+      if (isDisposed || !player) return;
+      const video = videoRef.current;
+      if (!video || !Number.isFinite(video.duration) || video.duration <= 0) {
+        if (attempt < 20) {
+          markerRenderRetryTimer = window.setTimeout(() => void refreshChapters(attempt + 1), 150);
+        }
+        return;
+      }
+      const raw = await getPlayerChapters();
+      if (isDisposed) return;
+      // Chapters VTT may still be loading — retry until we get data
+      if (raw.length === 0 && attempt < 20) {
+        markerRenderRetryTimer = window.setTimeout(() => void refreshChapters(attempt + 1), 200);
+        return;
+      }
+      const dur = video.duration;
+      const sorted = raw.filter(c => c.startTime >= 0 && c.startTime < dur).sort((a, b) => a.startTime - b.startTime);
+      const deduped: import('shaka-player').Chapter[] = [];
+      for (const c of sorted) {
+        const last = deduped[deduped.length - 1];
+        if (!last || c.startTime - last.startTime > 1) deduped.push(c);
+      }
+      setChapters(deduped);
+    };
+
+    const refreshPlayerState = () => {
+      if (!player || isDisposed) return;
+      setAudioTracks(player.getAudioTracks());
+      const caps = player.getTextTracks().filter(t => t.kind !== 'chapters' && t.kind !== 'metadata');
+      setCaptionTracks(caps);
+      setActiveCaptionId(caps.find(t => t.active)?.id ?? null);
+    };
+
+    const setupPlayer = async () => {
       setIsLoadingPlayer(true);
       setPlayerError(null);
+      setChapters([]);
+      setAudioTracks([]);
+      setCaptionTracks([]);
+      setActiveCaptionId(null);
 
       void prefetchFirstSegments(manifestUrl, special);
 
       await destroyPromiseRef.current;
-      if (isDisposed) return undefined;
+      if (isDisposed) return;
 
       const video = videoRef.current;
       const container = containerRef.current;
-      if (!video || !container) {
-        setIsLoadingPlayer(false);
-        return undefined;
-      }
+      if (!video || !container) { setIsLoadingPlayer(false); return; }
 
       try {
         const shaka = await import('shaka-player/dist/shaka-player.ui.js');
-        if (isDisposed) return undefined;
+        if (isDisposed) return;
 
         shaka.polyfill.installAll();
-
         if (!shaka.Player.isBrowserSupported()) {
           setPlayerError('This browser does not support playback for this stream.');
           setIsLoadingPlayer(false);
-          return undefined;
+          return;
         }
 
         player = new shaka.Player();
-        window.shakaPlayer = player;
+        playerRef.current = player;
         await player.attach(video);
+        // Required for subtitle/caption rendering without the UI overlay
+        player.setVideoContainer(container);
 
         player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
           const uri = request.uris[0];
-          const isOwnServer = uri.startsWith('/') || uri.startsWith(window.location.origin) || (BACKEND_BASE !== '' && uri.startsWith(BACKEND_BASE));
-          if (!isOwnServer) {
+          const isOwn = uri.startsWith('/') || uri.startsWith(window.location.origin) || (BACKEND_BASE !== '' && uri.startsWith(BACKEND_BASE));
+          if (!isOwn) {
             request.allowCrossSiteCredentials = false;
           } else {
-            // In native builds the WebView origin (https://localhost) differs from the backend —
-            // explicitly allow credentials so session cookies are sent on cross-origin segment requests.
-            if (!uri.startsWith('/') && !uri.startsWith(window.location.origin)) {
-              request.allowCrossSiteCredentials = true;
-            }
+            // Backend URIs (absolute BACKEND_BASE URLs) need credentials enabled explicitly
+            if (BACKEND_BASE !== '' && uri.startsWith(BACKEND_BASE)) request.allowCrossSiteCredentials = true;
             if (special && !uri.includes('special=true')) {
               request.uris = request.uris.map(u => u + (u.includes('?') ? '&special=true' : '?special=true'));
             }
@@ -265,274 +279,593 @@ export const VideoPlayer = ({ manifestUrl, chaptersUrl, thumbnailsUrl, posterUrl
 
         if (special) {
           player.getNetworkingEngine()?.registerResponseFilter((_type, response) => {
-            const uri = response.uri;
-            if (!uri.includes('.vtt')) return;
+            if (!response.uri.includes('.vtt')) return;
             const text = new TextDecoder().decode(response.data);
-            // Thumbnail VTTs reference image URLs with #xywh= fragments.
-            // Shaka's UI loads those images via <img>.src (bypassing the request filter),
-            // so we rewrite the VTT itself to include ?special=true before the fragment.
             const rewritten = text.replace(/(#xywh=)/g, '?special=true#xywh=');
             response.data = new TextEncoder().encode(rewritten).buffer as ArrayBuffer;
           });
         }
 
-        const configurablePlayer = player as import('shaka-player').Player & {
-          configure?: (config: object) => void;
-          retryStreaming?: () => boolean;
-        };
-
-        configurablePlayer.configure?.({
+        (player as any).configure?.({
           streaming: {
-            lowLatencyMode: false,
-            stallEnabled: true,
-            stallThreshold: 1,
-            gapDetectionThreshold: 0.5,
-            smallGapLimit: 0.5,
-            jumpLargeGaps: true,
-            extrapolateDuration: true,
-            startAtFirstSegment: true,
-            bufferingGoal: 15,
-            rebufferingGoal: 2,
+            lowLatencyMode: false, stallEnabled: true, stallThreshold: 1,
+            gapDetectionThreshold: 0.5, smallGapLimit: 0.5, jumpLargeGaps: true,
+            extrapolateDuration: true, startAtFirstSegment: true,
+            bufferingGoal: 15, rebufferingGoal: 2,
           },
-          manifest: {
-            dash: {
-              ignoreMinBufferTime: true,
-            },
-          },
+          manifest: { dash: { ignoreMinBufferTime: true } },
         });
 
-
-        const handleTracksChanged = () => scheduleChapterMarkersRender();
-        const handleDurationChange = () => scheduleChapterMarkersRender();
-        const handlePlayerError = (event: Event) => {
-          const detail = (event as Event & { detail?: { code?: number; category?: number; message?: string; data?: unknown[]; }; }).detail;
+        const onTracksChanged = () => { refreshPlayerState(); void refreshChapters(); };
+        const onDurationChange = () => void refreshChapters();
+        const onPlayerError = (event: Event) => {
+          const detail = (event as any).detail;
           console.error('Shaka runtime error', detail);
           const code = detail?.code != null ? ` (${detail.category}:${detail.code})` : '';
           setPlayerError(`Could not play this video stream.${code}`);
         };
-        const handleVideoError = () => {
-          const message = formatVideoError();
-          console.error('HTML video error', video.error);
-          setPlayerError(message);
-        };
-        const handlePotentialStall = () => {
-          clearStallRecoveryTimer();
-          stallRecoveryTimer = window.setTimeout(() => attemptPlaybackRecovery(), 1200);
-        };
-        const handlePlaybackProgress = () => {
-          clearStallRecoveryTimer();
-          if (!isDisposed) setPlayerError(null);
-        };
-        player.addEventListener('trackschanged', handleTracksChanged);
-        player.addEventListener('error', handlePlayerError);
-        video.addEventListener('durationchange', handleDurationChange);
-        video.addEventListener('loadedmetadata', handleDurationChange);
-        video.addEventListener('error', handleVideoError);
-        video.addEventListener('waiting', handlePotentialStall);
-        video.addEventListener('stalled', handlePotentialStall);
-        video.addEventListener('playing', handlePlaybackProgress);
-        video.addEventListener('canplay', handlePlaybackProgress);
+        const onVideoError = () => { console.error('HTML video error', video.error); setPlayerError(formatVideoError(video)); };
+        const onStall = () => { clearStallRecovery(); stallRecoveryTimer = window.setTimeout(attemptPlaybackRecovery, 1200); };
+        const onProgress = () => { clearStallRecovery(); if (!isDisposed) setPlayerError(null); };
 
-        if (isDisposed) return undefined;
+        player.addEventListener('trackschanged', onTracksChanged);
+        player.addEventListener('error', onPlayerError);
+        video.addEventListener('durationchange', onDurationChange);
+        video.addEventListener('loadedmetadata', onDurationChange);
+        video.addEventListener('error', onVideoError);
+        video.addEventListener('waiting', onStall);
+        video.addEventListener('stalled', onStall);
+        video.addEventListener('playing', onProgress);
+        video.addEventListener('canplay', onProgress);
 
+        if (isDisposed) return;
         await player.load(manifestUrl);
         if (isDisposed) return;
 
-        uiOverlay = new shaka.ui.Overlay(player, container, video);
-
-        let currentCompact: boolean | null = null;
-        const reconfigureUI = () => {
-          if (!uiOverlay) return;
-          const compact = container.clientWidth < 640;
-          if (compact === currentCompact) return;
-          currentCompact = compact;
-          uiOverlay.configure({
-            controlPanelElements: compact
-              ? ['play_pause', 'time_and_duration', 'mute', 'spacer', 'overflow_menu', 'fullscreen']
-              : ['play_pause', 'time_and_duration', 'mute', 'volume', 'spacer', 'captions', 'language', 'chapter', 'overflow_menu', 'fullscreen'],
-            seekBarColors: { chapters: 'transparent' },
-          });
-          requestAnimationFrame(() => (player as unknown as EventTarget)?.dispatchEvent(new Event('variantchanged')));
-        };
-        reconfigureUI();
-        resizeObserver = new ResizeObserver(reconfigureUI);
-        resizeObserver.observe(container);
+        refreshPlayerState();
 
         if (chaptersUrl) {
-          try {
-            await player.addChaptersTrack(chaptersUrl, 'und');
-            scheduleChapterMarkersRender();
-          } catch (e) {
-            console.warn('Failed to load chapters track:', e);
-          }
-        } else {
-          removeChapterMarkers();
+          try { await player.addChaptersTrack(chaptersUrl, 'und'); void refreshChapters(); }
+          catch (e) { console.warn('Failed to load chapters track:', e); }
+        }
+        if (thumbnailsUrl) {
+          try { await player.addThumbnailsTrack(thumbnailsUrl); }
+          catch (e) { console.warn('Failed to load thumbnails track:', e); }
         }
 
-        if (thumbnailsUrl) {
-          try {
-            await player.addThumbnailsTrack(thumbnailsUrl);
-          } catch (e) {
-            console.warn('Failed to load thumbnails track:', e);
-          }
+        if (isTV) {
+          requestAnimationFrame(() => container.querySelector<HTMLButtonElement>('.kawaz-play-btn')?.focus());
         }
 
         return () => {
-          resizeObserver?.disconnect();
-          resizeObserver = null;
-          clearStallRecoveryTimer();
-          player?.removeEventListener('trackschanged', handleTracksChanged);
-          player?.removeEventListener('error', handlePlayerError);
-          video.removeEventListener('durationchange', handleDurationChange);
-          video.removeEventListener('loadedmetadata', handleDurationChange);
-          video.removeEventListener('error', handleVideoError);
-          video.removeEventListener('waiting', handlePotentialStall);
-          video.removeEventListener('stalled', handlePotentialStall);
-          video.removeEventListener('playing', handlePlaybackProgress);
-          video.removeEventListener('canplay', handlePlaybackProgress);
+          clearStallRecovery();
+          player?.removeEventListener('trackschanged', onTracksChanged);
+          player?.removeEventListener('error', onPlayerError);
+          video.removeEventListener('durationchange', onDurationChange);
+          video.removeEventListener('loadedmetadata', onDurationChange);
+          video.removeEventListener('error', onVideoError);
+          video.removeEventListener('waiting', onStall);
+          video.removeEventListener('stalled', onStall);
+          video.removeEventListener('playing', onProgress);
+          video.removeEventListener('canplay', onProgress);
         };
-      } catch (error: unknown) {
-        if (!isDisposed) {
-          console.error('Shaka Player error', error);
-          setPlayerError('Could not load the video stream.');
-        }
+      } catch (error) {
+        if (!isDisposed) { console.error('Shaka Player error', error); setPlayerError('Could not load the video stream.'); }
         return undefined;
       } finally {
         if (!isDisposed) setIsLoadingPlayer(false);
       }
     };
 
-    let cleanupPlayerListeners: (() => void) | undefined;
-    void setupPlayer().then(cleanup => { cleanupPlayerListeners = cleanup; });
+    let cleanupListeners: (() => void) | undefined;
+    void setupPlayer().then(cleanup => { cleanupListeners = cleanup; });
 
     return () => {
       isDisposed = true;
-      resizeObserver?.disconnect();
-      resizeObserver = null;
-      cleanupPlayerListeners?.();
-      clearStallRecoveryTimer();
+      cleanupListeners?.();
+      clearStallRecovery();
       if (markerRenderRetryTimer !== null) window.clearTimeout(markerRenderRetryTimer);
-      removeChapterMarkers();
+      playerRef.current = null;
 
-      const overlayToDestroy = uiOverlay;
       const playerToDestroy = player;
       const videoToReset = videoRef.current;
-      uiOverlay = null;
       player = null;
 
       destroyPromiseRef.current = (async () => {
-        try {
-          await overlayToDestroy?.destroy();
-        } catch (error) {
-          console.warn('Failed to destroy Shaka UI overlay:', error);
-        }
-
-        try {
-          await playerToDestroy?.destroy();
-        } catch (error) {
-          console.warn('Failed to destroy Shaka player:', error);
-        }
-
+        try { await playerToDestroy?.destroy(); } catch (e) { console.warn('Failed to destroy Shaka player:', e); }
         if (videoToReset) {
           try {
-            await new Promise<void>((resolve) => {
-              const done = () => {
-                videoToReset.removeEventListener('emptied', done);
-                resolve();
-              };
+            await new Promise<void>(resolve => {
+              const done = () => { videoToReset.removeEventListener('emptied', done); resolve(); };
               videoToReset.addEventListener('emptied', done);
               videoToReset.pause();
               videoToReset.removeAttribute('src');
               videoToReset.load();
-              // Fallback: resolve after 500ms if emptied never fires
               setTimeout(resolve, 500);
             });
-          } catch (error) {
-            console.warn('Failed to reset video element:', error);
-          }
+          } catch (e) { console.warn('Failed to reset video element:', e); }
         }
       })();
     };
   }, [manifestUrl, chaptersUrl, thumbnailsUrl, special]);
 
+  // Fullscreen API sync (non-TV only; TV uses CSS class only)
   useEffect(() => {
-    const handleFullscreenChange = async () => {
-      const inFullscreen = !!document.fullscreenElement;
-      containerRef.current?.classList.toggle('kawaz-fullscreen', inFullscreen);
+    const handleFsChange = async () => {
+      const inFs = !!document.fullscreenElement;
+      if (!isTV || inFs) isFullscreenRef.current = inFs;
+      setIsFullscreen(isTV ? isFullscreenRef.current : inFs);
+      containerRef.current?.classList.toggle('kawaz-fullscreen', inFs);
       if (Capacitor.isNativePlatform()) {
-        if (inFullscreen) await SystemBars.hide();
-        else await SystemBars.show();
+        if (inFs) await SystemBars.hide();
+        else if (!window.matchMedia('(orientation: landscape)').matches) await SystemBars.show();
       }
     };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
+  // TV: CSS fullscreen from mount; Mobile: fullscreen tied to orientation
   useEffect(() => {
-    const showVolume = (vol: number) => {
-      setVolumeDisplay(Math.round(vol * 100));
-      if (volumeHideTimer.current !== null) window.clearTimeout(volumeHideTimer.current);
-      volumeHideTimer.current = window.setTimeout(() => setVolumeDisplay(null), 1500);
+    if (!Capacitor.isNativePlatform()) return;
+    if (isTV) {
+      isFullscreenRef.current = true;
+      containerRef.current?.classList.add('kawaz-fullscreen');
+      return () => { containerRef.current?.classList.remove('kawaz-fullscreen'); };
+    }
+    const handleOrientation = async (e: MediaQueryList | MediaQueryListEvent) => {
+      if (e.matches) { if (!document.fullscreenElement) await containerRef.current?.requestFullscreen().catch(() => { }); }
+      else { if (document.fullscreenElement) await document.exitFullscreen().catch(() => { }); }
     };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const video = videoRef.current;
-      if (!video) return;
-      const active = document.activeElement;
-      // On TV, spatial navigation owns arrow keys when focus is on body/document.
-      // Only intercept when a specific element inside the player has focus.
-      const playerFocused = isTV
-        ? !!containerRef.current?.contains(active)
-        : active === document.body || active === document.documentElement || !!containerRef.current?.contains(active);
-      if (!playerFocused) return;
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (video.paused) video.play().catch(() => { });
-        else video.pause();
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        e.stopPropagation();
-        video.currentTime = Math.max(0, video.currentTime - 5);
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        e.stopPropagation();
-        video.currentTime = Math.min(video.duration || 0, video.currentTime + 5);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        e.stopPropagation();
-        const next = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
-        video.volume = next;
-        showVolume(next);
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        e.stopPropagation();
-        const next = Math.max(0, Math.round((video.volume - 0.1) * 10) / 10);
-        video.volume = next;
-        showVolume(next);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown, { capture: true });
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown, { capture: true });
-      if (volumeHideTimer.current !== null) window.clearTimeout(volumeHideTimer.current);
-    };
+    const mq = window.matchMedia('(orientation: landscape)');
+    void handleOrientation(mq);
+    mq.addEventListener('change', handleOrientation);
+    return () => mq.removeEventListener('change', handleOrientation);
   }, []);
+
+  // Clear pending seek/thumb timers on unmount
+  useEffect(() => () => {
+    if (seekDebounceRef.current !== null) window.clearTimeout(seekDebounceRef.current);
+    if (thumbHideTimerRef.current !== null) window.clearTimeout(thumbHideTimerRef.current);
+  }, []);
+
+  // --- Controls actions ---
+
+  const togglePlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    showControls();
+    if (video.paused) video.play().catch(() => { });
+    else video.pause();
+  };
+
+  const toggleMute = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.muted || v.volume === 0) {
+      v.muted = false;
+      if (v.volume === 0) v.volume = 1;
+    } else {
+      v.muted = true;
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.volume = Number(e.target.value);
+    v.muted = false;
+  };
+
+  const seek = (time: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = Math.max(0, Math.min(video.duration || 0, time));
+    setCurrentTime(video.currentTime);
+  };
+
+  const getThumb = async (time: number): Promise<import('shaka-player').ThumbnailData | null> => {
+    const player = playerRef.current;
+    if (!player) return null;
+    const tracks = player.getImageTracks();
+    if (!tracks.length) return null;
+    return await player.getThumbnails(tracks[0].id, time);
+  };
+
+  const updateHoverThumb = (time: number, clientX: number) => {
+    setHoverTime(time);
+    setHoverX(clientX - (containerRef.current?.getBoundingClientRect().left ?? 0));
+    void getThumb(time).then(setHoverThumb);
+  };
+
+  const clearHoverThumb = useCallback(() => {
+    setHoverTime(null);
+    setHoverThumb(null);
+  }, []);
+
+  const handleSeekbarMouseMove = (e: React.MouseEvent<HTMLInputElement>) => {
+    if (!duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    updateHoverThumb(fraction * duration, e.clientX);
+  };
+
+  const handleSeekbarKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    e.stopPropagation();
+    showControls();
+    const video = videoRef.current;
+    if (!video || !duration) return;
+    const step = 10;
+    const base = scrubTime ?? video.currentTime;
+    const newTime = Math.max(0, Math.min(duration, base + (e.key === 'ArrowRight' ? step : -step)));
+    setScrubTime(newTime);
+    const rect = seekbarRef.current?.getBoundingClientRect();
+    const cRect = containerRef.current?.getBoundingClientRect();
+    const clientX = rect && cRect ? rect.left + (newTime / duration) * rect.width : 0;
+    updateHoverThumb(newTime, clientX);
+    if (thumbHideTimerRef.current) window.clearTimeout(thumbHideTimerRef.current);
+    thumbHideTimerRef.current = window.setTimeout(clearHoverThumb, 2000);
+    if (seekDebounceRef.current) window.clearTimeout(seekDebounceRef.current);
+    seekDebounceRef.current = window.setTimeout(() => { seek(newTime); setScrubTime(null); }, 300);
+  };
+
+  const handleSelectAudio = (index: number) => {
+    const player = playerRef.current;
+    if (!player) return;
+    const track = player.getAudioTracks()[index];
+    if (track) player.selectAudioTrack(track);
+    setAudioTracks(player.getAudioTracks());
+    setAudioMenuOpen(false);
+    showControls();
+  };
+
+  const handleSelectCaption = (value: string) => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (value === 'off') {
+      player.selectTextTrack(null);
+      setActiveCaptionId(null);
+    } else {
+      const id = Number(value);
+      const track = captionTracks.find(t => t.id === id);
+      if (track) { player.selectTextTrack(track); setActiveCaptionId(id); }
+    }
+    setCaptionsMenuOpen(false);
+    showControls();
+  };
+
+  const toggleFullscreen = async () => {
+    if (isTV) {
+      const next = !isFullscreenRef.current;
+      isFullscreenRef.current = next;
+      setIsFullscreen(next);
+      containerRef.current?.classList.toggle('kawaz-fullscreen', next);
+      if (!next) {
+        requestAnimationFrame(() => {
+          const h = document.querySelector('h1');
+          if (h) { h.setAttribute('tabindex', '-1'); (h as HTMLElement).focus(); }
+        });
+      }
+    } else {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => { });
+      else await containerRef.current?.requestFullscreen().catch(() => { });
+    }
+    showControls();
+  };
+
+  // Computed values for seekbar / volume slider styling
+  const playedPct = duration > 0 ? ((scrubTime ?? currentTime) / duration) * 100 : 0;
+  const bufferedPct = duration > 0 ? (bufferedEnd / duration) * 100 : 0;
+  const volPct = muted ? 0 : volume * 100;
+
+  // Thumbnail box positioning (clamp to container edges)
+  const thumbW = hoverThumb?.width ?? 0;
+  const thumbH = hoverThumb?.height ?? 0;
+  const containerW = containerRef.current?.clientWidth ?? 0;
+  const thumbLeft = Math.max(8, Math.min(hoverX - thumbW / 2, containerW - thumbW - 8));
+
+  // Chapter markers baked into the seekbar gradient so they appear inside the track
+  const seekbarBg = (() => {
+    const played = '#ef4444';
+    const buf = 'rgba(255,255,255,0.35)';
+    const unplayed = 'rgba(255,255,255,0.15)';
+    const gap = 'rgba(255,255,255,0.9)';
+    if (!chapters.length || !duration || !containerW) {
+      return `linear-gradient(to right, ${played} ${playedPct}%, ${buf} ${playedPct}% ${bufferedPct}%, ${unplayed} ${bufferedPct}% 100%)`;
+    }
+    const sw = Math.max(1, containerW - 24); // seekbar width (px-3 on each side)
+    const halfW = (1.5 / sw) * 100; // 3px marker total, expressed as %
+    const getColor = (p: number) => p < playedPct ? played : p < bufferedPct ? buf : unplayed;
+    const pts = new Set([0, playedPct, bufferedPct, 100]);
+    const ranges: [number, number][] = [];
+    for (const c of chapters) {
+      if (c.startTime <= 0 || c.startTime >= duration) continue;
+      const cp = (c.startTime / duration) * 100;
+      const lo = Math.max(0, cp - halfW), hi = Math.min(100, cp + halfW);
+      pts.add(lo); pts.add(hi); ranges.push([lo, hi]);
+    }
+    const sorted = [...pts].sort((a, b) => a - b);
+    const stops: string[] = [];
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const lo = sorted[i], hi = sorted[i + 1], mid = (lo + hi) / 2;
+      const color = ranges.some(([a, b]) => mid >= a && mid <= b) ? gap : getColor(mid);
+      stops.push(`${color} ${lo.toFixed(4)}%`, `${color} ${hi.toFixed(4)}%`);
+    }
+    return `linear-gradient(to right, ${stops.join(', ')})`;
+  })();
+
+  // Chapter tooltip: derive from hoverX so seekbar keeps all pointer events
+  const seekPad = 12; // px-3
+  const seekW = Math.max(1, containerW - seekPad * 2);
+  const hoverNearChapter = hoverTime !== null && duration > 0 && containerW > 0
+    ? (chapters.find(c => Math.abs(seekPad + (c.startTime / duration) * seekW - hoverX) < 10) ?? null)
+    : null;
 
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
-      <div ref={containerRef} className="relative w-full">
+      <div
+        ref={containerRef}
+        data-spatial-root={isTV ? '' : undefined}
+        className={cn(
+          'kawaz-player-inner relative w-full bg-black',
+          isTV && 'kawaz-tv-player',
+        )}
+        onMouseMove={showControls}
+        onTouchStart={showControls}
+        onMouseLeave={() => { if (!pausedRef.current) scheduleHide(); }}
+      >
         <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} />
+
+        {/* Thumbnail preview */}
+        {hoverThumb && hoverTime !== null && (
+          <div
+            className="pointer-events-none absolute z-20"
+            style={{ bottom: 68, left: thumbLeft }}
+          >
+            <div style={{
+              width: thumbW, height: thumbH,
+              overflow: 'hidden', position: 'relative',
+              background: '#000', borderRadius: 4,
+              boxShadow: '0 2px 10px rgba(0,0,0,0.7)',
+            }}>
+              <img
+                src={hoverThumb.uris[0]}
+                style={{ position: 'absolute', maxWidth: 'none', maxHeight: 'none', left: -hoverThumb.positionX, top: -hoverThumb.positionY }}
+                alt=""
+              />
+            </div>
+            <div style={{ textAlign: 'center', color: '#fff', fontSize: 12, marginTop: 4, textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
+              {formatTime(hoverTime)}
+            </div>
+          </div>
+        )}
+
+        {/* Controls overlay */}
+        <div
+          className={cn(
+            'absolute inset-0 flex flex-col justify-end transition-opacity duration-300',
+            controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
+          )}
+          onClick={() => { showControls(); setChaptersMenuOpen(false); setAudioMenuOpen(false); setCaptionsMenuOpen(false); if (!isTV) togglePlay(); }}
+        >
+          {/* Gradient */}
+          <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent" />
+
+          {/* Chapter name tooltip */}
+          {hoverNearChapter && (
+            <div
+              className="pointer-events-none absolute z-10 rounded bg-black/85 px-2 py-0.5 text-xs text-white"
+              style={{ bottom: 54, left: hoverX, transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}
+            >
+              {hoverNearChapter.title}
+            </div>
+          )}
+
+          {/* Seekbar + chapter marks */}
+          <div
+            className="relative pointer-events-auto px-3 pb-1"
+            style={{ zIndex: 2 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="relative w-full">
+              <input
+                ref={seekbarRef}
+                type="range"
+                className="kawaz-seekbar relative w-full"
+                style={{
+                  zIndex: 2,
+                  background: seekbarBg,
+                }}
+                min={0}
+                max={duration || 100}
+                step={0.5}
+                value={scrubTime ?? currentTime}
+                onChange={e => {
+                  const time = Number(e.target.value);
+                  setScrubTime(time);
+                  if (duration > 0) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clientX = rect.left + (time / duration) * rect.width;
+                    updateHoverThumb(time, clientX);
+                    if (thumbHideTimerRef.current) window.clearTimeout(thumbHideTimerRef.current);
+                    thumbHideTimerRef.current = window.setTimeout(clearHoverThumb, 1500);
+                  }
+                }}
+                onMouseUp={() => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } }}
+                onTouchEnd={() => { if (scrubTime !== null) { seek(scrubTime); setScrubTime(null); } else clearHoverThumb(); }}
+                onMouseMove={handleSeekbarMouseMove}
+                onMouseLeave={clearHoverThumb}
+                onKeyDown={handleSeekbarKeyDown}
+                onFocus={showControls}
+              />
+            </div>
+          </div>
+
+          {/* Bottom controls bar */}
+          <div
+            className="relative flex items-center gap-2 px-3 pb-3 pointer-events-auto"
+            style={{ zIndex: 2 }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Play / Pause */}
+            <button
+              className="kawaz-play-btn shrink-0 rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
+              tabIndex={0}
+              onClick={togglePlay}
+              aria-label={paused ? 'Play' : 'Pause'}
+            >
+              {paused ? <Play size={22} fill="white" /> : <Pause size={22} fill="white" />}
+            </button>
+
+            {/* Time display */}
+            <span className="shrink-0 select-none text-sm tabular-nums text-white">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+
+            {/* Volume (desktop/mobile only; TV uses hardware volume) */}
+            {!isTV && (
+              <>
+                <button
+                  className="hidden sm:inline-flex shrink-0 rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  tabIndex={0}
+                  onClick={toggleMute}
+                  aria-label={muted || volume === 0 ? 'Unmute' : 'Mute'}
+                >
+                  {muted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                </button>
+                <input
+                  type="range"
+                  className="kawaz-vol-slider hidden sm:block w-20 shrink-0"
+                  style={{ background: `linear-gradient(to right, rgba(255,255,255,0.9) ${volPct}%, rgba(255,255,255,0.2) ${volPct}% 100%)` }}
+                  min={0} max={1} step={0.05}
+                  value={muted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                />
+              </>
+            )}
+
+            <div className="flex-1" />
+
+            {/* Chapters dropdown */}
+            {chapters.length > 0 && (
+              <div className="relative shrink-0">
+                <button
+                  className="rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  tabIndex={0}
+                  onClick={() => { setChaptersMenuOpen(o => !o); setAudioMenuOpen(false); setCaptionsMenuOpen(false); }}
+                  aria-label="Chapters"
+                >
+                  <List size={20} />
+                </button>
+                {chaptersMenuOpen && (
+                  <div className="absolute bottom-full right-0 mb-2 max-h-60 w-60 overflow-y-auto rounded bg-black/90 py-1 shadow-lg" style={{ zIndex: 10 }}>
+                    {chapters.map(c => (
+                      <button
+                        key={c.id}
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                        onClick={() => { seek(c.startTime); setChaptersMenuOpen(false); }}
+                      >
+                        <span className="shrink-0 tabular-nums text-xs text-white/50">{formatTime(c.startTime)}</span>
+                        <span className="flex-1 truncate">{c.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Captions panel */}
+            {captionTracks.length > 0 && (
+              <div className="relative shrink-0">
+                <button
+                  className={cn('flex items-center gap-1 rounded px-2 py-1 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500', activeCaptionId !== null ? 'text-red-400' : 'text-white')}
+                  tabIndex={0}
+                  onClick={() => { setCaptionsMenuOpen(o => !o); setAudioMenuOpen(false); setChaptersMenuOpen(false); }}
+                  aria-label="Subtitles"
+                >
+                  <Captions size={16} />
+                  {activeCaptionId !== null && (
+                    <span className="hidden sm:inline text-xs">{displayLanguageNative(captionTracks.find(t => t.id === activeCaptionId)?.language ?? '')}</span>
+                  )}
+                </button>
+                {captionsMenuOpen && (
+                  <div className="absolute bottom-full right-0 mb-2 max-h-60 w-44 overflow-y-auto rounded bg-black/90 py-1 shadow-lg" style={{ zIndex: 10 }}>
+                    <button
+                      className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/10', activeCaptionId === null ? 'text-red-400' : 'text-white')}
+                      onClick={() => handleSelectCaption('off')}
+                    >
+                      <span className="w-4 shrink-0 text-xs">{activeCaptionId === null ? '✓' : ''}</span>
+                      <span>Off</span>
+                    </button>
+                    {captionTracks.map(t => (
+                      <button
+                        key={t.id}
+                        className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/10', t.id === activeCaptionId ? 'text-red-400' : 'text-white')}
+                        onClick={() => handleSelectCaption(String(t.id))}
+                      >
+                        <span className="w-4 shrink-0 text-xs">{t.id === activeCaptionId ? '✓' : ''}</span>
+                        <span className="flex-1 truncate">{displayLanguageNative(t.language)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Audio language panel */}
+            {audioTracks.length > 1 && (
+              <div className="relative shrink-0">
+                <button
+                  className="flex items-center gap-1 rounded px-2 py-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  tabIndex={0}
+                  onClick={() => { setAudioMenuOpen(o => !o); setCaptionsMenuOpen(false); setChaptersMenuOpen(false); }}
+                  aria-label="Audio language"
+                >
+                  <Languages size={16} />
+                  <span className="hidden sm:inline text-xs">{audioTrackLabel(audioTracks.find(t => t.active) ?? audioTracks[0])}</span>
+                </button>
+                {audioMenuOpen && (
+                  <div className="absolute bottom-full right-0 mb-2 max-h-60 w-52 overflow-y-auto rounded bg-black/90 py-1 shadow-lg" style={{ zIndex: 10 }}>
+                    {audioTracks.map((t, i) => (
+                      <button
+                        key={i}
+                        className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/10', t.active ? 'text-red-400' : 'text-white')}
+                        onClick={() => handleSelectAudio(i)}
+                      >
+                        <span className="w-4 shrink-0 text-xs">{t.active ? '✓' : ''}</span>
+                        <span className="flex-1 truncate">{audioTrackLabel(t)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fullscreen */}
+            <button
+              className="shrink-0 rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
+              tabIndex={0}
+              onClick={toggleFullscreen}
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Volume OSD (desktop keyboard shortcuts) */}
         {volumeDisplay !== null && (
           <div className="pointer-events-none absolute left-1/2 top-6 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm">
             {volumeDisplay === 0 ? 'Muted' : `Volume ${volumeDisplay}%`}
           </div>
         )}
+
+
       </div>
-      {isLoadingPlayer && (
-        <p className="mt-2 text-sm text-muted-foreground">Loading player...</p>
-      )}
+
+      {isLoadingPlayer && <p className="mt-2 text-sm text-muted-foreground">Loading player...</p>}
       {playerError && <p className="mt-2 text-sm text-destructive">{playerError}</p>}
     </div>
   );

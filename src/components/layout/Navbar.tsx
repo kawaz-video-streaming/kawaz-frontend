@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { isTV } from '../../lib/platform';
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search, Database } from 'lucide-react';
@@ -73,22 +74,22 @@ export const Navbar = () => {
   };
 
   return (
-    <nav className={`sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md${Capacitor.isNativePlatform() ? ' portrait:pt-8' : ''}`}>
+    <nav className={`sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md${Capacitor.isNativePlatform() && !isTV ? ' portrait:pt-8' : ''}`}>
       <div className="flex items-center px-3 py-3 sm:px-6">
         {/* Left: Navigation Links — flex-1 so center stays naturally centered */}
         <div className="flex flex-1 items-center gap-3 lg:gap-6">
           {isAdmin && (
             <>
-              <Link to="/upload" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <Link to="/upload" className="hidden lg:inline landscape:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
                 Upload
               </Link>
-              <Link to="/collections/new" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground whitespace-nowrap">
+              <Link to="/collections/new" className="hidden lg:inline landscape:inline text-sm text-muted-foreground transition-colors hover:text-foreground whitespace-nowrap">
                 New Collection
               </Link>
-              <Link to="/admin/avatars" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <Link to="/admin/avatars" className="hidden lg:inline landscape:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
                 Avatars
               </Link>
-              <Link to="/admin/genres" className="hidden lg:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <Link to="/admin/genres" className="hidden lg:inline landscape:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
                 Genres
               </Link>
             </>
@@ -119,7 +120,7 @@ export const Navbar = () => {
           {isAdmin && (
             <button
               onClick={toggleSpecialPool}
-              className={`relative hidden lg:flex rounded-lg p-2 transition-colors hover:bg-accent ${specialPool ? 'text-purple-500' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`relative hidden lg:flex landscape:flex rounded-lg p-2 transition-colors hover:bg-accent ${specialPool ? 'text-purple-500' : 'text-muted-foreground hover:text-foreground'}`}
               aria-label={specialPool ? 'Switch to regular pool' : 'Switch to special pool'}
             >
               <Database size={16} />
@@ -131,7 +132,7 @@ export const Navbar = () => {
 
           {/* Processing panel (admin only) — hidden on mobile, BottomNav handles it there */}
           {isAdmin && (
-            <div ref={processingRef} className="relative hidden lg:block">
+            <div ref={processingRef} className="relative hidden lg:block landscape:block">
               <button
                 onClick={() => setProcessingOpen((o) => !o)}
                 className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -150,7 +151,7 @@ export const Navbar = () => {
 
           {/* Pending signups panel (admin only) — hidden on mobile, BottomNav handles it there */}
           {isAdmin && (
-            <div ref={signupsRef} className="relative hidden lg:block">
+            <div ref={signupsRef} className="relative hidden lg:block landscape:block">
               <button
                 onClick={() => setSignupsOpen((o) => !o)}
                 className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

@@ -9,7 +9,7 @@ export const Layout = () => {
       <div className="sticky top-0 z-50">
         <Navbar />
       </div>
-      <main className="flex-1 px-4 pt-8 sm:px-6 lg:px-10 xl:px-16 pb-20 lg:pb-0">
+      <main className="flex-1 px-4 pt-8 sm:px-6 lg:px-10 xl:px-16 pb-20 lg:pb-0 landscape:pb-0">
         <Outlet />
       </main>
       <BottomNav />

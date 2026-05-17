@@ -538,7 +538,7 @@ export const CollectionPage = () => {
       </div>
 
       {items.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
           {items.map((item) =>
             item.type === 'collection' ? (
               <button
@@ -572,12 +572,12 @@ export const CollectionPage = () => {
                 onClick={() => void navigate(`/collections/${id}/videos/${item.data._id}`)}
                 className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
               >
-                <div className="relative w-full pt-[56.25%]">
+                <div className={`relative w-full ${collection.kind === 'collection' ? 'pt-[150%]' : 'pt-[56.25%]'}`}>
                   <ItemThumbnail
                     src={mediaThumbnailUrl(item.data._id, special)}
                     title={item.data.title}
                     focalPoint={item.data.thumbnailFocalPoint}
-                    aspectRatio={16 / 9}
+                    aspectRatio={collection.kind === 'collection' ? 2 / 3 : 16 / 9}
                   />
                 </div>
                 <div className="flex flex-col gap-1 p-3">
@@ -585,15 +585,6 @@ export const CollectionPage = () => {
                   <p className="text-xs text-muted-foreground">{formatDuration(item.data.durationInMs)}</p>
                   {item.data.description && (
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.data.description}</p>
-                  )}
-                  {item.data.genres.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {item.data.genres.map((name) => (
-                        <span key={name} className="rounded-full bg-accent px-2 py-0.5 text-xs text-muted-foreground">
-                          {name}
-                        </span>
-                      ))}
-                    </div>
                   )}
                 </div>
               </button>

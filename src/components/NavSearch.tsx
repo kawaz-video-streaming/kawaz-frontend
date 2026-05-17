@@ -78,7 +78,7 @@ export const NavSearch = ({ open, onClose }: NavSearchProps) => {
 
   return createPortal(
     <div className={`fixed inset-0 z-100 flex flex-col bg-background/95 backdrop-blur-md${Capacitor.isNativePlatform() ? ' portrait:pt-8' : ''}`}>
-      <div className="flex items-center gap-3 border-b border-border px-4 py-4 sm:px-8">
+      <div className="flex items-center gap-3 border-b border-border px-4 py-4 sm:px-8" data-spatial-navzone>
         <Search size={20} className="shrink-0 text-muted-foreground" />
         <input
           ref={inputRef}
