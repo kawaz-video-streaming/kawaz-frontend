@@ -6,7 +6,7 @@ import { SystemBars } from '../plugins/systemBars';
 import { prefetchFirstSegments, formatVideoError } from '../lib/videoUtils';
 import { useTVControls } from '../hooks/useTVControls';
 import { useVideoKeyboard } from '../hooks/useVideoKeyboard';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List } from 'lucide-react';
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
 
@@ -17,6 +17,29 @@ const formatTime = (s: number): string => {
   const sec = Math.floor(s % 60);
   if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   return `${m}:${String(sec).padStart(2, '0')}`;
+};
+
+const displayLanguageNative = (code: string): string => {
+  try {
+    const dn = new Intl.DisplayNames([code, 'en'], { type: 'language' });
+    return dn.of(code) ?? code.toUpperCase();
+  } catch { return code.toUpperCase(); }
+};
+
+const audioChannelLabel = (track: import('shaka-player').AudioTrack): string => {
+  if (track.spatialAudio) return 'Spatial';
+  const ch = track.channelsCount;
+  if (!ch) return '';
+  if (ch <= 1) return 'Mono';
+  if (ch === 2) return 'Stereo';
+  if (ch <= 6) return '5.1';
+  return '7.1';
+};
+
+const audioTrackLabel = (track: import('shaka-player').AudioTrack): string => {
+  const lang = track.label ?? displayLanguageNative(track.language);
+  const ch = audioChannelLabel(track);
+  return ch ? `${lang} · ${ch}` : lang;
 };
 
 interface VideoPlayerProps {
@@ -64,10 +87,12 @@ export const VideoPlayer = ({
 
   // Player features (populated after load)
   const [chapters, setChapters] = useState<import('shaka-player').Chapter[]>([]);
-  const [audioLanguages, setAudioLanguages] = useState<string[]>([]);
-  const [currentAudioLang, setCurrentAudioLang] = useState('');
-  const [hasCaptions, setHasCaptions] = useState(false);
-  const [captionsVisible, setCaptionsVisible] = useState(false);
+  const [audioTracks, setAudioTracks] = useState<import('shaka-player').AudioTrack[]>([]);
+  const [captionTracks, setCaptionTracks] = useState<import('shaka-player').TextTrack[]>([]);
+  const [activeCaptionId, setActiveCaptionId] = useState<number | null>(null);
+  const [chaptersMenuOpen, setChaptersMenuOpen] = useState(false);
+  const [audioMenuOpen, setAudioMenuOpen] = useState(false);
+  const [captionsMenuOpen, setCaptionsMenuOpen] = useState(false);
 
   // Thumbnail hover/seek preview
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -190,6 +215,11 @@ export const VideoPlayer = ({
       }
       const raw = await getPlayerChapters();
       if (isDisposed) return;
+      // Chapters VTT may still be loading — retry until we get data
+      if (raw.length === 0 && attempt < 20) {
+        markerRenderRetryTimer = window.setTimeout(() => void refreshChapters(attempt + 1), 200);
+        return;
+      }
       const dur = video.duration;
       const sorted = raw.filter(c => c.startTime >= 0 && c.startTime < dur).sort((a, b) => a.startTime - b.startTime);
       const deduped: import('shaka-player').Chapter[] = [];
@@ -202,23 +232,19 @@ export const VideoPlayer = ({
 
     const refreshPlayerState = () => {
       if (!player || isDisposed) return;
-      const variants = player.getVariantTracks();
-      const langs = [...new Set(variants.map(t => t.language))].filter(Boolean);
-      setAudioLanguages(langs);
-      setCurrentAudioLang(variants.find(t => t.active)?.language ?? langs[0] ?? '');
-      const textTracks = player.getTextTracks();
-      setHasCaptions(textTracks.length > 0);
-      setCaptionsVisible(player.isTextTrackVisible());
+      setAudioTracks(player.getAudioTracks());
+      const caps = player.getTextTracks().filter(t => t.kind !== 'chapters' && t.kind !== 'metadata');
+      setCaptionTracks(caps);
+      setActiveCaptionId(caps.find(t => t.active)?.id ?? null);
     };
 
     const setupPlayer = async () => {
       setIsLoadingPlayer(true);
       setPlayerError(null);
       setChapters([]);
-      setAudioLanguages([]);
-      setCurrentAudioLang('');
-      setHasCaptions(false);
-      setCaptionsVisible(false);
+      setAudioTracks([]);
+      setCaptionTracks([]);
+      setActiveCaptionId(null);
 
       void prefetchFirstSegments(manifestUrl, special);
 
@@ -243,6 +269,8 @@ export const VideoPlayer = ({
         player = new shaka.Player();
         playerRef.current = player;
         await player.attach(video);
+        // Required for subtitle/caption rendering without the UI overlay
+        player.setVideoContainer(container);
 
         player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
           const uri = request.uris[0];
@@ -414,7 +442,16 @@ export const VideoPlayer = ({
     else video.pause();
   };
 
-  const toggleMute = () => { const v = videoRef.current; if (v) v.muted = !v.muted; };
+  const toggleMute = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.muted || v.volume === 0) {
+      v.muted = false;
+      if (v.volume === 0) v.volume = 1;
+    } else {
+      v.muted = true;
+    }
+  };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = videoRef.current;
@@ -430,17 +467,18 @@ export const VideoPlayer = ({
     setCurrentTime(video.currentTime);
   };
 
-  const getThumb = (time: number): import('shaka-player').ThumbnailData | null => {
+  const getThumb = async (time: number): Promise<import('shaka-player').ThumbnailData | null> => {
     const player = playerRef.current;
     if (!player) return null;
     const tracks = player.getImageTracks();
-    return tracks.length ? player.getThumbnails(tracks[0].id, time) : null;
+    if (!tracks.length) return null;
+    return await player.getThumbnails(tracks[0].id, time);
   };
 
   const updateHoverThumb = (time: number, clientX: number) => {
     setHoverTime(time);
     setHoverX(clientX - (containerRef.current?.getBoundingClientRect().left ?? 0));
-    setHoverThumb(getThumb(time));
+    void getThumb(time).then(setHoverThumb);
   };
 
   const clearHoverThumb = useCallback(() => {
@@ -474,21 +512,28 @@ export const VideoPlayer = ({
     dbg(`SEEK_RAF ct=${video.currentTime.toFixed(1)} new=${newTime.toFixed(1)}`);
   };
 
-  const cycleAudioLanguage = () => {
+  const handleSelectAudio = (index: number) => {
     const player = playerRef.current;
-    if (!player || audioLanguages.length <= 1) return;
-    const next = audioLanguages[(audioLanguages.indexOf(currentAudioLang) + 1) % audioLanguages.length];
-    (player as any).selectAudioLanguage?.(next);
-    setCurrentAudioLang(next);
+    if (!player) return;
+    const track = player.getAudioTracks()[index];
+    if (track) player.selectAudioTrack(track);
+    setAudioTracks(player.getAudioTracks());
+    setAudioMenuOpen(false);
     showControls();
   };
 
-  const toggleCaptions = () => {
+  const handleSelectCaption = (value: string) => {
     const player = playerRef.current;
     if (!player) return;
-    const next = !captionsVisible;
-    player.setTextTrackVisibility(next);
-    setCaptionsVisible(next);
+    if (value === 'off') {
+      player.selectTextTrack(null);
+      setActiveCaptionId(null);
+    } else {
+      const id = Number(value);
+      const track = captionTracks.find(t => t.id === id);
+      if (track) { player.selectTextTrack(track); setActiveCaptionId(id); }
+    }
+    setCaptionsMenuOpen(false);
     showControls();
   };
 
@@ -522,14 +567,50 @@ export const VideoPlayer = ({
   const containerW = containerRef.current?.clientWidth ?? 0;
   const thumbLeft = Math.max(8, Math.min(hoverX - thumbW / 2, containerW - thumbW - 8));
 
+  // Chapter markers baked into the seekbar gradient so they appear inside the track
+  const seekbarBg = (() => {
+    const played = '#ef4444';
+    const buf = 'rgba(255,255,255,0.35)';
+    const unplayed = 'rgba(255,255,255,0.15)';
+    const gap = 'rgba(255,255,255,0.9)';
+    if (!chapters.length || !duration || !containerW) {
+      return `linear-gradient(to right, ${played} ${playedPct}%, ${buf} ${playedPct}% ${bufferedPct}%, ${unplayed} ${bufferedPct}% 100%)`;
+    }
+    const sw = Math.max(1, containerW - 24); // seekbar width (px-3 on each side)
+    const halfW = (1.5 / sw) * 100; // 3px marker total, expressed as %
+    const getColor = (p: number) => p < playedPct ? played : p < bufferedPct ? buf : unplayed;
+    const pts = new Set([0, playedPct, bufferedPct, 100]);
+    const ranges: [number, number][] = [];
+    for (const c of chapters) {
+      if (c.startTime <= 0 || c.startTime >= duration) continue;
+      const cp = (c.startTime / duration) * 100;
+      const lo = Math.max(0, cp - halfW), hi = Math.min(100, cp + halfW);
+      pts.add(lo); pts.add(hi); ranges.push([lo, hi]);
+    }
+    const sorted = [...pts].sort((a, b) => a - b);
+    const stops: string[] = [];
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const lo = sorted[i], hi = sorted[i + 1], mid = (lo + hi) / 2;
+      const color = ranges.some(([a, b]) => mid >= a && mid <= b) ? gap : getColor(mid);
+      stops.push(`${color} ${lo.toFixed(4)}%`, `${color} ${hi.toFixed(4)}%`);
+    }
+    return `linear-gradient(to right, ${stops.join(', ')})`;
+  })();
+
+  // Chapter tooltip: derive from hoverX so seekbar keeps all pointer events
+  const seekPad = 12; // px-3
+  const seekW = Math.max(1, containerW - seekPad * 2);
+  const hoverNearChapter = hoverTime !== null && duration > 0 && containerW > 0
+    ? (chapters.find(c => Math.abs(seekPad + (c.startTime / duration) * seekW - hoverX) < 10) ?? null)
+    : null;
+
   return (
     <div className={cn('kawaz-video-player rounded-lg', className)}>
       <div
         ref={containerRef}
         data-spatial-root={isTV ? '' : undefined}
         className={cn(
-          'relative w-full bg-black',
-          Capacitor.isNativePlatform() && !isTV && 'landscape:max-h-[50vh]',
+          'kawaz-player-inner relative w-full bg-black',
           isTV && 'kawaz-tv-player',
         )}
         onMouseMove={showControls}
@@ -568,10 +649,20 @@ export const VideoPlayer = ({
             'absolute inset-0 flex flex-col justify-end transition-opacity duration-300',
             controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
-          onClick={() => { showControls(); if (!isTV) togglePlay(); }}
+          onClick={() => { showControls(); setChaptersMenuOpen(false); setAudioMenuOpen(false); setCaptionsMenuOpen(false); if (!isTV) togglePlay(); }}
         >
           {/* Gradient */}
           <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent" />
+
+          {/* Chapter name tooltip */}
+          {hoverNearChapter && (
+            <div
+              className="pointer-events-none absolute z-10 rounded bg-black/85 px-2 py-0.5 text-xs text-white"
+              style={{ bottom: 54, left: hoverX, transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}
+            >
+              {hoverNearChapter.title}
+            </div>
+          )}
 
           {/* Seekbar + chapter marks */}
           <div
@@ -580,27 +671,13 @@ export const VideoPlayer = ({
             onClick={e => e.stopPropagation()}
           >
             <div className="relative w-full">
-              {/* Chapter marks */}
-              {duration > 0 && chapters.map(c => (
-                <div
-                  key={c.id}
-                  className="pointer-events-none absolute"
-                  style={{
-                    left: `${(c.startTime / duration) * 100}%`,
-                    top: '50%', width: 2, height: 12,
-                    background: '#dc2626',
-                    transform: 'translate(-50%, -50%)',
-                    zIndex: 3,
-                  }}
-                />
-              ))}
               <input
                 ref={seekbarRef}
                 type="range"
                 className="kawaz-seekbar relative w-full"
                 style={{
                   zIndex: 2,
-                  background: `linear-gradient(to right, #ef4444 ${playedPct}%, rgba(255,255,255,0.35) ${playedPct}% ${bufferedPct}%, rgba(255,255,255,0.15) ${bufferedPct}% 100%)`,
+                  background: seekbarBg,
                 }}
                 min={0}
                 max={duration || 100}
@@ -640,7 +717,7 @@ export const VideoPlayer = ({
             {!isTV && (
               <>
                 <button
-                  className="shrink-0 rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="hidden sm:inline-flex shrink-0 rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
                   tabIndex={0}
                   onClick={toggleMute}
                   aria-label={muted || volume === 0 ? 'Unmute' : 'Mute'}
@@ -649,7 +726,7 @@ export const VideoPlayer = ({
                 </button>
                 <input
                   type="range"
-                  className="kawaz-vol-slider w-20 shrink-0"
+                  className="kawaz-vol-slider hidden sm:block w-20 shrink-0"
                   style={{ background: `linear-gradient(to right, rgba(255,255,255,0.9) ${volPct}%, rgba(255,255,255,0.2) ${volPct}% 100%)` }}
                   min={0} max={1} step={0.05}
                   value={muted ? 0 : volume}
@@ -660,32 +737,99 @@ export const VideoPlayer = ({
 
             <div className="flex-1" />
 
-            {/* Captions toggle */}
-            {hasCaptions && (
-              <button
-                className={cn(
-                  'shrink-0 rounded p-1 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500',
-                  captionsVisible ? 'text-red-400' : 'text-white',
+            {/* Chapters dropdown */}
+            {chapters.length > 0 && (
+              <div className="relative shrink-0">
+                <button
+                  className="rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  tabIndex={0}
+                  onClick={() => { setChaptersMenuOpen(o => !o); setAudioMenuOpen(false); setCaptionsMenuOpen(false); }}
+                  aria-label="Chapters"
+                >
+                  <List size={20} />
+                </button>
+                {chaptersMenuOpen && (
+                  <div className="absolute bottom-full right-0 mb-2 max-h-60 w-60 overflow-y-auto rounded bg-black/90 py-1 shadow-lg" style={{ zIndex: 10 }}>
+                    {chapters.map(c => (
+                      <button
+                        key={c.id}
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                        onClick={() => { seek(c.startTime); setChaptersMenuOpen(false); }}
+                      >
+                        <span className="shrink-0 tabular-nums text-xs text-white/50">{formatTime(c.startTime)}</span>
+                        <span className="flex-1 truncate">{c.title}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
-                tabIndex={0}
-                onClick={toggleCaptions}
-                aria-label="Toggle captions"
-              >
-                <Captions size={20} />
-              </button>
+              </div>
             )}
 
-            {/* Audio language cycle button */}
-            {audioLanguages.length > 1 && (
-              <button
-                className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs font-medium uppercase text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
-                tabIndex={0}
-                onClick={cycleAudioLanguage}
-                aria-label={`Audio: ${currentAudioLang}`}
-              >
-                <Languages size={16} />
-                {currentAudioLang}
-              </button>
+            {/* Captions panel */}
+            {captionTracks.length > 0 && (
+              <div className="relative shrink-0">
+                <button
+                  className={cn('flex items-center gap-1 rounded px-2 py-1 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500', activeCaptionId !== null ? 'text-red-400' : 'text-white')}
+                  tabIndex={0}
+                  onClick={() => { setCaptionsMenuOpen(o => !o); setAudioMenuOpen(false); setChaptersMenuOpen(false); }}
+                  aria-label="Subtitles"
+                >
+                  <Captions size={16} />
+                  {activeCaptionId !== null && (
+                    <span className="hidden sm:inline text-xs">{displayLanguageNative(captionTracks.find(t => t.id === activeCaptionId)?.language ?? '')}</span>
+                  )}
+                </button>
+                {captionsMenuOpen && (
+                  <div className="absolute bottom-full right-0 mb-2 max-h-60 w-44 overflow-y-auto rounded bg-black/90 py-1 shadow-lg" style={{ zIndex: 10 }}>
+                    <button
+                      className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/10', activeCaptionId === null ? 'text-red-400' : 'text-white')}
+                      onClick={() => handleSelectCaption('off')}
+                    >
+                      <span className="w-4 shrink-0 text-xs">{activeCaptionId === null ? '✓' : ''}</span>
+                      <span>Off</span>
+                    </button>
+                    {captionTracks.map(t => (
+                      <button
+                        key={t.id}
+                        className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/10', t.id === activeCaptionId ? 'text-red-400' : 'text-white')}
+                        onClick={() => handleSelectCaption(String(t.id))}
+                      >
+                        <span className="w-4 shrink-0 text-xs">{t.id === activeCaptionId ? '✓' : ''}</span>
+                        <span className="flex-1 truncate">{displayLanguageNative(t.language)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Audio language panel */}
+            {audioTracks.length > 1 && (
+              <div className="relative shrink-0">
+                <button
+                  className="flex items-center gap-1 rounded px-2 py-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  tabIndex={0}
+                  onClick={() => { setAudioMenuOpen(o => !o); setCaptionsMenuOpen(false); setChaptersMenuOpen(false); }}
+                  aria-label="Audio language"
+                >
+                  <Languages size={16} />
+                  <span className="hidden sm:inline text-xs">{audioTrackLabel(audioTracks.find(t => t.active) ?? audioTracks[0])}</span>
+                </button>
+                {audioMenuOpen && (
+                  <div className="absolute bottom-full right-0 mb-2 max-h-60 w-52 overflow-y-auto rounded bg-black/90 py-1 shadow-lg" style={{ zIndex: 10 }}>
+                    {audioTracks.map((t, i) => (
+                      <button
+                        key={i}
+                        className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/10', t.active ? 'text-red-400' : 'text-white')}
+                        onClick={() => handleSelectAudio(i)}
+                      >
+                        <span className="w-4 shrink-0 text-xs">{t.active ? '✓' : ''}</span>
+                        <span className="flex-1 truncate">{audioTrackLabel(t)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Fullscreen */}

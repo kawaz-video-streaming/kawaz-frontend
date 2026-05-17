@@ -188,6 +188,15 @@ a:focus-visible,
   object-fit: contain !important;
 }
 
+/* Landscape non-fullscreen: cap video height so the player doesn't overflow the viewport.
+   The fullscreen rules above (with !important) override this when the player is fullscreen. */
+@media (orientation: landscape) {
+  .kawaz-player-inner:not(.kawaz-fullscreen) video {
+    max-height: calc(100dvh - 9rem);
+    object-fit: contain;
+  }
+}
+
 /* TV D-pad focus ring — use :focus (not just :focus-visible) because Android TV
    WebView may not set the focus-visible flag for remote control navigation. */
 .kawaz-tv-player button:focus {

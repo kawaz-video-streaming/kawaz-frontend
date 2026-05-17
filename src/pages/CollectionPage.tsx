@@ -538,7 +538,7 @@ export const CollectionPage = () => {
       </div>
 
       {items.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 xl:grid-cols-6">
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
           {items.map((item) =>
             item.type === 'collection' ? (
               <button

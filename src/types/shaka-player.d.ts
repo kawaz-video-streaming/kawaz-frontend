@@ -3,6 +3,16 @@ declare module 'shaka-player' {
     function installAll(): void
   }
 
+  interface AudioTrack {
+    language: string
+    label: string | null
+    active: boolean
+    roles: string[]
+    channelsCount: number | null
+    audioSamplingRate: number | null
+    spatialAudio: boolean
+  }
+
   interface VariantTrack {
     id: number
     active: boolean
@@ -37,6 +47,8 @@ declare module 'shaka-player' {
     height: number
     positionX: number
     positionY: number
+    imageWidth: number
+    imageHeight: number
   }
 
   interface ImageTrack {
@@ -55,36 +67,30 @@ declare module 'shaka-player' {
     addChaptersTrack(uri: string, language: string, mimeType?: string): Promise<TextTrack>
     addThumbnailsTrack(uri: string, mimeType?: string): Promise<TextTrack>
     getImageTracks(): ImageTrack[]
-    getThumbnails(trackId: number, time: number): ThumbnailData | null
+    getThumbnails(trackId: number, time: number): Promise<ThumbnailData | null>
     destroy(): Promise<void>
     addEventListener(type: string, listener: EventListenerOrEventListenerObject): void
     removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void
     getVariantTracks(): VariantTrack[]
+    getAudioTracks(): AudioTrack[]
+    selectAudioTrack(track: AudioTrack): void
     getTextTracks(): TextTrack[]
     getChaptersTracks(): TextTrack[]
     getChaptersAsync(language: string): Promise<Chapter[]>
     selectVariantTrack(track: VariantTrack, clearBuffer?: boolean, safeMargin?: number): void
-    selectTextTrack(track: TextTrack): void
-    setTextTrackVisibility(isVisible: boolean): void
+    selectTextTrack(track?: TextTrack | null): void
     isTextTrackVisible(): boolean
+    setVideoContainer(container: HTMLElement | null): void
   }
 
   export { polyfill, Player }
-  export type { Chapter, VariantTrack, TextTrack, ThumbnailData, ImageTrack }
+  export type { Chapter, AudioTrack, VariantTrack, TextTrack, ThumbnailData, ImageTrack }
 }
 
 declare module 'shaka-player/dist/shaka-player.ui.js' {
   import { Player, polyfill } from 'shaka-player'
-  import type { Chapter, VariantTrack, TextTrack } from 'shaka-player'
+  import type { Chapter, AudioTrack, VariantTrack, TextTrack, ThumbnailData, ImageTrack } from 'shaka-player'
 
-  namespace ui {
-    class Overlay {
-      constructor(player: Player, container: HTMLElement, video: HTMLMediaElement)
-      configure(config: string | object, value?: unknown): void
-      destroy(forceDisconnect?: boolean): Promise<void>
-    }
-  }
-
-  export { Player, polyfill, ui }
-  export type { Chapter, VariantTrack, TextTrack, ThumbnailData, ImageTrack }
+  export { Player, polyfill }
+  export type { Chapter, AudioTrack, VariantTrack, TextTrack, ThumbnailData, ImageTrack }
 }
