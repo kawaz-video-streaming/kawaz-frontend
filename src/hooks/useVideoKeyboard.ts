@@ -28,6 +28,10 @@ export function useVideoKeyboard(
         active === document.documentElement ||
         !!containerRef.current?.contains(active);
       if (!playerFocused) return;
+      // When a range input is focused, let the custom seekbar/volume handler own arrow keys
+      const isRangeInput = active instanceof HTMLInputElement && active.type === 'range';
+      if (isRangeInput && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) return;
+
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
