@@ -500,7 +500,7 @@ export const VideoPlayer = ({
     showControls();
     const video = videoRef.current;
     if (!video || !duration) return;
-    const step = Math.max(5, duration / 30);
+    const step = 10;
     const newTime = Math.max(0, Math.min(duration, video.currentTime + (e.key === 'ArrowRight' ? step : -step)));
     seek(newTime);
     const rect = seekbarRef.current?.getBoundingClientRect();
@@ -683,9 +683,20 @@ export const VideoPlayer = ({
                 max={duration || 100}
                 step={0.5}
                 value={currentTime}
-                onChange={e => seek(Number(e.target.value))}
+                onChange={e => {
+                  const time = Number(e.target.value);
+                  seek(time);
+                  if (duration > 0) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clientX = rect.left + (time / duration) * rect.width;
+                    updateHoverThumb(time, clientX);
+                    if (thumbHideTimerRef.current) window.clearTimeout(thumbHideTimerRef.current);
+                    thumbHideTimerRef.current = window.setTimeout(clearHoverThumb, 1500);
+                  }
+                }}
                 onMouseMove={handleSeekbarMouseMove}
                 onMouseLeave={clearHoverThumb}
+                onTouchEnd={clearHoverThumb}
                 onKeyDown={handleSeekbarKeyDown}
                 onFocus={showControls}
               />
