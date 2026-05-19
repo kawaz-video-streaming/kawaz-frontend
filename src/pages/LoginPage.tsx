@@ -159,8 +159,8 @@ export const LoginPage = () => {
           expiresAt: Date.now() + data.expiresIn * 1000,
           interval: data.interval,
         })
-      } catch {
-        toast.error('Could not start Google sign-in. Please try again.', toastError)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not start Google sign-in. Please try again.', toastError)
       } finally {
         setLoading(false)
       }
