@@ -1,15 +1,28 @@
-import { useState, useEffect, type SyntheticEvent } from 'react'
-import { apiUrl } from '../api/client'
+import { useState, useEffect, useRef, useCallback, type SyntheticEvent } from 'react'
+import { Browser } from '@capacitor/browser'
+import { App } from '@capacitor/app'
+import { apiUrl, apiRequest, AuthError } from '../api/client'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Input } from '../components/ui/input'
 import { useAuth } from '../auth/useAuth'
+import { isNative, isTV } from '../lib/platform'
 
 type Mode = 'login' | 'signup' | 'forgot'
 
 const validateUsername = (v: string) => v.length >= 3
 const validatePassword = (v: string) => v.length >= 12
 const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+
+interface DeviceFlowState {
+  deviceCode: string
+  userCode: string
+  verificationUrl: string
+  expiresAt: number
+  interval: number
+}
+
+const toastError = { style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' } }
 
 export const LoginPage = () => {
   const [mode, setMode] = useState<Mode>('login')
@@ -21,6 +34,8 @@ export const LoginPage = () => {
   const [emailTouched, setEmailTouched] = useState(false)
   const [loading, setLoading] = useState(false)
   const [inlineMessage, setInlineMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [deviceFlow, setDeviceFlow] = useState<DeviceFlowState | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { login } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -30,6 +45,132 @@ export const LoginPage = () => {
       setInlineMessage({ type: 'success', text: 'Your account is pending admin approval.' })
     }
   }, [searchParams])
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current !== null) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }, [])
+
+  // Device flow polling
+  useEffect(() => {
+    if (!deviceFlow) return
+
+    const poll = async () => {
+      if (Date.now() >= deviceFlow.expiresAt) {
+        stopPolling()
+        setDeviceFlow(null)
+        toast.error('Sign-in timed out. Please try again.', toastError)
+        return
+      }
+      try {
+        const data = await apiRequest<{
+          status: 'pending' | 'slow_down' | 'approved' | 'denied'
+          role?: string
+          username?: string
+        }>(`/auth/google/device/poll?device_code=${encodeURIComponent(deviceFlow.deviceCode)}`)
+
+        if (data.status === 'approved') {
+          stopPolling()
+          setDeviceFlow(null)
+          login(data.role, data.username)
+          void navigate('/profiles')
+        } else if (data.status === 'denied') {
+          stopPolling()
+          setDeviceFlow(null)
+          toast.error('Sign-in was denied.', toastError)
+        }
+        // 'pending' | 'slow_down' → keep waiting
+      } catch (err) {
+        if (err instanceof AuthError) {
+          // 401 = device code expired
+          stopPolling()
+          setDeviceFlow(null)
+          toast.error('Sign-in timed out. Please try again.', toastError)
+        }
+        // other network hiccups — keep polling
+      }
+    }
+
+    pollRef.current = setInterval(poll, deviceFlow.interval * 1000)
+    return stopPolling
+  }, [deviceFlow, login, navigate, stopPolling])
+
+  // Listen for deep link callback after Chrome Custom Tabs OAuth (mobile native)
+  useEffect(() => {
+    if (!isNative || isTV) return
+
+    const listener = App.addListener('appUrlOpen', (data) => {
+      void Browser.close()
+      const url = new URL(data.url)
+      // com.kawaz.plus://auth/callback → hostname="auth", pathname="/callback"
+      if (url.hostname !== 'auth' || url.pathname !== '/callback') return
+
+      const code = url.searchParams.get('code')
+      const error = url.searchParams.get('error')
+
+      if (url.searchParams.get('pending') === 'true') {
+        setInlineMessage({ type: 'success', text: 'Your account is pending admin approval.' })
+      } else if (error === 'conflict') {
+        setInlineMessage({ type: 'error', text: 'This Google account is already linked to a username/password account. Please sign in manually.' })
+      } else if (error) {
+        toast.error('Google sign-in failed. Please try again.', toastError)
+      } else if (code) {
+        // Exchange the one-time code for the session cookie
+        void apiRequest('/auth/google/native/exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        }).then(() => {
+          login()
+          void navigate('/profiles')
+        }).catch(() => {
+          toast.error('Google sign-in failed. Please try again.', toastError)
+        })
+      }
+    })
+
+    return () => { void listener.then((h) => h.remove()) }
+  }, [login, navigate])
+
+  const handleGoogleClick = async () => {
+    if (!isNative) {
+      // Web: standard server-side OAuth redirect
+      window.location.href = apiUrl('/auth/google/login')
+      return
+    }
+
+    if (isTV) {
+      // TV: device authorization grant (enter code on another device)
+      setLoading(true)
+      try {
+        const data = await apiRequest<{
+          deviceCode: string
+          userCode: string
+          verificationUrl: string
+          expiresIn: number
+          interval: number
+        }>('/auth/google/device/start', { method: 'POST' })
+        setDeviceFlow({
+          deviceCode: data.deviceCode,
+          userCode: data.userCode,
+          verificationUrl: data.verificationUrl,
+          expiresAt: Date.now() + data.expiresIn * 1000,
+          interval: data.interval,
+        })
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not start Google sign-in. Please try again.', toastError)
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    // Mobile native: open OAuth in Chrome Custom Tabs (Google-allowed)
+    // Backend must redirect to com.kawaz.plus://auth/callback on completion
+    await Browser.open({ url: apiUrl('/auth/google/login?return=native'), presentationStyle: 'popover' })
+  }
 
   const usernameValid = validateUsername(username)
   const passwordValid = validatePassword(password)
@@ -92,13 +233,17 @@ export const LoginPage = () => {
       login(undefined, username)
       void navigate('/profiles')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Authentication failed', {
-        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
-      })
+      toast.error(err instanceof Error ? err.message : 'Authentication failed', toastError)
     } finally {
       setLoading(false)
     }
   }
+
+  const subtitle = deviceFlow
+    ? 'Complete sign-in on another device'
+    : mode === 'login' ? 'Sign in to continue watching'
+    : mode === 'signup' ? 'Create your account'
+    : 'Reset your password'
 
   return (
     <div className="dark relative flex min-h-screen items-center justify-center bg-zinc-950 px-4">
@@ -109,154 +254,175 @@ export const LoginPage = () => {
           <h1 className="text-5xl font-extrabold tracking-tight text-white">
             Kawaz<span className="text-red-500">+</span>
           </h1>
-          <p className="mt-3 text-sm text-zinc-400">
-            {mode === 'login' ? 'Sign in to continue watching' : mode === 'signup' ? 'Create your account' : 'Reset your password'}
-          </p>
+          <p className="mt-3 text-sm text-zinc-400">{subtitle}</p>
         </div>
 
         <div className="rounded-2xl bg-zinc-900/80 p-8 shadow-2xl ring-1 ring-white/10 backdrop-blur-sm">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            {mode === 'forgot' ? (
-              <div className="flex flex-col gap-1.5">
-                <Input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onBlur={() => setEmailTouched(true)}
-                  className={[
-                    'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
-                    emailTouched && !emailValid ? 'bg-red-950/60 border-red-700' : '',
-                  ].join(' ')}
-                />
-                {emailTouched && !emailValid && (
-                  <p className="text-xs text-red-400">Enter a valid email address</p>
-                )}
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1.5">
-                  <Input
-                    type="text"
-                    placeholder="Username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    onBlur={() => setUsernameTouched(true)}
-                    className={[
-                      'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
-                      usernameTouched && !usernameValid ? 'bg-red-950/60 border-red-700' : '',
-                    ].join(' ')}
-                  />
-                  {usernameTouched && !usernameValid && (
-                    <p className="text-xs text-red-400">Username must be at least 3 characters</p>
-                  )}
-                </div>
-
-                {mode === 'signup' && (
-                  <div className="flex flex-col gap-1.5">
-                    <Input
-                      type="email"
-                      placeholder="Email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      onBlur={() => setEmailTouched(true)}
-                      className={[
-                        'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
-                        emailTouched && !emailValid ? 'bg-red-950/60 border-red-700' : '',
-                      ].join(' ')}
-                    />
-                    {emailTouched && !emailValid && (
-                      <p className="text-xs text-red-400">Enter a valid email address</p>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-1.5">
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onBlur={() => setPasswordTouched(true)}
-                    className={[
-                      'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
-                      passwordTouched && !passwordValid ? 'bg-red-950/60 border-red-700' : '',
-                    ].join(' ')}
-                  />
-                  {passwordTouched && !passwordValid && (
-                    <p className="text-xs text-red-400">Password must be at least 12 characters</p>
-                  )}
-                </div>
-              </>
-            )}
-
-            {inlineMessage && (
-              <p className={[
-                'rounded-lg px-3 py-2 text-sm text-center',
-                inlineMessage.type === 'success'
-                  ? 'bg-green-950/60 text-green-300 ring-1 ring-green-700'
-                  : 'bg-red-950/60 text-red-300 ring-1 ring-red-700',
-              ].join(' ')}>
-                {inlineMessage.text}
+          {deviceFlow ? (
+            <div className="flex flex-col items-center gap-5 text-center">
+              <p className="text-sm text-zinc-400">On your phone or computer, go to:</p>
+              <p className="text-lg font-semibold text-white break-all">{deviceFlow.verificationUrl}</p>
+              <p className="text-sm text-zinc-400">Then enter this code:</p>
+              <p className="text-5xl font-mono font-black tracking-widest text-red-500 select-all">
+                {deviceFlow.userCode}
               </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || !canSubmit}
-              className="mt-1 w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {loading
-                ? mode === 'login' ? 'Signing in...' : mode === 'signup' ? 'Creating account...' : 'Sending...'
-                : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Sign up' : 'Send reset link'}
-            </button>
-
-            {mode === 'login' && (
+              <div className="flex items-center gap-2 text-zinc-500 mt-1">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-blue-400" />
+                <span className="text-sm">Waiting for sign-in…</span>
+              </div>
               <button
                 type="button"
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors -mt-2"
-                onClick={() => switchMode('forgot')}
+                onClick={() => { stopPolling(); setDeviceFlow(null) }}
+                className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors mt-1"
               >
-                Forgot password?
+                Cancel
               </button>
-            )}
-
-            {mode !== 'forgot' && (
-              <>
-                <div className="flex items-center gap-3 -my-1">
-                  <div className="h-px flex-1 bg-zinc-700" />
-                  <span className="text-xs text-zinc-500">or</span>
-                  <div className="h-px flex-1 bg-zinc-700" />
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+              {mode === 'forgot' ? (
+                <div className="flex flex-col gap-1.5">
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => setEmailTouched(true)}
+                    className={[
+                      'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
+                      emailTouched && !emailValid ? 'bg-red-950/60 border-red-700' : '',
+                    ].join(' ')}
+                  />
+                  {emailTouched && !emailValid && (
+                    <p className="text-xs text-red-400">Enter a valid email address</p>
+                  )}
                 </div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <Input
+                      type="text"
+                      placeholder="Username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      onBlur={() => setUsernameTouched(true)}
+                      className={[
+                        'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
+                        usernameTouched && !usernameValid ? 'bg-red-950/60 border-red-700' : '',
+                      ].join(' ')}
+                    />
+                    {usernameTouched && !usernameValid && (
+                      <p className="text-xs text-red-400">Username must be at least 3 characters</p>
+                    )}
+                  </div>
 
+                  {mode === 'signup' && (
+                    <div className="flex flex-col gap-1.5">
+                      <Input
+                        type="email"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        onBlur={() => setEmailTouched(true)}
+                        className={[
+                          'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
+                          emailTouched && !emailValid ? 'bg-red-950/60 border-red-700' : '',
+                        ].join(' ')}
+                      />
+                      {emailTouched && !emailValid && (
+                        <p className="text-xs text-red-400">Enter a valid email address</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-1.5">
+                    <Input
+                      type="password"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onBlur={() => setPasswordTouched(true)}
+                      className={[
+                        'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
+                        passwordTouched && !passwordValid ? 'bg-red-950/60 border-red-700' : '',
+                      ].join(' ')}
+                    />
+                    {passwordTouched && !passwordValid && (
+                      <p className="text-xs text-red-400">Password must be at least 12 characters</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {inlineMessage && (
+                <p className={[
+                  'rounded-lg px-3 py-2 text-sm text-center',
+                  inlineMessage.type === 'success'
+                    ? 'bg-green-950/60 text-green-300 ring-1 ring-green-700'
+                    : 'bg-red-950/60 text-red-300 ring-1 ring-red-700',
+                ].join(' ')}>
+                  {inlineMessage.text}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || !canSubmit}
+                className="mt-1 w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {loading
+                  ? mode === 'login' ? 'Signing in...' : mode === 'signup' ? 'Creating account...' : 'Sending...'
+                  : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Sign up' : 'Send reset link'}
+              </button>
+
+              {mode === 'login' && (
                 <button
                   type="button"
-                  onClick={() => { window.location.href = apiUrl('/auth/google/login') }}
-                  className="flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700"
+                  className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors -mt-2"
+                  onClick={() => switchMode('forgot')}
                 >
-                  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                    <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/>
-                    <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/>
-                    <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332Z" fill="#FBBC05"/>
-                    <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58Z" fill="#EA4335"/>
-                  </svg>
-                  Sign in with Google
+                  Forgot password?
                 </button>
-              </>
-            )}
+              )}
 
-            <button
-              type="button"
-              className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
-              onClick={() => switchMode(mode === 'forgot' ? 'login' : mode === 'login' ? 'signup' : 'login')}
-            >
-              {mode === 'login'
-                ? "Don't have an account? Sign up"
-                : mode === 'signup'
-                  ? 'Already have an account? Sign in'
-                  : 'Back to sign in'}
-            </button>
-          </form>
+              {mode !== 'forgot' && (
+                <>
+                  <div className="flex items-center gap-3 -my-1">
+                    <div className="h-px flex-1 bg-zinc-700" />
+                    <span className="text-xs text-zinc-500">or</span>
+                    <div className="h-px flex-1 bg-zinc-700" />
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => { void handleGoogleClick() }}
+                    className="flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                      <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/>
+                      <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/>
+                      <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332Z" fill="#FBBC05"/>
+                      <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58Z" fill="#EA4335"/>
+                    </svg>
+                    {isTV ? 'Sign in with Google on another device' : 'Sign in with Google'}
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+                onClick={() => switchMode(mode === 'forgot' ? 'login' : mode === 'login' ? 'signup' : 'login')}
+              >
+                {mode === 'login'
+                  ? "Don't have an account? Sign up"
+                  : mode === 'signup'
+                    ? 'Already have an account? Sign in'
+                    : 'Back to sign in'}
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </div>

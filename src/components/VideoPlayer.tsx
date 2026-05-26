@@ -6,7 +6,21 @@ import { SystemBars } from '../plugins/systemBars';
 import { prefetchFirstSegments, formatVideoError } from '../lib/videoUtils';
 import { useTVControls } from '../hooks/useTVControls';
 import { useVideoKeyboard } from '../hooks/useVideoKeyboard';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List, RotateCcw, RotateCw } from 'lucide-react';
+
+const SkipBackIcon = ({ size = 22 }: { size?: number }) => (
+  <span className="relative inline-flex" style={{ width: size, height: size }}>
+    <RotateCcw size={size} strokeWidth={2.5} />
+    <span aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center font-bold leading-none" style={{ fontSize: Math.max(7, Math.round(size * 0.32)) }}>10</span>
+  </span>
+);
+
+const SkipForwardIcon = ({ size = 22 }: { size?: number }) => (
+  <span className="relative inline-flex" style={{ width: size, height: size }}>
+    <RotateCw size={size} strokeWidth={2.5} />
+    <span aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center font-bold leading-none" style={{ fontSize: Math.max(7, Math.round(size * 0.32)) }}>10</span>
+  </span>
+);
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
 
@@ -70,9 +84,16 @@ export const VideoPlayer = ({
   const seekDebounceRef = useRef<number | null>(null);
   const seekbarRef = useRef<HTMLInputElement>(null);
   const showControlsRef = useRef<() => void>(() => { });
+  const controlsVisibleSyncRef = useRef(true);
+  const controlsVisibleAtTouchStart = useRef(true);
+  const lastPointerTypeRef = useRef('mouse');
+  const lastTapRef = useRef<{ time: number; side: 'left' | 'right' } | null>(null);
+  const skipFeedbackTimerRef = useRef<number | null>(null);
+  const skipAccumulatedRef = useRef(0);
 
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
+  const [skipFeedback, setSkipFeedback] = useState<{ side: 'left' | 'right'; seconds: number } | null>(null);
 
   // Playback state (driven by video element events)
   const [currentTime, setCurrentTime] = useState(0);
@@ -106,13 +127,27 @@ export const VideoPlayer = ({
   const scheduleHide = useCallback(() => {
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     if (!pausedRef.current) {
-      hideTimerRef.current = window.setTimeout(() => setControlsVisible(false), 3500);
+      hideTimerRef.current = window.setTimeout(() => {
+        setControlsVisible(false);
+        controlsVisibleSyncRef.current = false;
+      }, 3500);
     }
   }, []);
 
   const showControls = useCallback(() => {
     setControlsVisible(true);
+    controlsVisibleSyncRef.current = true;
     scheduleHide();
+    if (isTV) {
+      requestAnimationFrame(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const active = document.activeElement;
+        if (!container.contains(active) || active === container) {
+          container.querySelector<HTMLButtonElement>('.kawaz-center-play-btn')?.focus();
+        }
+      });
+    }
   }, [scheduleHide]);
 
   // Keep a stable ref so useTVControls can call showControls without dep-array churn
@@ -135,6 +170,7 @@ export const VideoPlayer = ({
       pausedRef.current = true;
       setPaused(true);
       setControlsVisible(true);
+      controlsVisibleSyncRef.current = true;
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     };
     const onPlay = () => {
@@ -334,7 +370,7 @@ export const VideoPlayer = ({
         }
 
         if (isTV) {
-          requestAnimationFrame(() => container.querySelector<HTMLButtonElement>('.kawaz-play-btn')?.focus());
+          requestAnimationFrame(() => container.querySelector<HTMLButtonElement>('.kawaz-center-play-btn')?.focus());
         }
 
         return () => {
@@ -423,13 +459,40 @@ export const VideoPlayer = ({
     return () => mq.removeEventListener('change', handleOrientation);
   }, []);
 
-  // Clear pending seek/thumb timers on unmount
+  // Clear pending seek/thumb/skip timers on unmount
   useEffect(() => () => {
     if (seekDebounceRef.current !== null) window.clearTimeout(seekDebounceRef.current);
     if (thumbHideTimerRef.current !== null) window.clearTimeout(thumbHideTimerRef.current);
+    if (skipFeedbackTimerRef.current !== null) window.clearTimeout(skipFeedbackTimerRef.current);
   }, []);
 
   // --- Controls actions ---
+
+  const showSkipFeedback = (side: 'left' | 'right') => {
+    if (skipFeedbackTimerRef.current) window.clearTimeout(skipFeedbackTimerRef.current);
+    skipAccumulatedRef.current += 10;
+    setSkipFeedback({ side, seconds: skipAccumulatedRef.current });
+    skipFeedbackTimerRef.current = window.setTimeout(() => {
+      setSkipFeedback(null);
+      skipAccumulatedRef.current = 0;
+    }, 800);
+  };
+
+  const skipBack10 = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = Math.max(0, video.currentTime - 10);
+    setCurrentTime(video.currentTime);
+    showControls();
+  };
+
+  const skipForward10 = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
+    setCurrentTime(video.currentTime);
+    showControls();
+  };
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -613,7 +676,10 @@ export const VideoPlayer = ({
           isTV && 'kawaz-tv-player',
         )}
         onMouseMove={showControls}
-        onTouchStart={showControls}
+        onTouchStart={() => {
+          controlsVisibleAtTouchStart.current = controlsVisibleSyncRef.current;
+          if (!controlsVisibleSyncRef.current) showControls();
+        }}
         onMouseLeave={() => { if (!pausedRef.current) scheduleHide(); }}
       >
         <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} />
@@ -648,10 +714,68 @@ export const VideoPlayer = ({
             'absolute inset-0 flex flex-col justify-end transition-opacity duration-300',
             controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
-          onClick={() => { showControls(); setChaptersMenuOpen(false); setAudioMenuOpen(false); setCaptionsMenuOpen(false); if (!isTV) togglePlay(); }}
+          onPointerDown={(e) => { lastPointerTypeRef.current = e.pointerType; }}
+          onTouchEnd={(e) => {
+            if ((e.target as HTMLElement).closest('button, input')) return;
+            const touch = e.changedTouches[0];
+            const now = Date.now();
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const side: 'left' | 'right' = touch.clientX - rect.left < rect.width / 2 ? 'left' : 'right';
+            const last = lastTapRef.current;
+            if (last && now - last.time < 300 && last.side === side) {
+              lastTapRef.current = null;
+              if (side === 'left') skipBack10(); else skipForward10();
+              showSkipFeedback(side);
+              showControls();
+            } else {
+              lastTapRef.current = { time: now, side };
+              if (controlsVisibleAtTouchStart.current) {
+                setControlsVisible(false);
+                controlsVisibleSyncRef.current = false;
+                if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+              }
+            }
+          }}
+          onClick={() => {
+            if (lastPointerTypeRef.current === 'touch') return;
+            setChaptersMenuOpen(false);
+            setAudioMenuOpen(false);
+            setCaptionsMenuOpen(false);
+            showControls();
+            if (!isTV) togglePlay();
+          }}
         >
           {/* Gradient */}
           <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent" />
+
+          {/* Center playback controls */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-4 sm:gap-8">
+            <button
+              className="pointer-events-auto flex items-center justify-center rounded-full bg-black/30 p-2 sm:p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              tabIndex={controlsVisible ? 0 : -1}
+              onClick={(e) => { e.stopPropagation(); skipBack10(); }}
+              aria-label="Skip back 10 seconds"
+            >
+              <SkipBackIcon size={20} />
+            </button>
+            <button
+              className="kawaz-center-play-btn pointer-events-auto rounded-full bg-black/30 p-2 sm:p-4 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              tabIndex={controlsVisible ? 0 : -1}
+              onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+              aria-label={paused ? 'Play' : 'Pause'}
+            >
+              {paused ? <Play size={36} fill="white" /> : <Pause size={36} fill="white" />}
+            </button>
+            <button
+              className="pointer-events-auto flex items-center justify-center rounded-full bg-black/30 p-2 sm:p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              tabIndex={controlsVisible ? 0 : -1}
+              onClick={(e) => { e.stopPropagation(); skipForward10(); }}
+              aria-label="Skip forward 10 seconds"
+            >
+              <SkipForwardIcon size={20} />
+            </button>
+          </div>
 
           {/* Chapter name tooltip */}
           {hoverNearChapter && (
@@ -854,6 +978,22 @@ export const VideoPlayer = ({
             </button>
           </div>
         </div>
+
+        {/* Double-tap skip feedback */}
+        {skipFeedback && (
+          <div
+            className={cn(
+              'pointer-events-none absolute top-1/2 z-30 -translate-y-1/2 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-white backdrop-blur-sm',
+              skipFeedback.side === 'left' ? 'left-6' : 'right-6',
+            )}
+          >
+            {skipFeedback.side === 'left' ? (
+              <><RotateCcw size={14} /><span className="text-sm font-medium">{skipFeedback.seconds}s</span></>
+            ) : (
+              <><span className="text-sm font-medium">{skipFeedback.seconds}s</span><RotateCw size={14} /></>
+            )}
+          </div>
+        )}
 
         {/* Volume OSD (desktop keyboard shortcuts) */}
         {volumeDisplay !== null && (
