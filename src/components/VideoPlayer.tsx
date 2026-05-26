@@ -714,30 +714,30 @@ export const VideoPlayer = ({
           <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent" />
 
           {/* Center playback controls */}
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-8">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-4 sm:gap-8">
             <button
-              className="pointer-events-auto rounded-full bg-black/30 p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="pointer-events-auto rounded-full bg-black/30 p-2 sm:p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
               tabIndex={controlsVisible ? 0 : -1}
               onClick={(e) => { e.stopPropagation(); skipBack10(); }}
               aria-label="Skip back 10 seconds"
             >
-              <SkipBackIcon size={30} />
+              <SkipBackIcon size={22} />
             </button>
             <button
-              className="kawaz-center-play-btn pointer-events-auto rounded-full bg-black/30 p-4 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="kawaz-center-play-btn pointer-events-auto rounded-full bg-black/30 p-2 sm:p-4 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
               tabIndex={controlsVisible ? 0 : -1}
               onClick={(e) => { e.stopPropagation(); togglePlay(); }}
               aria-label={paused ? 'Play' : 'Pause'}
             >
-              {paused ? <Play size={44} fill="white" /> : <Pause size={44} fill="white" />}
+              {paused ? <Play size={36} fill="white" /> : <Pause size={36} fill="white" />}
             </button>
             <button
-              className="pointer-events-auto rounded-full bg-black/30 p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="pointer-events-auto rounded-full bg-black/30 p-2 sm:p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
               tabIndex={controlsVisible ? 0 : -1}
               onClick={(e) => { e.stopPropagation(); skipForward10(); }}
               aria-label="Skip forward 10 seconds"
             >
-              <SkipForwardIcon size={30} />
+              <SkipForwardIcon size={22} />
             </button>
           </div>
 
@@ -805,24 +805,6 @@ export const VideoPlayer = ({
               aria-label={paused ? 'Play' : 'Pause'}
             >
               {paused ? <Play size={22} fill="white" /> : <Pause size={22} fill="white" />}
-            </button>
-
-            {/* Skip back / forward */}
-            <button
-              className="shrink-0 rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
-              tabIndex={0}
-              onClick={skipBack10}
-              aria-label="Skip back 10 seconds"
-            >
-              <SkipBackIcon size={20} />
-            </button>
-            <button
-              className="shrink-0 rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
-              tabIndex={0}
-              onClick={skipForward10}
-              aria-label="Skip forward 10 seconds"
-            >
-              <SkipForwardIcon size={20} />
             </button>
 
             {/* Time display */}
