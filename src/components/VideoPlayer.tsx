@@ -87,9 +87,13 @@ export const VideoPlayer = ({
   const controlsVisibleSyncRef = useRef(true);
   const controlsVisibleAtTouchStart = useRef(true);
   const lastPointerTypeRef = useRef('mouse');
+  const lastTapRef = useRef<{ time: number; side: 'left' | 'right' } | null>(null);
+  const skipFeedbackTimerRef = useRef<number | null>(null);
+  const skipAccumulatedRef = useRef(0);
 
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
+  const [skipFeedback, setSkipFeedback] = useState<{ side: 'left' | 'right'; seconds: number } | null>(null);
 
   // Playback state (driven by video element events)
   const [currentTime, setCurrentTime] = useState(0);
@@ -455,13 +459,24 @@ export const VideoPlayer = ({
     return () => mq.removeEventListener('change', handleOrientation);
   }, []);
 
-  // Clear pending seek/thumb timers on unmount
+  // Clear pending seek/thumb/skip timers on unmount
   useEffect(() => () => {
     if (seekDebounceRef.current !== null) window.clearTimeout(seekDebounceRef.current);
     if (thumbHideTimerRef.current !== null) window.clearTimeout(thumbHideTimerRef.current);
+    if (skipFeedbackTimerRef.current !== null) window.clearTimeout(skipFeedbackTimerRef.current);
   }, []);
 
   // --- Controls actions ---
+
+  const showSkipFeedback = (side: 'left' | 'right') => {
+    if (skipFeedbackTimerRef.current) window.clearTimeout(skipFeedbackTimerRef.current);
+    skipAccumulatedRef.current += 10;
+    setSkipFeedback({ side, seconds: skipAccumulatedRef.current });
+    skipFeedbackTimerRef.current = window.setTimeout(() => {
+      setSkipFeedback(null);
+      skipAccumulatedRef.current = 0;
+    }, 800);
+  };
 
   const skipBack10 = () => {
     const video = videoRef.current;
@@ -663,7 +678,7 @@ export const VideoPlayer = ({
         onMouseMove={showControls}
         onTouchStart={() => {
           controlsVisibleAtTouchStart.current = controlsVisibleSyncRef.current;
-          showControls();
+          if (!controlsVisibleSyncRef.current) showControls();
         }}
         onMouseLeave={() => { if (!pausedRef.current) scheduleHide(); }}
       >
@@ -700,14 +715,35 @@ export const VideoPlayer = ({
             controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
           onPointerDown={(e) => { lastPointerTypeRef.current = e.pointerType; }}
+          onTouchEnd={(e) => {
+            if ((e.target as HTMLElement).closest('button, input')) return;
+            const touch = e.changedTouches[0];
+            const now = Date.now();
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const side: 'left' | 'right' = touch.clientX - rect.left < rect.width / 2 ? 'left' : 'right';
+            const last = lastTapRef.current;
+            if (last && now - last.time < 300 && last.side === side) {
+              lastTapRef.current = null;
+              if (side === 'left') skipBack10(); else skipForward10();
+              showSkipFeedback(side);
+              showControls();
+            } else {
+              lastTapRef.current = { time: now, side };
+              if (controlsVisibleAtTouchStart.current) {
+                setControlsVisible(false);
+                controlsVisibleSyncRef.current = false;
+                if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+              }
+            }
+          }}
           onClick={() => {
-            showControls();
+            if (lastPointerTypeRef.current === 'touch') return;
             setChaptersMenuOpen(false);
             setAudioMenuOpen(false);
             setCaptionsMenuOpen(false);
-            if (!isTV && (lastPointerTypeRef.current === 'mouse' || controlsVisibleAtTouchStart.current)) {
-              togglePlay();
-            }
+            showControls();
+            if (!isTV) togglePlay();
           }}
         >
           {/* Gradient */}
@@ -942,6 +978,22 @@ export const VideoPlayer = ({
             </button>
           </div>
         </div>
+
+        {/* Double-tap skip feedback */}
+        {skipFeedback && (
+          <div
+            className={cn(
+              'pointer-events-none absolute top-1/2 z-30 -translate-y-1/2 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-white backdrop-blur-sm',
+              skipFeedback.side === 'left' ? 'left-6' : 'right-6',
+            )}
+          >
+            {skipFeedback.side === 'left' ? (
+              <><RotateCcw size={14} /><span className="text-sm font-medium">{skipFeedback.seconds}s</span></>
+            ) : (
+              <><span className="text-sm font-medium">{skipFeedback.seconds}s</span><RotateCw size={14} /></>
+            )}
+          </div>
+        )}
 
         {/* Volume OSD (desktop keyboard shortcuts) */}
         {volumeDisplay !== null && (
