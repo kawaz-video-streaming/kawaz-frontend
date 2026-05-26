@@ -716,12 +716,12 @@ export const VideoPlayer = ({
           {/* Center playback controls */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-4 sm:gap-8">
             <button
-              className="pointer-events-auto rounded-full bg-black/30 p-2 sm:p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="pointer-events-auto flex items-center justify-center rounded-full bg-black/30 p-2 sm:p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
               tabIndex={controlsVisible ? 0 : -1}
               onClick={(e) => { e.stopPropagation(); skipBack10(); }}
               aria-label="Skip back 10 seconds"
             >
-              <SkipBackIcon size={22} />
+              <SkipBackIcon size={20} />
             </button>
             <button
               className="kawaz-center-play-btn pointer-events-auto rounded-full bg-black/30 p-2 sm:p-4 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -732,12 +732,12 @@ export const VideoPlayer = ({
               {paused ? <Play size={36} fill="white" /> : <Pause size={36} fill="white" />}
             </button>
             <button
-              className="pointer-events-auto rounded-full bg-black/30 p-2 sm:p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="pointer-events-auto flex items-center justify-center rounded-full bg-black/30 p-2 sm:p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
               tabIndex={controlsVisible ? 0 : -1}
               onClick={(e) => { e.stopPropagation(); skipForward10(); }}
               aria-label="Skip forward 10 seconds"
             >
-              <SkipForwardIcon size={22} />
+              <SkipForwardIcon size={20} />
             </button>
           </div>
 
