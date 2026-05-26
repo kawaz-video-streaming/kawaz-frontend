@@ -6,7 +6,21 @@ import { SystemBars } from '../plugins/systemBars';
 import { prefetchFirstSegments, formatVideoError } from '../lib/videoUtils';
 import { useTVControls } from '../hooks/useTVControls';
 import { useVideoKeyboard } from '../hooks/useVideoKeyboard';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List, RotateCcw, RotateCw } from 'lucide-react';
+
+const SkipBackIcon = ({ size = 22 }: { size?: number }) => (
+  <span className="relative inline-flex" style={{ width: size, height: size }}>
+    <RotateCcw size={size} strokeWidth={2.5} />
+    <span aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center font-bold leading-none" style={{ fontSize: Math.max(7, Math.round(size * 0.32)) }}>10</span>
+  </span>
+);
+
+const SkipForwardIcon = ({ size = 22 }: { size?: number }) => (
+  <span className="relative inline-flex" style={{ width: size, height: size }}>
+    <RotateCw size={size} strokeWidth={2.5} />
+    <span aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center font-bold leading-none" style={{ fontSize: Math.max(7, Math.round(size * 0.32)) }}>10</span>
+  </span>
+);
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
 
@@ -70,6 +84,9 @@ export const VideoPlayer = ({
   const seekDebounceRef = useRef<number | null>(null);
   const seekbarRef = useRef<HTMLInputElement>(null);
   const showControlsRef = useRef<() => void>(() => { });
+  const controlsVisibleSyncRef = useRef(true);
+  const controlsVisibleAtTouchStart = useRef(true);
+  const lastPointerTypeRef = useRef('mouse');
 
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
@@ -106,13 +123,27 @@ export const VideoPlayer = ({
   const scheduleHide = useCallback(() => {
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     if (!pausedRef.current) {
-      hideTimerRef.current = window.setTimeout(() => setControlsVisible(false), 3500);
+      hideTimerRef.current = window.setTimeout(() => {
+        setControlsVisible(false);
+        controlsVisibleSyncRef.current = false;
+      }, 3500);
     }
   }, []);
 
   const showControls = useCallback(() => {
     setControlsVisible(true);
+    controlsVisibleSyncRef.current = true;
     scheduleHide();
+    if (isTV) {
+      requestAnimationFrame(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const active = document.activeElement;
+        if (!container.contains(active) || active === container) {
+          container.querySelector<HTMLButtonElement>('.kawaz-center-play-btn')?.focus();
+        }
+      });
+    }
   }, [scheduleHide]);
 
   // Keep a stable ref so useTVControls can call showControls without dep-array churn
@@ -135,6 +166,7 @@ export const VideoPlayer = ({
       pausedRef.current = true;
       setPaused(true);
       setControlsVisible(true);
+      controlsVisibleSyncRef.current = true;
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     };
     const onPlay = () => {
@@ -334,7 +366,7 @@ export const VideoPlayer = ({
         }
 
         if (isTV) {
-          requestAnimationFrame(() => container.querySelector<HTMLButtonElement>('.kawaz-play-btn')?.focus());
+          requestAnimationFrame(() => container.querySelector<HTMLButtonElement>('.kawaz-center-play-btn')?.focus());
         }
 
         return () => {
@@ -430,6 +462,22 @@ export const VideoPlayer = ({
   }, []);
 
   // --- Controls actions ---
+
+  const skipBack10 = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = Math.max(0, video.currentTime - 10);
+    setCurrentTime(video.currentTime);
+    showControls();
+  };
+
+  const skipForward10 = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
+    setCurrentTime(video.currentTime);
+    showControls();
+  };
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -613,7 +661,10 @@ export const VideoPlayer = ({
           isTV && 'kawaz-tv-player',
         )}
         onMouseMove={showControls}
-        onTouchStart={showControls}
+        onTouchStart={() => {
+          controlsVisibleAtTouchStart.current = controlsVisibleSyncRef.current;
+          showControls();
+        }}
         onMouseLeave={() => { if (!pausedRef.current) scheduleHide(); }}
       >
         <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} />
@@ -648,10 +699,47 @@ export const VideoPlayer = ({
             'absolute inset-0 flex flex-col justify-end transition-opacity duration-300',
             controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
-          onClick={() => { showControls(); setChaptersMenuOpen(false); setAudioMenuOpen(false); setCaptionsMenuOpen(false); if (!isTV) togglePlay(); }}
+          onPointerDown={(e) => { lastPointerTypeRef.current = e.pointerType; }}
+          onClick={() => {
+            showControls();
+            setChaptersMenuOpen(false);
+            setAudioMenuOpen(false);
+            setCaptionsMenuOpen(false);
+            if (!isTV && (lastPointerTypeRef.current === 'mouse' || controlsVisibleAtTouchStart.current)) {
+              togglePlay();
+            }
+          }}
         >
           {/* Gradient */}
           <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent" />
+
+          {/* Center playback controls */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-8">
+            <button
+              className="pointer-events-auto rounded-full bg-black/30 p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              tabIndex={controlsVisible ? 0 : -1}
+              onClick={(e) => { e.stopPropagation(); skipBack10(); }}
+              aria-label="Skip back 10 seconds"
+            >
+              <SkipBackIcon size={30} />
+            </button>
+            <button
+              className="kawaz-center-play-btn pointer-events-auto rounded-full bg-black/30 p-4 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              tabIndex={controlsVisible ? 0 : -1}
+              onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+              aria-label={paused ? 'Play' : 'Pause'}
+            >
+              {paused ? <Play size={44} fill="white" /> : <Pause size={44} fill="white" />}
+            </button>
+            <button
+              className="pointer-events-auto rounded-full bg-black/30 p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
+              tabIndex={controlsVisible ? 0 : -1}
+              onClick={(e) => { e.stopPropagation(); skipForward10(); }}
+              aria-label="Skip forward 10 seconds"
+            >
+              <SkipForwardIcon size={30} />
+            </button>
+          </div>
 
           {/* Chapter name tooltip */}
           {hoverNearChapter && (
@@ -717,6 +805,24 @@ export const VideoPlayer = ({
               aria-label={paused ? 'Play' : 'Pause'}
             >
               {paused ? <Play size={22} fill="white" /> : <Pause size={22} fill="white" />}
+            </button>
+
+            {/* Skip back / forward */}
+            <button
+              className="shrink-0 rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
+              tabIndex={0}
+              onClick={skipBack10}
+              aria-label="Skip back 10 seconds"
+            >
+              <SkipBackIcon size={20} />
+            </button>
+            <button
+              className="shrink-0 rounded p-1 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-red-500"
+              tabIndex={0}
+              onClick={skipForward10}
+              aria-label="Skip forward 10 seconds"
+            >
+              <SkipForwardIcon size={20} />
             </button>
 
             {/* Time display */}
