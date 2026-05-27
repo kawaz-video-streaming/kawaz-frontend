@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { Database, FolderPlus, Image, Loader2, Tag, Upload, UserPlus } from 'lucide-react'
+import { Database, FolderPlus, Image, Loader2, Mail, Tag, Upload, UserPlus } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { usePendingMedia } from '../../hooks/usePendingMedia'
 import { usePendingUsers } from '../../hooks/usePendingUsers'
@@ -74,6 +74,11 @@ export const BottomNav = () => {
         <Link to="/admin/genres" className={linkCls('/admin/genres')}>
           <Tag size={18} />
           <span>Genres</span>
+        </Link>
+
+        <Link to="/admin/newsletter" className={linkCls('/admin/newsletter')}>
+          <Mail size={18} />
+          <span>Newsletter</span>
         </Link>
 
         <button

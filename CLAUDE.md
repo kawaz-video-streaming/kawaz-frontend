@@ -35,6 +35,7 @@ The project targets Android and iOS via Capacitor. Platform directories (`androi
 - **`capacitor.config.ts`** — app ID (`com.kawaz.plus`), app name, web dir
 - **`assets/`** — source images (`icon.png` 1024×1024, `splash.png` 2732×2732) used by `@capacitor/assets` to generate all density variants
 - **Android release** — built via GitHub Actions (`.github/workflows/android-release.yml`) on tag push. Requires `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_PASSWORD` secrets. Keystore files (`android/keystore.jks`, `android/keystore.properties`) are gitignored.
+- **iOS release** — built via GitHub Actions (`.github/workflows/ios-release.yml`) on tag push. Requires `IOS_CERTIFICATE_BASE64`, `IOS_CERTIFICATE_PASSWORD`, `IOS_PROVISIONING_PROFILE_BASE64`, `APPLE_TEAM_ID`, `APP_STORE_CONNECT_API_KEY_ID`, `APP_STORE_CONNECT_API_KEY_ISSUER_ID`, `APP_STORE_CONNECT_API_KEY_BASE64` secrets.
 - **Android TV / Fire TV** — same APK; `LEANBACK_LAUNCHER` intent-filter added to manifest
 
 ## Architecture
@@ -45,8 +46,8 @@ The project targets Android and iOS via Capacitor. Platform directories (`androi
 - **`src/api/media.ts`** — Media upload, update, delete, and `getUploadingMedia()` (returns pending/processing/failed items; treats 404 as `[]`). Upload accepts optional `collectionId`. All mutating functions accept `special?: boolean` to target the special data pool.
 - **`src/api/mediaCollection.ts`** — Collection CRUD. All functions accept `special?: boolean`.
 - **`src/api/avatar.ts`** — Avatar catalog: list, image URL helper, upload (admin), delete (admin). All functions accept `special?: boolean`; `avatarImageUrl(id, special?)` appends `?special=true` when needed.
-- **`src/api/user.ts`** — User profile CRUD: get, create, update (change avatar), delete.
-- **`src/api/admin.ts`** — Admin user approval: `getPendingUsers()`, `approveUser(username, role)` (role: `'user' | 'special'`), `denyUser(username)`.
+- **`src/api/user.ts`** — User profile CRUD: get, create, update (change avatar), delete. Also `deleteAccount()` (`DELETE /user/account`).
+- **`src/api/admin.ts`** — Admin user approval: `getPendingUsers()`, `approveUser(username, role)` (role: `'user' | 'special'`), `denyUser(username)`. Also `sendNewsletter(subject, body)` (`POST /admin/newsletter`).
 
 ### Auth
 
@@ -66,7 +67,7 @@ TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`.
 - `usePendingMedia(enabled, panelOpen)` — polls in-flight uploads; refetches every 3s when panel is open, 10s when closed
 - `usePendingUsers(enabled, panelOpen)` — polls pending signup queue; refetches every 10s when panel is open, 30s when closed
 
-**Mutation hooks:** `useUploadMedia`, `useUpdateMedia`, `useDeleteMedia`, `useCreateProfile`, `useUpdateProfile`, `useDeleteProfile`, `useCreateCollection`, `useUpdateCollection`, `useDeleteCollection`, `useUploadAvatar`, `useDeleteAvatar`, `useApproveUser`, `useDenyUser`.
+**Mutation hooks:** `useUploadMedia`, `useUpdateMedia`, `useDeleteMedia`, `useCreateProfile`, `useUpdateProfile`, `useDeleteProfile`, `useCreateCollection`, `useUpdateCollection`, `useDeleteCollection`, `useUploadAvatar`, `useDeleteAvatar`, `useApproveUser`, `useDenyUser`, `useDeleteAccount`, `useSendNewsletter`.
 
 ### Video Player
 
@@ -79,15 +80,19 @@ TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`.
 ### Routing
 
 ```
-/login          → LoginPage (public)
-/profiles       → ProfilesPage (protected, no navbar — standalone like login)
-/               → Layout (ProtectedRoute, with Navbar)
-  /             → HomePage (video grid)
-  /upload       → UploadPage (admin)
-  /videos/:id   → VideoPage (player + metadata)
-  /collections/:id     → CollectionPage
-  /collections/new     → CreateCollectionPage (admin)
-  /admin/avatars       → AvatarAdminPage (admin)
+/login              → LoginPage (public)
+/delete-account     → DeleteAccountPage (public — data deletion info for app store compliance)
+/profiles           → ProfilesPage (protected, no navbar — standalone like login)
+/                   → Layout (ProtectedRoute, with Navbar)
+  /                 → HomePage (video grid)
+  /upload           → UploadPage (admin)
+  /videos/:id       → VideoPage (player + metadata)
+  /collections/:id        → CollectionPage
+  /collections/new        → CreateCollectionPage (admin)
+  /admin/avatars          → AvatarAdminPage (admin)
+  /admin/genres           → GenreAdminPage (admin)
+  /admin/newsletter       → NewsletterPage (admin)
+  /account                → AccountPage (protected)
 ```
 
 After login, users land on `/profiles`. Selecting a profile stores it in `AuthContext.selectedProfile` and navigates to `/`.
@@ -96,11 +101,13 @@ After login, users land on `/profiles`. Selecting a profile stores it in `AuthCo
 
 - **ProfilesPage** — Netflix-style profile picker. No navbar. Users select a profile to enter the app. Supports creating (name + avatar picker dialog) and deleting profiles. The avatar picker dialog is a separate modal showing only images grouped by category.
 - **AvatarAdminPage** — Admin-only. Shows all avatar categories (always, even if empty) with fixed-height rows. Supports uploading new avatars (name, category from fixed enum, image) and deleting existing ones with a confirmation dialog.
-- **Navbar** (`src/components/layout/Navbar.tsx`) — Sticky top bar. Left: admin nav links (Upload, New Collection, Avatars) shown only for admins on `lg+` screens. Center: Kawaz+ logo and welcome message. Right: theme toggle, special-pool toggle (Database icon, purple when active), admin processing panel, admin pending signups panel, search icon, avatar menu. Admin panels and pool toggle are `hidden lg:block` — `BottomNav` handles them on mobile.
-- **BottomNav** (`src/components/layout/BottomNav.tsx`) — Mobile-only (`lg:hidden`), admin-only fixed bottom bar. Contains links to Upload, Collection, Avatars, Genres and toggle buttons for special pool, MediaProcessingPanel, and PendingSignupsPanel (both rendered as `fixed inset-x-4 bottom-20` overlays). Shows badge counts on the panel buttons. Uses `env(safe-area-inset-bottom)` for notch padding.
+- **Navbar** (`src/components/layout/Navbar.tsx`) — Sticky top bar. Left: admin "Admin" dropdown (Upload, New Collection, Avatars, Genres, Newsletter) shown only for admins on `lg+` screens. Center: Kawaz+ logo and welcome message. Right: theme toggle, special-pool toggle (Database icon, purple when active), admin processing panel, admin pending signups panel, search icon, avatar menu (Change profile, Account settings, Logout). Admin panels and pool toggle are `hidden lg:block` — `BottomNav` handles them on mobile.
+- **BottomNav** (`src/components/layout/BottomNav.tsx`) — Mobile-only (`lg:hidden`), admin-only fixed bottom bar. Contains links to Upload, Collection, Avatars, Genres, Newsletter and toggle buttons for special pool, MediaProcessingPanel, and PendingSignupsPanel (both rendered as `fixed inset-x-4 bottom-20` overlays). Shows badge counts on the panel buttons. Uses `env(safe-area-inset-bottom)` for notch padding.
 - **NavSearch** (`src/components/NavSearch.tsx`) — Full-screen search overlay, opened by the search icon button in the Navbar. Calls `useVideos()` and `useCollections()` directly (TanStack Query serves cached data, no extra requests). Filters top-level items (no `collectionId`) by title and description substring match. Results appear with portrait thumbnails. Closes on outside click or Escape.
 - **MediaProcessingPanel** (`src/components/MediaProcessingPanel.tsx`) — Dropdown/overlay panel listing all non-ready media with SVG circular progress bars (floored %). Color-coded by status: yellow=pending, blue=processing, red=failed. Supports deleting failed items. Closes on outside click.
 - **PendingSignupsPanel** (`src/components/PendingSignupsPanel.tsx`) — Admin-only dropdown/overlay listing pending user signups (name + email). Two approve buttons: green "User" (regular pool) and blue "Special" (demo pool); Deny requires a second confirmation click. Powered by `usePendingUsers`, `useApproveUser`, `useDenyUser`.
+- **AccountPage** (`src/pages/AccountPage.tsx`) — Shows signed-in username and a danger-zone delete-account flow requiring the user to type their username to confirm. Calls `useDeleteAccount` → `DELETE /user/account`, then logs out and redirects to `/login`.
+- **NewsletterPage** (`src/pages/NewsletterPage.tsx`) — Admin-only. Compose (subject + body textarea) with a live HTML email preview side-by-side. Two-step send confirmation before calling `useSendNewsletter` → `POST /admin/newsletter`.
 
 ### Avatar Categories (fixed enum)
 
