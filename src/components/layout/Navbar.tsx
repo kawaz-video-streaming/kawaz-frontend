@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { isTV } from '../../lib/platform';
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search, Database } from 'lucide-react';
+import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search, Database, Settings } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useTheme } from '../../theme/ThemeContext';
 import { avatarImageUrl } from '../../api/avatar';
@@ -71,6 +71,11 @@ export const Navbar = () => {
   const handleChangeProfile = () => {
     setMenuOpen(false);
     void navigate('/profiles');
+  };
+
+  const handleAccountSettings = () => {
+    setMenuOpen(false);
+    void navigate('/account');
   };
 
   return (
@@ -205,6 +210,13 @@ export const Navbar = () => {
                 >
                   <Users size={15} />
                   Change profile
+                </button>
+                <button
+                  onClick={handleAccountSettings}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <Settings size={15} />
+                  Account settings
                 </button>
                 <div className="my-1 border-t border-border" />
                 <button

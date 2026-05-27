@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type SyntheticEvent } from 'react'
 import { Browser } from '@capacitor/browser'
 import { App } from '@capacitor/app'
+import { Eye, EyeOff } from 'lucide-react'
 import { apiUrl, apiRequest, AuthError } from '../api/client'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -24,13 +25,55 @@ interface DeviceFlowState {
 
 const toastError = { style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' } }
 
+const PasswordInput = ({
+  placeholder,
+  value,
+  onChange,
+  onBlur,
+  hasError,
+}: {
+  placeholder: string
+  value: string
+  onChange: (v: string) => void
+  onBlur: () => void
+  hasError: boolean
+}) => {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative">
+      <Input
+        type={show ? 'text' : 'password'}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        className={[
+          'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500 pr-10',
+          hasError ? 'bg-red-950/60 border-red-700' : '',
+        ].join(' ')}
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+        tabIndex={-1}
+        aria-label={show ? 'Hide password' : 'Show password'}
+      >
+        {show ? <EyeOff size={15} /> : <Eye size={15} />}
+      </button>
+    </div>
+  )
+}
+
 export const LoginPage = () => {
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [email, setEmail] = useState('')
   const [usernameTouched, setUsernameTouched] = useState(false)
   const [passwordTouched, setPasswordTouched] = useState(false)
+  const [confirmPasswordTouched, setConfirmPasswordTouched] = useState(false)
   const [emailTouched, setEmailTouched] = useState(false)
   const [loading, setLoading] = useState(false)
   const [inlineMessage, setInlineMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -175,14 +218,18 @@ export const LoginPage = () => {
   const usernameValid = validateUsername(username)
   const passwordValid = validatePassword(password)
   const emailValid = validateEmail(email)
+  const passwordsMatch = confirmPassword === password
   const canSubmit =
     mode === 'forgot'
       ? emailValid
-      : usernameValid && passwordValid && (mode === 'login' || emailValid)
+      : usernameValid && passwordValid
+        && (mode === 'login' || (emailValid && passwordsMatch && confirmPassword.length > 0))
 
   const switchMode = (next: Mode) => {
     setMode(next)
     setInlineMessage(null)
+    setConfirmPassword('')
+    setConfirmPasswordTouched(false)
   }
 
   const handleSubmit = async (e: SyntheticEvent) => {
@@ -336,21 +383,32 @@ export const LoginPage = () => {
                   )}
 
                   <div className="flex flex-col gap-1.5">
-                    <Input
-                      type="password"
+                    <PasswordInput
                       placeholder="Password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={setPassword}
                       onBlur={() => setPasswordTouched(true)}
-                      className={[
-                        'border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-red-500',
-                        passwordTouched && !passwordValid ? 'bg-red-950/60 border-red-700' : '',
-                      ].join(' ')}
+                      hasError={passwordTouched && !passwordValid}
                     />
                     {passwordTouched && !passwordValid && (
                       <p className="text-xs text-red-400">Password must be at least 12 characters</p>
                     )}
                   </div>
+
+                  {mode === 'signup' && (
+                    <div className="flex flex-col gap-1.5">
+                      <PasswordInput
+                        placeholder="Confirm password"
+                        value={confirmPassword}
+                        onChange={setConfirmPassword}
+                        onBlur={() => setConfirmPasswordTouched(true)}
+                        hasError={confirmPasswordTouched && confirmPassword.length > 0 && !passwordsMatch}
+                      />
+                      {confirmPasswordTouched && confirmPassword.length > 0 && !passwordsMatch && (
+                        <p className="text-xs text-red-400">Passwords do not match</p>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
