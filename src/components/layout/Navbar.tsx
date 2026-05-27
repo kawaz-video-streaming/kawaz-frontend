@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { isTV } from '../../lib/platform';
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search, Database, Settings } from 'lucide-react';
+import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search, Database, Settings, ChevronDown, Upload, FolderPlus, Image, Tag, Mail } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useTheme } from '../../theme/ThemeContext';
 import { avatarImageUrl } from '../../api/avatar';
@@ -17,10 +17,12 @@ export const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const [processingOpen, setProcessingOpen] = useState(false);
   const [signupsOpen, setSignupsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const adminMenuRef = useRef<HTMLDivElement>(null);
   const processingRef = useRef<HTMLDivElement>(null);
   const signupsRef = useRef<HTMLDivElement>(null);
   const { data: pendingItems } = usePendingMedia(isAdmin, processingOpen);
@@ -49,6 +51,18 @@ export const Navbar = () => {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [processingOpen]);
+
+  // Close admin menu on outside click
+  useEffect(() => {
+    if (!adminMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (adminMenuRef.current && !adminMenuRef.current.contains(e.target as Node)) {
+        setAdminMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [adminMenuOpen]);
 
   // Close signups panel on outside click
   useEffect(() => {
@@ -81,23 +95,63 @@ export const Navbar = () => {
   return (
     <nav className={`sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md${Capacitor.isNativePlatform() && !isTV ? ' portrait:pt-8' : ''}`}>
       <div className="flex items-center px-3 py-3 sm:px-6">
-        {/* Left: Navigation Links — flex-1 so center stays naturally centered */}
-        <div className="flex flex-1 items-center gap-3 lg:gap-6">
+        {/* Left: Admin dropdown — flex-1 so center stays naturally centered */}
+        <div className="flex flex-1 items-center">
           {isAdmin && (
-            <>
-              <Link to="/upload" className="hidden lg:inline landscape:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
-                Upload
-              </Link>
-              <Link to="/collections/new" className="hidden lg:inline landscape:inline text-sm text-muted-foreground transition-colors hover:text-foreground whitespace-nowrap">
-                New Collection
-              </Link>
-              <Link to="/admin/avatars" className="hidden lg:inline landscape:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
-                Avatars
-              </Link>
-              <Link to="/admin/genres" className="hidden lg:inline landscape:inline text-sm text-muted-foreground transition-colors hover:text-foreground">
-                Genres
-              </Link>
-            </>
+            <div ref={adminMenuRef} className="relative hidden lg:block landscape:block">
+              <button
+                onClick={() => setAdminMenuOpen((o) => !o)}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                Admin
+                <ChevronDown size={14} className={`transition-transform ${adminMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {adminMenuOpen && (
+                <div className="absolute left-0 top-full mt-2 w-44 rounded-xl border border-border bg-card py-1 shadow-lg z-50">
+                  <Link
+                    to="/upload"
+                    onClick={() => setAdminMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <Upload size={15} />
+                    Upload
+                  </Link>
+                  <Link
+                    to="/collections/new"
+                    onClick={() => setAdminMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <FolderPlus size={15} />
+                    New Collection
+                  </Link>
+                  <Link
+                    to="/admin/avatars"
+                    onClick={() => setAdminMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <Image size={15} />
+                    Avatars
+                  </Link>
+                  <Link
+                    to="/admin/genres"
+                    onClick={() => setAdminMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <Tag size={15} />
+                    Genres
+                  </Link>
+                  <div className="my-1 border-t border-border" />
+                  <Link
+                    to="/admin/newsletter"
+                    onClick={() => setAdminMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <Mail size={15} />
+                    Newsletter
+                  </Link>
+                </div>
+              )}
+            </div>
           )}
         </div>
 

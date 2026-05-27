@@ -20,6 +20,7 @@ import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage'
 import { DeleteAccountPage } from './pages/DeleteAccountPage'
 import { AccountPage } from './pages/AccountPage'
+import { NewsletterPage } from './pages/NewsletterPage'
 
 const AppRoutes = () => {
   useSpatialNavigation()
@@ -48,6 +49,7 @@ const AppRoutes = () => {
         <Route path="admin/avatars" element={<AdminRoute><AvatarAdminPage /></AdminRoute>} />
         <Route path="admin/genres" element={<AdminRoute><GenreAdminPage /></AdminRoute>} />
         <Route path="account" element={<AccountPage />} />
+        <Route path="admin/newsletter" element={<AdminRoute><NewsletterPage /></AdminRoute>} />
       </Route>
     </Routes>
   )

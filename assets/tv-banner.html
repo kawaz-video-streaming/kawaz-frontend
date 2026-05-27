@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
+    background: #09090b;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .blob1 {
+    position: absolute;
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(220,38,38,0.12) 0%, transparent 70%);
+    top: -250px;
+    left: -150px;
+    border-radius: 50%;
+  }
+  .blob2 {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(220,38,38,0.07) 0%, transparent 70%);
+    bottom: -200px;
+    right: -100px;
+    border-radius: 50%;
+  }
+
+  .grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .content {
+    position: relative;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .logo {
+    font-size: 140px;
+    font-weight: 900;
+    letter-spacing: -4px;
+    color: #ffffff;
+    line-height: 1;
+  }
+  .logo span {
+    color: #ef4444;
+  }
+
+  .tagline {
+    font-size: 28px;
+    font-weight: 400;
+    color: #a1a1aa;
+    letter-spacing: 0.5px;
+  }
+
+  .pills {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .pill {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 999px;
+    padding: 8px 20px;
+    font-size: 15px;
+    color: #a1a1aa;
+    letter-spacing: 0.3px;
+  }
+</style>
+</head>
+<body>
+  <div class="blob1"></div>
+  <div class="blob2"></div>
+  <div class="grid"></div>
+
+  <div class="content">
+    <div class="logo">Kawaz<span>+</span></div>
+    <div class="tagline">Your personal streaming app</div>
+    <div class="pills">
+      <div class="pill">MPEG-DASH streaming</div>
+      <div class="pill">Multi-language audio</div>
+      <div class="pill">Your library, anywhere</div>
+    </div>
+  </div>
+</body>
+</html>
