@@ -18,6 +18,8 @@ import { GenreAdminPage } from './pages/GenreAdminPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage'
+import { DeleteAccountPage } from './pages/DeleteAccountPage'
+import { AccountPage } from './pages/AccountPage'
 
 const AppRoutes = () => {
   useSpatialNavigation()
@@ -27,6 +29,7 @@ const AppRoutes = () => {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/auth/callback" element={<OAuthCallbackPage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/delete-account" element={<DeleteAccountPage />} />
       <Route path="/profiles" element={<ProtectedRoute><ProfilesPage /></ProtectedRoute>} />
       <Route
         path="/"
@@ -44,6 +47,7 @@ const AppRoutes = () => {
         <Route path="collections/new" element={<AdminRoute><CreateCollectionPage /></AdminRoute>} />
         <Route path="admin/avatars" element={<AdminRoute><AvatarAdminPage /></AdminRoute>} />
         <Route path="admin/genres" element={<AdminRoute><GenreAdminPage /></AdminRoute>} />
+        <Route path="account" element={<AccountPage />} />
       </Route>
     </Routes>
   )

@@ -20,3 +20,6 @@ export const updateProfile = (profileName: string, avatarId: string) =>
 
 export const deleteProfile = (name: string) =>
   apiRequest<{ message: string }>(`/user/profile/${encodeURIComponent(name)}`, { method: 'DELETE' })
+
+export const deleteAccount = () =>
+  apiRequest<{ message: string }>('/user/account', { method: 'DELETE' })
