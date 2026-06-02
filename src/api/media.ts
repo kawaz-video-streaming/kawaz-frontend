@@ -167,6 +167,39 @@ export const searchTmdbEpisode = (showTitle: string, showYear: number, seasonNum
   return apiRequest<TmdbEpisodeDetails>(`/media/tmdb/episode?${params}`);
 };
 
+export const addSubtitle = async (
+  mediaId: string,
+  file: File,
+  language: string,
+  title: string,
+  special = false,
+): Promise<void> => {
+  const sp = specialParam(special);
+  const { subtitleId, uploadUrl } = await apiRequest<{ subtitleId: string; uploadUrl: string }>(
+    `/media/${mediaId}/subtitle/initiate${sp}`,
+    { method: 'POST' },
+  );
+  await putToStorage(uploadUrl, file);
+  await apiRequest(`/media/${mediaId}/subtitle/complete${sp}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subtitleId, language, title }),
+  });
+};
+
+export const updateSubtitle = (
+  mediaId: string,
+  subtitleId: string,
+  fields: { enabled?: boolean; title?: string },
+  special = false,
+) =>
+  apiRequest(`/media/${mediaId}/subtitle/${subtitleId}${specialParam(special)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  });
+
+
 export const fetchTmdbPoster = async (url: string): Promise<Blob> => {
   const params = new URLSearchParams({ url });
   const response = await fetch(apiUrl(`/media/tmdb/poster?${params}`), { credentials: 'include' });

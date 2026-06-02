@@ -25,7 +25,14 @@ const mediaSchema = z.object({
     })).optional(),
     videoStreams: z.array(z.object({ title: z.string(), durationInMs: z.number() })),
     audioStreams: z.array(z.object({ language: z.string(), title: z.string(), durationInMs: z.number() })),
-    subtitleStreams: z.array(z.object({ language: z.string(), title: z.string(), durationInMs: z.number() })),
+    subtitleStreams: z.array(z.object({
+      language: z.string(),
+      title: z.string(),
+      durationInMs: z.number(),
+      subtitleId: z.string().optional(),
+      fileName: z.string().optional(),
+      enabled: z.boolean().optional(),
+    })),
   }),
 }).loose();
 

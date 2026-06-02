@@ -618,6 +618,8 @@ export const VideoPlayer = ({
     showControls();
   };
 
+  const activeCaptionTrack = captionTracks.find(t => t.id === activeCaptionId) ?? null;
+
   // Computed values for seekbar / volume slider styling
   const playedPct = duration > 0 ? ((scrubTime ?? currentTime) / duration) * 100 : 0;
   const bufferedPct = duration > 0 ? (bufferedEnd / duration) * 100 : 0;
@@ -910,8 +912,10 @@ export const VideoPlayer = ({
                   aria-label="Subtitles"
                 >
                   <Captions size={16} />
-                  {activeCaptionId !== null && (
-                    <span className="hidden sm:inline text-xs">{displayLanguageNative(captionTracks.find(t => t.id === activeCaptionId)?.language ?? '')}</span>
+                  {activeCaptionTrack && (
+                    <span className="hidden sm:inline text-xs">
+                      {activeCaptionTrack.label ? `${displayLanguageNative(activeCaptionTrack.language)} · ${activeCaptionTrack.label}` : displayLanguageNative(activeCaptionTrack.language)}
+                    </span>
                   )}
                 </button>
                 {captionsMenuOpen && (
@@ -930,7 +934,7 @@ export const VideoPlayer = ({
                         onClick={() => handleSelectCaption(String(t.id))}
                       >
                         <span className="w-4 shrink-0 text-xs">{t.id === activeCaptionId ? '✓' : ''}</span>
-                        <span className="flex-1 truncate">{displayLanguageNative(t.language)}</span>
+                        <span className="flex-1 truncate">{t.label ? `${displayLanguageNative(t.language)} · ${t.label}` : displayLanguageNative(t.language)}</span>
                       </button>
                     ))}
                   </div>
