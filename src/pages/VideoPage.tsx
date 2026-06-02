@@ -87,6 +87,7 @@ export const VideoPage = () => {
   const [newSubTitle, setNewSubTitle] = useState('');
   const [renamingSubtitleId, setRenamingSubtitleId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const renameCancelledRef = useRef(false);
 
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
@@ -589,14 +590,21 @@ export const VideoPage = () => {
                     value={renameValue}
                     onChange={e => setRenameValue(e.target.value)}
                     onBlur={() => {
-                      if (renameValue.trim() && renameValue.trim() !== sub.title) {
-                        updateSub({ subtitleId: sub.subtitleId!, title: renameValue.trim() });
+                      if (!renameCancelledRef.current && renameValue.trim() && renameValue.trim() !== sub.title) {
+                        updateSub(
+                          { subtitleId: sub.subtitleId!, title: renameValue.trim() },
+                          { onSuccess: () => setManifestVersion(Date.now()) },
+                        );
                       }
+                      renameCancelledRef.current = false;
                       setRenamingSubtitleId(null);
                     }}
                     onKeyDown={e => {
                       if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                      if (e.key === 'Escape') { setRenamingSubtitleId(null); }
+                      if (e.key === 'Escape') {
+                        renameCancelledRef.current = true;
+                        setRenamingSubtitleId(null);
+                      }
                     }}
                     className="flex-1 rounded-lg border border-border bg-background px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
                   />
