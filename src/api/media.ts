@@ -199,8 +199,6 @@ export const updateSubtitle = (
     body: JSON.stringify(fields),
   });
 
-export const deleteSubtitle = (mediaId: string, subtitleId: string, special = false) =>
-  apiRequest(`/media/${mediaId}/subtitle/${subtitleId}${specialParam(special)}`, { method: 'DELETE' });
 
 export const fetchTmdbPoster = async (url: string): Promise<Blob> => {
   const params = new URLSearchParams({ url });

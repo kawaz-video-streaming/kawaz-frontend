@@ -9,7 +9,6 @@ import { useUpdateMedia } from '../hooks/useUpdateMedia';
 import { useDeleteMedia } from '../hooks/useDeleteMedia';
 import { useAddSubtitle } from '../hooks/useAddSubtitle';
 import { useUpdateSubtitle } from '../hooks/useUpdateSubtitle';
-import { useDeleteSubtitle } from '../hooks/useDeleteSubtitle';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
 import { useAuth } from '../auth/useAuth';
@@ -80,7 +79,6 @@ export const VideoPage = () => {
 
   const { mutate: addSub, isPending: isAddingSub } = useAddSubtitle(id ?? '');
   const { mutate: updateSub } = useUpdateSubtitle(id ?? '');
-  const { mutate: deleteSub } = useDeleteSubtitle(id ?? '');
 
   const [manifestVersion, setManifestVersion] = useState(() => Date.now());
   const [showAddSubtitle, setShowAddSubtitle] = useState(false);
@@ -89,7 +87,6 @@ export const VideoPage = () => {
   const [newSubTitle, setNewSubTitle] = useState('');
   const [renamingSubtitleId, setRenamingSubtitleId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [confirmDeleteSubtitleId, setConfirmDeleteSubtitleId] = useState<string | null>(null);
 
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
@@ -626,30 +623,6 @@ export const VideoPage = () => {
                 >
                   {sub.enabled === false ? 'Off' : 'On'}
                 </button>
-                {confirmDeleteSubtitleId === sub.subtitleId ? (
-                  <>
-                    <button
-                      onClick={() => deleteSub(sub.subtitleId!, { onSuccess: () => { setConfirmDeleteSubtitleId(null); setManifestVersion(Date.now()); } })}
-                      className="shrink-0 text-xs font-medium text-red-500 hover:underline"
-                    >
-                      Confirm
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteSubtitleId(null)}
-                      className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setConfirmDeleteSubtitleId(sub.subtitleId!)}
-                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
-                    aria-label="Delete subtitle"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
               </div>
             ))}
 
