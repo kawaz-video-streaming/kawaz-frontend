@@ -7,6 +7,9 @@ import { useVideo } from '../hooks/useVideo';
 import { useVideos } from '../hooks/useVideos';
 import { useUpdateMedia } from '../hooks/useUpdateMedia';
 import { useDeleteMedia } from '../hooks/useDeleteMedia';
+import { useAddSubtitle } from '../hooks/useAddSubtitle';
+import { useUpdateSubtitle } from '../hooks/useUpdateSubtitle';
+import { useDeleteSubtitle } from '../hooks/useDeleteSubtitle';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
 import { useAuth } from '../auth/useAuth';
@@ -74,6 +77,19 @@ export const VideoPage = () => {
   const { data: collections } = useCollections();
   const { data: allVideos } = useVideos();
   const { data: genreOptions } = useGenres();
+
+  const { mutate: addSub, isPending: isAddingSub } = useAddSubtitle(id ?? '');
+  const { mutate: updateSub } = useUpdateSubtitle(id ?? '');
+  const { mutate: deleteSub } = useDeleteSubtitle(id ?? '');
+
+  const [manifestVersion, setManifestVersion] = useState(() => Date.now());
+  const [showAddSubtitle, setShowAddSubtitle] = useState(false);
+  const [newSubFile, setNewSubFile] = useState<File | null>(null);
+  const [newSubLang, setNewSubLang] = useState('');
+  const [newSubTitle, setNewSubTitle] = useState('');
+  const [renamingSubtitleId, setRenamingSubtitleId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [confirmDeleteSubtitleId, setConfirmDeleteSubtitleId] = useState<string | null>(null);
 
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
@@ -289,6 +305,7 @@ export const VideoPage = () => {
       })()}
 
       <VideoPlayer
+        key={manifestVersion}
         manifestUrl={mediaStreamUrl(video.playUrl, special)}
         chaptersUrl={video.chaptersUrl ? mediaStreamUrl(video.chaptersUrl, special) : undefined}
         thumbnailsUrl={video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined}
@@ -546,6 +563,152 @@ export const VideoPage = () => {
           </>
         )}
       </div>
+
+      {isAdmin && (() => {
+        const managedSubtitles = video.subtitleStreams.filter(s => s.subtitleId);
+        return (
+          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Subtitle Tracks</h3>
+              {!showAddSubtitle && (
+                <button
+                  onClick={() => setShowAddSubtitle(true)}
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  + Add Subtitle
+                </button>
+              )}
+            </div>
+
+            {managedSubtitles.length === 0 && !showAddSubtitle && (
+              <p className="text-sm text-muted-foreground">No managed subtitle tracks yet.</p>
+            )}
+
+            {managedSubtitles.map(sub => (
+              <div key={sub.subtitleId} className="flex items-center gap-3">
+                {renamingSubtitleId === sub.subtitleId ? (
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={e => setRenameValue(e.target.value)}
+                    onBlur={() => {
+                      if (renameValue.trim() && renameValue.trim() !== sub.title) {
+                        updateSub({ subtitleId: sub.subtitleId!, title: renameValue.trim() });
+                      }
+                      setRenamingSubtitleId(null);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                      if (e.key === 'Escape') { setRenamingSubtitleId(null); }
+                    }}
+                    className="flex-1 rounded-lg border border-border bg-background px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                  />
+                ) : (
+                  <button
+                    onClick={() => { setRenamingSubtitleId(sub.subtitleId!); setRenameValue(sub.title); }}
+                    className="flex-1 text-left text-sm hover:text-red-500 transition-colors truncate"
+                  >
+                    {sub.title}
+                    <span className="ml-1.5 text-xs text-muted-foreground">({sub.language})</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => updateSub(
+                    { subtitleId: sub.subtitleId!, enabled: sub.enabled === false },
+                    { onSuccess: () => setManifestVersion(Date.now()) },
+                  )}
+                  className={[
+                    'shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+                    sub.enabled === false
+                      ? 'bg-muted text-muted-foreground'
+                      : 'bg-red-500/10 text-red-500',
+                  ].join(' ')}
+                >
+                  {sub.enabled === false ? 'Off' : 'On'}
+                </button>
+                {confirmDeleteSubtitleId === sub.subtitleId ? (
+                  <>
+                    <button
+                      onClick={() => deleteSub(sub.subtitleId!, { onSuccess: () => { setConfirmDeleteSubtitleId(null); setManifestVersion(Date.now()); } })}
+                      className="shrink-0 text-xs font-medium text-red-500 hover:underline"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteSubtitleId(null)}
+                      className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteSubtitleId(sub.subtitleId!)}
+                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
+                    aria-label="Delete subtitle"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {showAddSubtitle && (
+              <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-3">
+                <input
+                  type="file"
+                  accept=".vtt"
+                  onChange={e => setNewSubFile(e.target.files?.[0] ?? null)}
+                  className="text-sm file:mr-3 file:rounded file:border-0 file:bg-red-500/10 file:px-2 file:py-1 file:text-xs file:font-medium file:text-red-500"
+                />
+                <div className="flex gap-2">
+                  <input
+                    placeholder="Language (e.g. eng)"
+                    value={newSubLang}
+                    onChange={e => setNewSubLang(e.target.value)}
+                    className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                  />
+                  <input
+                    placeholder="Label (e.g. English SDH)"
+                    value={newSubTitle}
+                    onChange={e => setNewSubTitle(e.target.value)}
+                    className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    disabled={!newSubFile || !newSubLang.trim() || !newSubTitle.trim() || isAddingSub}
+                    onClick={() => {
+                      if (!newSubFile || !newSubLang.trim() || !newSubTitle.trim()) return;
+                      addSub(
+                        { file: newSubFile, language: newSubLang.trim(), title: newSubTitle.trim() },
+                        {
+                          onSuccess: () => {
+                            setShowAddSubtitle(false);
+                            setNewSubFile(null);
+                            setNewSubLang('');
+                            setNewSubTitle('');
+                            setManifestVersion(Date.now());
+                          },
+                        },
+                      );
+                    }}
+                    className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-40"
+                  >
+                    {isAddingSub ? 'Uploading…' : 'Upload'}
+                  </button>
+                  <button
+                    onClick={() => { setShowAddSubtitle(false); setNewSubFile(null); setNewSubLang(''); setNewSubTitle(''); }}
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">

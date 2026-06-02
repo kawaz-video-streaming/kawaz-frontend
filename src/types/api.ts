@@ -17,6 +17,9 @@ export interface SubtitleStream {
   language: string
   title: string
   durationInMs: number
+  subtitleId?: string
+  fileName?: string
+  enabled?: boolean
 }
 
 export interface VideoChapter {
