@@ -694,16 +694,16 @@ export const VideoPlayer = ({
           >
             <div style={{
               width: thumbW, height: thumbH,
-              overflow: 'hidden', position: 'relative',
-              background: '#000', borderRadius: 4,
+              // Use background-image so the browser never applies #xywh= media-fragment
+              // spatial clipping (Android TV WebView does this on <img> src, breaking the crop).
+              backgroundImage: `url(${hoverThumb.uris[0].split('#')[0]})`,
+              backgroundPosition: `-${hoverThumb.positionX}px -${hoverThumb.positionY}px`,
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'auto',
+              backgroundColor: '#000',
+              borderRadius: 4,
               boxShadow: '0 2px 10px rgba(0,0,0,0.7)',
-            }}>
-              <img
-                src={hoverThumb.uris[0]}
-                style={{ position: 'absolute', maxWidth: 'none', maxHeight: 'none', left: -hoverThumb.positionX, top: -hoverThumb.positionY }}
-                alt=""
-              />
-            </div>
+            }} />
             <div style={{ textAlign: 'center', color: '#fff', fontSize: 12, marginTop: 4, textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
               {formatTime(hoverTime)}
             </div>

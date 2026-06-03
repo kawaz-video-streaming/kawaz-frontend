@@ -182,7 +182,7 @@ const SectionCarousel = ({
     <div className="relative">
       <div
         ref={viewportRef}
-        className="overflow-hidden"
+        className="overflow-hidden py-1.5 -my-1.5"
         onTouchStart={(e) => {
           touchStartXRef.current = e.touches[0].clientX;
           touchStartYRef.current = e.touches[0].clientY;
