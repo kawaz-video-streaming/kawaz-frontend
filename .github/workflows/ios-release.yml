@@ -106,9 +106,10 @@ jobs:
             -configuration Release \
             -archivePath $RUNNER_TEMP/App.xcarchive \
             CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
-            -allowProvisioningUpdates
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID"
 
       - name: Export IPA
         run: |
