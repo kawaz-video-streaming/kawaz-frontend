@@ -1,7 +1,10 @@
 name: ios-release
 
 on:
-  workflow_dispatch: # tag trigger disabled until iOS setup is complete
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
