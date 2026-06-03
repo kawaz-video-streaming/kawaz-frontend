@@ -157,6 +157,15 @@ export interface TmdbCollectionDetails {
   genres: TmdbGenre[]
 }
 
+export interface TmdbSeasonDetails {
+  id: number
+  name: string
+  overview: string
+  air_date: string | null
+  poster_url: string | null
+  season_number: number
+}
+
 export interface TmdbMovieDetails {
   id: number
   title: string

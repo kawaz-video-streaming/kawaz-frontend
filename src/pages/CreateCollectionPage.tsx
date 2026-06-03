@@ -7,6 +7,7 @@ import { useCreateCollection } from '../hooks/useCreateCollection';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
 import { useTmdbShowSearch } from '../hooks/useTmdbShowSearch';
+import { useTmdbSeasonSearch } from '../hooks/useTmdbSeasonSearch';
 import { getFocalCropArea } from '../lib/focalPoints';
 import { parsePositiveInt } from '../lib/parsePositiveInt';
 import { buildTopographicList } from '../lib/collections';
@@ -83,6 +84,13 @@ export const CreateCollectionPage = () => {
     setThumbnailFocalPoint,
   });
 
+  const seasonTmdb = useTmdbSeasonSearch({
+    thumbnailPreview,
+    setTitle, setDescription, setSeasonNumber,
+    setThumbnail, setThumbnailPreview,
+    setThumbnailFocalPoint,
+  });
+
   const parentOptions = kind === 'season'
     ? (collections ?? []).filter((collection) => collection.kind === 'show')
     : kind === 'collection'
@@ -93,7 +101,8 @@ export const CreateCollectionPage = () => {
 
   useEffect(() => {
     if (kind !== 'show') showTmdb.reset();
-  }, [kind, showTmdb.reset]);
+    if (kind !== 'season') seasonTmdb.reset();
+  }, [kind, showTmdb.reset, seasonTmdb.reset]);
 
   useEffect(() => {
     if (kind === 'show' && parentCollectionId) {
@@ -187,6 +196,7 @@ export const CreateCollectionPage = () => {
           setSeasonNumber('');
           setParentCollectionId('');
           showTmdb.reset();
+          seasonTmdb.reset();
           removeThumbnail();
           reset();
           void navigate('/');
@@ -273,6 +283,66 @@ export const CreateCollectionPage = () => {
                   genres={showTmdb.result.genres.length > 0 ? showTmdb.result.genres : undefined}
                   onApply={() => showTmdb.handleApply(showTmdb.result!)}
                   applying={showTmdb.applying}
+                />
+              )}
+            </div>
+          )}
+
+          {/* TMDB search — season only */}
+          {kind === 'season' && (
+            <div className="flex flex-col gap-2 rounded-xl border border-border bg-accent/30 p-4">
+              <p className="text-sm font-medium">Search TMDB <span className="text-xs font-normal text-muted-foreground">(optional — auto-fills fields)</span></p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={seasonTmdb.showTitle}
+                  onChange={(e) => seasonTmdb.setShowTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), seasonTmdb.handleSearch())}
+                  placeholder="Show title"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+                <input
+                  type="number"
+                  value={seasonTmdb.showYear}
+                  onChange={(e) => seasonTmdb.setShowYear(e.target.value)}
+                  onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                  placeholder="Year"
+                  min={1900}
+                  max={2100}
+                  className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+                <input
+                  type="number"
+                  value={seasonTmdb.season}
+                  onChange={(e) => seasonTmdb.setSeason(e.target.value)}
+                  onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                  placeholder="Season #"
+                  min={1}
+                  className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                />
+                <button
+                  type="button"
+                  onClick={seasonTmdb.handleSearch}
+                  disabled={!seasonTmdb.showTitle.trim() || !seasonTmdb.showYear || !seasonTmdb.season || seasonTmdb.loading}
+                  className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {seasonTmdb.loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  Search
+                </button>
+              </div>
+
+              {seasonTmdb.error && <p className="text-xs text-red-500">{seasonTmdb.error}</p>}
+
+              {seasonTmdb.result && (
+                <TmdbResultCard
+                  imageUrl={seasonTmdb.result.poster_url}
+                  imageAlt={seasonTmdb.result.name}
+                  imageClassName="h-24 w-16"
+                  title={seasonTmdb.result.name}
+                  subtitle={seasonTmdb.result.air_date ? `(${seasonTmdb.result.air_date.slice(0, 4)})` : undefined}
+                  overview={seasonTmdb.result.overview || undefined}
+                  onApply={() => seasonTmdb.handleApply(seasonTmdb.result!)}
+                  applying={seasonTmdb.applying}
                 />
               )}
             </div>
