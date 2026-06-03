@@ -75,6 +75,10 @@ function findNearest(
 
 export function useSpatialNavigation() {
   useEffect(() => {
+    // Throttle: TV hardware fires repeated keydown events at high frequency.
+    // Calling getBoundingClientRect() on all candidates per event overloads slow chips.
+    let lastNavTime = 0
+
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as Element).tagName
       if (tag === 'SELECT') return
@@ -104,6 +108,10 @@ export function useSpatialNavigation() {
       // On native: stop propagation so Shaka Player and other element-level handlers
       // never see arrow keys. On web: allow bubbling so Shaka keeps its keyboard controls.
       if (isNative) e.stopPropagation()
+
+      const now = Date.now()
+      if (now - lastNavTime < 150) return
+      lastNavTime = now
 
       const focused = document.activeElement
       // data-spatial-root: when present on any element, confines D-pad entirely within it.
