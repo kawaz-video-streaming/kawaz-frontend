@@ -1,0 +1,158 @@
+name: tvos-release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.0.app
+
+      - name: Generate tvOS icons from source icon
+        run: |
+          # Large App Store icon: 1280x768 (center 768px square on black canvas)
+          magick assets/icon.png \
+            -resize 768x768 \
+            -gravity center \
+            -background black \
+            -extent 1280x768 \
+            "tvos/App/App/Assets.xcassets/AppIcon.brandassets/App Icon - App Store.imagestack/Back.imagestacklayer/Content.imageset/icon-large.png"
+
+          # Small home screen icon: 400x240
+          magick assets/icon.png \
+            -resize 240x240 \
+            -gravity center \
+            -background black \
+            -extent 400x240 \
+            "tvos/App/App/Assets.xcassets/AppIcon.brandassets/App Icon.imagestack/Back.imagestacklayer/Content.imageset/icon-small.png"
+
+          # Top Shelf Image: 1920x720
+          magick assets/icon.png \
+            -resize 720x720 \
+            -gravity center \
+            -background black \
+            -extent 1920x720 \
+            "tvos/App/App/Assets.xcassets/AppIcon.brandassets/Top Shelf Image.imageset/top-shelf.png"
+
+          # Top Shelf Image Wide: 2320x720
+          magick assets/icon.png \
+            -resize 720x720 \
+            -gravity center \
+            -background black \
+            -extent 2320x720 \
+            "tvos/App/App/Assets.xcassets/AppIcon.brandassets/Top Shelf Image Wide.imageset/top-shelf-wide.png"
+
+      - name: Import signing certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=temporarypassword
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/cert.p12
+          security import $RUNNER_TEMP/cert.p12 \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+      - name: Install tvOS provisioning profile
+        env:
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.TVOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          PP_PATH=$RUNNER_TEMP/tvos-profile.mobileprovision
+          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PP_PATH"
+
+          UUID=$(security cms -D -i "$PP_PATH" \
+            | plutil -extract UUID xml1 -o - - \
+            | sed -n 's/.*<string>\(.*\)<\/string>.*/\1/p')
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID".mobileprovision
+
+          echo "TVOS_PROFILE_UUID=$UUID" >> $GITHUB_ENV
+
+      - name: Create ExportOptions.plist
+        run: |
+          cat > $RUNNER_TEMP/TVExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>${{ secrets.APPLE_TEAM_ID }}</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.kawaz.plus</key>
+                  <string>${{ env.TVOS_PROFILE_UUID }}</string>
+              </dict>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build archive
+        working-directory: tvos/App
+        run: |
+          xcodebuild archive \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk appletvos \
+            -archivePath $RUNNER_TEMP/TVApp.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
+            PROVISIONING_PROFILE="$TVOS_PROFILE_UUID"
+
+      - name: Export IPA
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/TVApp.xcarchive \
+            -exportOptionsPlist $RUNNER_TEMP/TVExportOptions.plist \
+            -exportPath $RUNNER_TEMP/tvos-export
+
+      - name: Upload to App Store Connect
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$API_KEY_BASE64" | base64 --decode \
+            > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
+
+          xcrun altool --upload-app \
+            -f $RUNNER_TEMP/tvos-export/App.ipa \
+            -t appletvos \
+            --apiKey "$API_KEY_ID" \
+            --apiIssuer "$API_ISSUER_ID"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kawaz-tvos-${{ github.ref_name }}
+          path: ${{ runner.temp }}/tvos-export/App.ipa
+          retention-days: 30
