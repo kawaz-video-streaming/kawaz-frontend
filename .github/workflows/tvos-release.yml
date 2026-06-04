@@ -123,7 +123,7 @@ jobs:
             -project App.xcodeproj \
             -scheme App \
             -configuration Release \
-            -sdk appletvos \
+            -destination "generic/platform=tvOS" \
             -archivePath $RUNNER_TEMP/TVApp.xcarchive \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \

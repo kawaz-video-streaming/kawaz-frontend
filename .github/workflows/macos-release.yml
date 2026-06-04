@@ -104,7 +104,7 @@ jobs:
             -project App.xcodeproj \
             -scheme App \
             -configuration Release \
-            -sdk macosx \
+            -destination "generic/platform=macOS" \
             -archivePath $RUNNER_TEMP/MacApp.xcarchive \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
