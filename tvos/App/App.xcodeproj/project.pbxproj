@@ -17,7 +17,7 @@
 		CAFE00000000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CAFE00000000000000000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CAFE00000000000000000008 /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		CAFE00000000000000000019 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		CAFE00000000000000000019 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Cryptexes/OS/System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -169,6 +169,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
+				FRAMEWORK_SEARCH_PATHS = "$(SDKROOT)/System/Cryptexes/OS/System/Library/Frameworks $(inherited)";
 				CURRENT_PROJECT_VERSION = 51;
 				INFOPLIST_FILE = App/Info.plist;
 				MARKETING_VERSION = 1.0.51;
@@ -186,6 +187,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
+				FRAMEWORK_SEARCH_PATHS = "$(SDKROOT)/System/Cryptexes/OS/System/Library/Frameworks $(inherited)";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 51;
 				INFOPLIST_FILE = App/Info.plist;
