@@ -548,10 +548,12 @@ export const VideoPlayer = ({
     setHoverThumb(null);
   }, []);
 
-  // Load the sprite sheet once per media to get its natural pixel dimensions.
-  // background-size: auto can render it at half-size on some Android TV WebViews
-  // (treating it as a 2x image), making each tile occupy half the expected CSS pixels.
-  // Forcing backgroundSize to the sprite's actual pixel dimensions fixes this.
+  // Measure the sprite sheet to get its natural pixel dimensions so we can force an
+  // explicit backgroundSize. background-size: auto can render at half-size on some
+  // Android TV WebViews (treating it as a 2x image). naturalWidth is reliable because
+  // sprite width (~1600px) fits within GPU texture limits; naturalHeight may be
+  // silently downscaled for very tall sprites (4-hour movies produce ~12 960px sheets
+  // that exceed the ~4096px Android TV texture height limit).
   const spriteUrl = hoverThumb?.uris[0].split('#')[0] ?? '';
   useEffect(() => {
     if (!spriteUrl) return;
@@ -559,6 +561,25 @@ export const VideoPlayer = ({
     img.onload = () => setSpriteDims({ w: img.naturalWidth, h: img.naturalHeight });
     img.src = spriteUrl;
   }, [spriteUrl]);
+
+  // Reconstruct the ORIGINAL sprite height from VTT metadata so backgroundPosition
+  // offsets (which Shaka gives in original-pixel space) map to the right rows even
+  // when the TV has downscaled naturalHeight. Width is used as-is (not downscaled).
+  const spriteBgDims = (() => {
+    if (!spriteDims || !hoverThumb || duration <= 0) return spriteDims;
+    const tileW = hoverThumb.width;
+    const tileH = hoverThumb.height;
+    if (!tileW || !tileH) return spriteDims;
+    const cols = Math.round(spriteDims.w / tileW);
+    if (cols <= 0) return spriteDims;
+    // Derive interval from startTime ÷ frameIndex; for the first tile use endTime−startTime.
+    const frameIdx = Math.round(hoverThumb.positionY / tileH) * cols + Math.round(hoverThumb.positionX / tileW);
+    const interval = frameIdx > 0 ? hoverThumb.startTime / frameIdx : hoverThumb.endTime - hoverThumb.startTime;
+    if (interval <= 0) return spriteDims;
+    const totalFrames = Math.max(1, Math.ceil(duration / interval));
+    const rows = Math.ceil(totalFrames / cols);
+    return { w: cols * tileW, h: rows * tileH };
+  })();
 
   const handleSeekbarMouseMove = (e: React.MouseEvent<HTMLInputElement>) => {
     if (!duration) return;
@@ -713,7 +734,7 @@ export const VideoPlayer = ({
               backgroundImage: `url(${hoverThumb.uris[0].split('#')[0]})`,
               backgroundPosition: `-${hoverThumb.positionX}px -${hoverThumb.positionY}px`,
               backgroundRepeat: 'no-repeat',
-              backgroundSize: spriteDims ? `${spriteDims.w}px ${spriteDims.h}px` : 'auto',
+              backgroundSize: spriteBgDims ? `${spriteBgDims.w}px ${spriteBgDims.h}px` : 'auto',
               backgroundColor: '#000',
               borderRadius: 4,
               boxShadow: '0 2px 10px rgba(0,0,0,0.7)',
