@@ -75,28 +75,6 @@ jobs:
 
           echo "MACOS_PROFILE_UUID=$UUID" >> $GITHUB_ENV
 
-      - name: Create ExportOptions.plist
-        run: |
-          cat > $RUNNER_TEMP/MacExportOptions.plist << EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store</string>
-              <key>teamID</key>
-              <string>${{ secrets.APPLE_TEAM_ID }}</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>com.kawaz.plus</key>
-                  <string>${{ env.MACOS_PROFILE_UUID }}</string>
-              </dict>
-              <key>uploadSymbols</key>
-              <true/>
-          </dict>
-          </plist>
-          EOF
-
       - name: Build archive
         working-directory: macos/App
         run: |
@@ -111,12 +89,13 @@ jobs:
             DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
             PROVISIONING_PROFILE="$MACOS_PROFILE_UUID"
 
-      - name: Export package
+      - name: Package into pkg
         run: |
-          xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/MacApp.xcarchive \
-            -exportOptionsPlist $RUNNER_TEMP/MacExportOptions.plist \
-            -exportPath $RUNNER_TEMP/macos-export
+          APP_PATH=$(find $RUNNER_TEMP/MacApp.xcarchive -name "*.app" | head -1)
+          productbuild \
+            --component "$APP_PATH" /Applications \
+            --sign "3rd Party Mac Developer Installer" \
+            $RUNNER_TEMP/App.pkg
 
       - name: Upload to App Store Connect
         env:
@@ -128,9 +107,8 @@ jobs:
           echo "$API_KEY_BASE64" | base64 --decode \
             > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
 
-          PKG=$(find $RUNNER_TEMP/macos-export -name "*.pkg" | head -1)
           xcrun altool --upload-app \
-            -f "$PKG" \
+            -f $RUNNER_TEMP/App.pkg \
             -t osx \
             --apiKey "$API_KEY_ID" \
             --apiIssuer "$API_ISSUER_ID"
@@ -139,5 +117,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kawaz-macos-${{ github.ref_name }}
-          path: ${{ runner.temp }}/macos-export/*.pkg
+          path: ${{ runner.temp }}/App.pkg
           retention-days: 30
