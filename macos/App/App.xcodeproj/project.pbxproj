@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		DECA00000000000000000001 /* KawazApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECA00000000000000000002 /* KawazApp.swift */; };
 		DECA00000000000000000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DECA00000000000000000004 /* Assets.xcassets */; };
+		DECA00000000000000000016 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DECA00000000000000000017 /* WebKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -17,6 +18,7 @@
 		DECA00000000000000000005 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		DECA00000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DECA00000000000000000007 /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DECA00000000000000000017 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -24,6 +26,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DECA00000000000000000016 /* WebKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
