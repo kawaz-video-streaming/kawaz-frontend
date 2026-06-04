@@ -15,6 +15,9 @@ jobs:
       - name: Select Xcode 26
         run: sudo xcode-select -s /Applications/Xcode_26.0.app
 
+      - name: Install ImageMagick
+        run: brew install imagemagick
+
       - name: Generate tvOS icons from source icon
         run: |
           # Large App Store icon: 1280x768 (center 768px square on black canvas)
