@@ -562,9 +562,14 @@ export const VideoPlayer = ({
     img.src = spriteUrl;
   }, [spriteUrl]);
 
-  // Reconstruct the ORIGINAL sprite height from VTT metadata so backgroundPosition
-  // offsets (which Shaka gives in original-pixel space) map to the right rows even
-  // when the TV has downscaled naturalHeight. Width is used as-is (not downscaled).
+  // Reconstruct the ORIGINAL sprite height from VTT metadata to derive scaleY — the
+  // ratio by which Android TV has squished the sprite vertically (naturalHeight capped
+  // at the GPU texture limit, e.g. 8192 px, while width is never downscaled).
+  // We do NOT use the reconstructed height as background-size, because the TV's CSS
+  // compositing engine hits the same GPU limit and clamps large background-size values
+  // exactly like it clamps naturalHeight — landing in the wrong quadrant.
+  // Instead we work in loaded-image coordinate space: scale positionY down by scaleY
+  // and compensate the squish with a CSS transform: scaleY(1/scaleY) on the inner div.
   const spriteBgDims = (() => {
     if (!spriteDims || !hoverThumb || duration <= 0) return spriteDims;
     const tileW = hoverThumb.width;
@@ -580,6 +585,11 @@ export const VideoPlayer = ({
     const rows = Math.ceil(totalFrames / cols);
     return { w: cols * tileW, h: rows * tileH };
   })();
+  // scaleY < 1 when TV has squished the sprite; = 1 otherwise (including when spriteBgDims
+  // falls back to spriteDims, making the ratio exactly 1).
+  const scaleY = spriteBgDims && spriteDims && spriteBgDims.h > 0
+    ? spriteDims.h / spriteBgDims.h
+    : 1;
 
   const handleSeekbarMouseMove = (e: React.MouseEvent<HTMLInputElement>) => {
     if (!duration) return;
@@ -727,18 +737,31 @@ export const VideoPlayer = ({
             className="pointer-events-none absolute z-20"
             style={{ bottom: 68, left: thumbLeft }}
           >
+            {/* Outer div clips to thumbW×thumbH; inner div works in loaded-image coords.
+                When TV has squished the sprite (scaleY < 1), the inner div is height=thumbH*scaleY
+                and CSS scaleY(1/scaleY) stretches it back — GPU matrix transform, no texture limit.
+                backgroundSize stays at loaded-image dims so CSS compositing never exceeds the GPU cap. */}
             <div style={{
               width: thumbW, height: thumbH,
-              // Use background-image so the browser never applies #xywh= media-fragment
-              // spatial clipping (Android TV WebView does this on <img> src, breaking the crop).
-              backgroundImage: `url(${hoverThumb.uris[0].split('#')[0]})`,
-              backgroundPosition: `-${hoverThumb.positionX}px -${hoverThumb.positionY}px`,
-              backgroundRepeat: 'no-repeat',
-              backgroundSize: spriteBgDims ? `${spriteBgDims.w}px ${spriteBgDims.h}px` : 'auto',
+              overflow: 'hidden',
               backgroundColor: '#000',
               borderRadius: 4,
               boxShadow: '0 2px 10px rgba(0,0,0,0.7)',
-            }} />
+            }}>
+              <div style={{
+                width: thumbW,
+                height: scaleY < 1 ? thumbH * scaleY : thumbH,
+                // Use background-image so the browser never applies #xywh= media-fragment
+                // spatial clipping (Android TV WebView does this on <img> src, breaking the crop).
+                backgroundImage: `url(${hoverThumb.uris[0].split('#')[0]})`,
+                backgroundPosition: `-${hoverThumb.positionX}px -${scaleY < 1 ? (hoverThumb.positionY * scaleY).toFixed(2) : hoverThumb.positionY}px`,
+                backgroundRepeat: 'no-repeat',
+                // Explicit loaded-image size fixes background-size:auto rendering at half-size
+                // on some Android TV WebViews that treat the image as 2×.
+                backgroundSize: spriteDims ? `${spriteDims.w}px ${spriteDims.h}px` : 'auto',
+                ...(scaleY < 1 ? { transform: `scaleY(${(1 / scaleY).toFixed(6)})`, transformOrigin: 'top left' } : {}),
+              }} />
+            </div>
             <div style={{ textAlign: 'center', color: '#fff', fontSize: 12, marginTop: 4, textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
               {formatTime(hoverTime)}
             </div>
