@@ -7,15 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		CAFE00000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE00000000000000000002 /* AppDelegate.swift */; };
-		CAFE00000000000000000003 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE00000000000000000004 /* ViewController.swift */; };
+		CAFE00000000000000000001 /* KawazApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE00000000000000000002 /* KawazApp.swift */; };
 		CAFE00000000000000000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE00000000000000000006 /* Assets.xcassets */; };
 		CAFE00000000000000000018 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CAFE00000000000000000019 /* WebKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		CAFE00000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		CAFE00000000000000000004 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		CAFE00000000000000000002 /* KawazApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KawazApp.swift; sourceTree = "<group>"; };
 		CAFE00000000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CAFE00000000000000000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CAFE00000000000000000008 /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -37,8 +35,7 @@
 		CAFE0000000000000000000A /* App */ = {
 			isa = PBXGroup;
 			children = (
-				CAFE00000000000000000002 /* AppDelegate.swift */,
-				CAFE00000000000000000004 /* ViewController.swift */,
+				CAFE00000000000000000002 /* KawazApp.swift */,
 				CAFE00000000000000000006 /* Assets.xcassets */,
 				CAFE00000000000000000007 /* Info.plist */,
 			);
@@ -129,8 +126,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CAFE00000000000000000001 /* AppDelegate.swift in Sources */,
-				CAFE00000000000000000003 /* ViewController.swift in Sources */,
+				CAFE00000000000000000001 /* KawazApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
