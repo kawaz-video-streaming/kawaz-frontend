@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Capacitor } from '@capacitor/core'
+import { isTV } from '../lib/platform'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
 
@@ -132,7 +133,7 @@ export function useSpatialNavigation() {
         const contentFirst = candidates.find(c => !isInNavbar(c.el))
         const first = (contentFirst ?? candidates[0])?.el as HTMLElement | undefined
         first?.focus()
-        first?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        first?.scrollIntoView({ behavior: isTV ? 'instant' : 'smooth', block: 'nearest' })
         return
       }
 
@@ -175,7 +176,7 @@ export function useSpatialNavigation() {
 
       if (nearest) {
         ;(nearest as HTMLElement).focus()
-        nearest.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        nearest.scrollIntoView({ behavior: isTV ? 'instant' : 'smooth', block: 'nearest' })
       }
     }
 

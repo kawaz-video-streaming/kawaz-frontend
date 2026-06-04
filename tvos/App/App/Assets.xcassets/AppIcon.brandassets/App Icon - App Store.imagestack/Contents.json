@@ -1,0 +1,15 @@
+{
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "layers" : [
+    {
+      "filename" : "Back.imagestacklayer"
+    }
+  ],
+  "properties" : {
+    "auto-scaling" : "unset",
+    "on-demand-resource-tags" : []
+  }
+}

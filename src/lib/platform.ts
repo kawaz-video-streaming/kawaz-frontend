@@ -1,10 +1,13 @@
 import { Capacitor } from '@capacitor/core'
 
-export const isNative = Capacitor.isNativePlatform()
+const w = window as Window & { __KAWAZ_PLATFORM__?: string }
 
-// Fire TV / Android TV WebViews sometimes include "Mobile Safari" in their UA
-// (same as phones), but TV devices have no touch screen — maxTouchPoints === 0.
-// Phones always have touch, so this cleanly separates the two.
+// Apple TV WKWebView wrapper injects __KAWAZ_PLATFORM__ = 'tv' at document start
+export const isNative = Capacitor.isNativePlatform() || w.__KAWAZ_PLATFORM__ === 'tv'
+
+// Fire TV / Android TV: Capacitor native with no touch screen
+// Apple TV: WKWebView with __KAWAZ_PLATFORM__ injected by native wrapper
 export const isTV =
-  Capacitor.isNativePlatform() &&
-  (!navigator.userAgent.includes('Mobile') || navigator.maxTouchPoints === 0)
+  (Capacitor.isNativePlatform() &&
+    (!navigator.userAgent.includes('Mobile') || navigator.maxTouchPoints === 0)) ||
+  w.__KAWAZ_PLATFORM__ === 'tv'

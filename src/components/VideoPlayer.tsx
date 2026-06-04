@@ -93,6 +93,7 @@ export const VideoPlayer = ({
 
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
+  const [spriteDims, setSpriteDims] = useState<{ w: number; h: number } | null>(null);
   const [skipFeedback, setSkipFeedback] = useState<{ side: 'left' | 'right'; seconds: number } | null>(null);
 
   // Playback state (driven by video element events)
@@ -272,6 +273,7 @@ export const VideoPlayer = ({
       setAudioTracks([]);
       setCaptionTracks([]);
       setActiveCaptionId(null);
+      setSpriteDims(null);
 
       void prefetchFirstSegments(manifestUrl, special);
 
@@ -546,6 +548,18 @@ export const VideoPlayer = ({
     setHoverThumb(null);
   }, []);
 
+  // Load the sprite sheet once per media to get its natural pixel dimensions.
+  // background-size: auto can render it at half-size on some Android TV WebViews
+  // (treating it as a 2x image), making each tile occupy half the expected CSS pixels.
+  // Forcing backgroundSize to the sprite's actual pixel dimensions fixes this.
+  const spriteUrl = hoverThumb?.uris[0].split('#')[0] ?? '';
+  useEffect(() => {
+    if (!spriteUrl) return;
+    const img = new Image();
+    img.onload = () => setSpriteDims({ w: img.naturalWidth, h: img.naturalHeight });
+    img.src = spriteUrl;
+  }, [spriteUrl]);
+
   const handleSeekbarMouseMove = (e: React.MouseEvent<HTMLInputElement>) => {
     if (!duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -699,7 +713,7 @@ export const VideoPlayer = ({
               backgroundImage: `url(${hoverThumb.uris[0].split('#')[0]})`,
               backgroundPosition: `-${hoverThumb.positionX}px -${hoverThumb.positionY}px`,
               backgroundRepeat: 'no-repeat',
-              backgroundSize: 'auto',
+              backgroundSize: spriteDims ? `${spriteDims.w}px ${spriteDims.h}px` : 'auto',
               backgroundColor: '#000',
               borderRadius: 4,
               boxShadow: '0 2px 10px rgba(0,0,0,0.7)',

@@ -1,6 +1,6 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
-platform :ios, '14.0'
+platform :ios, '16.0'
 use_frameworks!
 
 # workaround to avoid Xcode caching of Pods that requires
@@ -22,5 +22,13 @@ target 'App' do
 end
 
 post_install do |installer|
+  # Disable code signing for all Pod targets — they don't need provisioning
+  # profiles; only the App target does. Without this, passing PROVISIONING_PROFILE
+  # globally to xcodebuild causes errors on Capacitor pod targets.
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+    end
+  end
   assertDeploymentTarget(installer)
 end
