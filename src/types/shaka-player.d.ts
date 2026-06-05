@@ -93,4 +93,41 @@ declare module 'shaka-player/dist/shaka-player.ui.js' {
 
   export { Player, polyfill }
   export type { Chapter, AudioTrack, VariantTrack, TextTrack, ThumbnailData, ImageTrack }
+
+  namespace offline {
+    interface StoredContent {
+      offlineUri: string | null
+      originalManifestUri: string
+      size: number
+      appMetadata: Record<string, unknown>
+      expiration: number
+      isIncomplete: boolean
+    }
+
+    interface StoreOperation {
+      promise: Promise<StoredContent>
+      abort(): void
+    }
+
+    interface OfflineTrack {
+      type: string
+      language: string
+      bandwidth: number
+      id: number
+    }
+
+    class Storage {
+      constructor(player?: Player)
+      configure(config: object | string, value?: unknown): boolean
+      getNetworkingEngine(): {
+        registerRequestFilter(filter: (type: number, request: { uris: string[]; allowCrossSiteCredentials: boolean }) => void): void
+      } | null
+      list(): Promise<StoredContent[]>
+      store(uri: string, appMetadata?: object, mimeType?: string | null): StoreOperation
+      remove(contentUri: string): Promise<void>
+      destroy(): Promise<void>
+    }
+  }
+
+  export { offline }
 }

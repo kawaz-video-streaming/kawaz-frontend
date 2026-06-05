@@ -1,8 +1,8 @@
 import { Capacitor } from '@capacitor/core';
-import { isTV } from '../../lib/platform';
+import { isTV, isNative } from '../../lib/platform';
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search, Database, Settings, ChevronDown, Upload, FolderPlus, Image, Tag, Mail } from 'lucide-react';
+import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search, Database, Settings, ChevronDown, Upload, FolderPlus, Image, Tag, Mail, ArrowDownToLine } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useTheme } from '../../theme/ThemeContext';
 import { avatarImageUrl } from '../../api/avatar';
@@ -225,6 +225,16 @@ export const Navbar = () => {
               </button>
               {signupsOpen && <PendingSignupsPanel onClose={() => setSignupsOpen(false)} />}
             </div>
+          )}
+
+          {isNative && !isTV && (
+            <Link
+              to="/downloads"
+              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Downloads"
+            >
+              <ArrowDownToLine size={16} />
+            </Link>
           )}
 
           <button

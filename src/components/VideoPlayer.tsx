@@ -605,7 +605,11 @@ export const VideoPlayer = ({
     const canvas = thumbCanvasRef.current;
     const img = spriteImgRef.current;
     if (!canvas || !img || !hoverThumb) return;
-    const ctx = canvas.getContext('2d');
+    // willReadFrequently forces Chromium's software (CPU) rendering path, which reads
+    // from the fully-decoded image in RAM. Without it, drawImage uses the GPU texture,
+    // which is capped at the device's GL_MAX_TEXTURE_SIZE (~12 288 px on this TV) and
+    // wraps for y > cap — showing the wrong frame for videos longer than ~3:47 h.
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
     const tileW = hoverThumb.width;
     const tileH = hoverThumb.height;

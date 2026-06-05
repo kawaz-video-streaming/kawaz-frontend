@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router';
 import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
 import { useVideos } from '../hooks/useVideos';
 import { useCollections } from '../hooks/useCollections';
-import { mediaThumbnailUrl } from '../api/media';
+import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
 import { collectionThumbnailUrl } from '../api/mediaCollection';
 import { useAuth } from '../auth/useAuth';
 import { ORIENTATION_CONFIG } from '../hooks/useThumbnailOrientation';
 import { getObjectPositionFromFocalPoint } from '../lib/focalPoints';
 import type { CollectionListItem, VideoListItem, Coordinates } from '../types/api';
+import { isNative, isTV } from '../lib/platform';
+import { DownloadButton } from '../components/DownloadButton';
 
 const formatDuration = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000);
@@ -384,6 +386,27 @@ export const HomePage = () => {
             focalPoint={item.data.thumbnailFocalPoint}
             aspectRatio={config.aspectRatio}
           />
+          {isNative && !isTV && (
+            <div className="absolute bottom-1.5 right-1.5">
+              <DownloadButton
+                compact
+                mediaId={item.data._id}
+                playUrl={mediaStreamUrl(`${item.data._id}/output.mpd`, special)}
+                thumbnailUrl={mediaThumbnailUrl(item.data._id, special)}
+                special={special}
+                metadata={{
+                  title: item.data.title,
+                  description: item.data.description,
+                  genres: item.data.genres,
+                  kind: item.data.kind,
+                  episodeNumber: item.data.episodeNumber,
+                  thumbnailFocalPoint: item.data.thumbnailFocalPoint,
+                  collectionId: item.data.collectionId,
+                  durationInMs: (item.data as VideoListItem).durationInMs,
+                }}
+              />
+            </div>
+          )}
         </div>
         <div className="portrait:hidden flex flex-col gap-0.5 p-2.5">
           <p className="text-sm font-semibold leading-tight">

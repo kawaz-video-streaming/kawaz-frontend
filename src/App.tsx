@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router'
 import { Toaster } from 'sonner'
 import { AuthProvider } from './auth/AuthContext'
 import { ThemeProvider } from './theme/ThemeContext'
+import { OfflineProvider } from './contexts/OfflineContext'
 import { useSpatialNavigation } from './hooks/useSpatialNavigation'
 import { Layout } from './components/layout/Layout'
 import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute'
@@ -21,6 +22,7 @@ import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage'
 import { DeleteAccountPage } from './pages/DeleteAccountPage'
 import { AccountPage } from './pages/AccountPage'
 import { NewsletterPage } from './pages/NewsletterPage'
+import { DownloadsPage } from './pages/DownloadsPage'
 
 const AppRoutes = () => {
   useSpatialNavigation()
@@ -50,6 +52,7 @@ const AppRoutes = () => {
         <Route path="admin/genres" element={<AdminRoute><GenreAdminPage /></AdminRoute>} />
         <Route path="account" element={<AccountPage />} />
         <Route path="admin/newsletter" element={<AdminRoute><NewsletterPage /></AdminRoute>} />
+        <Route path="downloads" element={<DownloadsPage />} />
       </Route>
     </Routes>
   )
@@ -58,10 +61,12 @@ const AppRoutes = () => {
 export const App = () => (
   <ThemeProvider>
     <AuthProvider>
-      <Toaster position="bottom-center" />
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <OfflineProvider>
+        <Toaster position="bottom-center" />
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </OfflineProvider>
     </AuthProvider>
   </ThemeProvider>
 )

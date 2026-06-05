@@ -1,5 +1,8 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
 import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
+import { isNative, isTV } from '../lib/platform';
+import { useOffline } from '../contexts/OfflineContext';
+import { DownloadButton } from '../components/DownloadButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import type { Coordinates, MediaKind } from '../types/api';
@@ -70,6 +73,9 @@ export const VideoPage = () => {
   const { id, collectionId: routeCollectionId } = useParams<{ id: string; collectionId?: string; }>();
   const navigate = useNavigate();
   const { isAdmin, specialPool } = useAuth();
+  const { entries } = useOffline();
+  const offlineEntry = entries.find(e => e.mediaId === (id ?? ''));
+  const offlineUri = offlineEntry?.offlineUri ?? null;
   const { data: video, isError, isLoading } = useVideo(id ?? '');
   const { mutate: update, isPending: isUpdating } = useUpdateMedia(id ?? '');
   const { mutate: remove, isPending: isDeleting } = useDeleteMedia();
@@ -258,6 +264,29 @@ export const VideoPage = () => {
     );
   }
 
+  if (isError && offlineEntry) {
+    return (
+      <div className="mx-auto max-w-6xl">
+        <VideoPlayer
+          manifestUrl={offlineEntry.offlineUri}
+          posterUrl={offlineEntry.thumbnailDataUrl}
+          className="mb-6 rounded-xl"
+        />
+        <h1 className="text-2xl font-bold tracking-tight">{offlineEntry.title}</h1>
+        {offlineEntry.description && (
+          <p className="mt-2 text-sm text-muted-foreground">{offlineEntry.description}</p>
+        )}
+        {offlineEntry.genres.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {offlineEntry.genres.map(name => (
+              <span key={name} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">{name}</span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (isError || !video) {
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">
@@ -271,6 +300,7 @@ export const VideoPage = () => {
 
   const special = isAdmin && specialPool;
   const thumbnailSrc = mediaThumbnailUrl(video._id, special);
+  const manifestUrl = offlineUri ?? mediaStreamUrl(video.playUrl, special);
   const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3;
 
   return (
@@ -304,11 +334,11 @@ export const VideoPage = () => {
 
       <VideoPlayer
         key={manifestVersion}
-        manifestUrl={mediaStreamUrl(video.playUrl, special)}
+        manifestUrl={manifestUrl}
         chaptersUrl={video.chaptersUrl ? mediaStreamUrl(video.chaptersUrl, special) : undefined}
         thumbnailsUrl={video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined}
-        posterUrl={thumbnailSrc}
-        special={special}
+        posterUrl={offlineEntry?.thumbnailDataUrl ?? thumbnailSrc}
+        special={special && !offlineUri}
         className="mb-6 rounded-xl"
       />
 
@@ -508,6 +538,27 @@ export const VideoPage = () => {
           <>
             <div className="flex items-start justify-between gap-4">
               <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
+              <div className="flex shrink-0 items-center gap-1">
+              {isNative && !isTV && (
+                <DownloadButton
+                  mediaId={video._id}
+                  playUrl={mediaStreamUrl(video.playUrl, special)}
+                  thumbnailUrl={thumbnailSrc}
+                  special={special}
+                  metadata={{
+                    title: video.title,
+                    description: video.description,
+                    genres: video.genres,
+                    kind: video.kind,
+                    episodeNumber: video.episodeNumber,
+                    thumbnailFocalPoint: video.thumbnailFocalPoint,
+                    collectionId: video.collectionId,
+                    durationInMs: video.durationInMs,
+                    audioStreams: video.audioStreams,
+                    subtitleStreams: video.subtitleStreams,
+                  }}
+                />
+              )}
               {isAdmin && (
                 <div className="flex shrink-0 items-center gap-2">
                   <button
@@ -526,6 +577,7 @@ export const VideoPage = () => {
                   </button>
                 </div>
               )}
+              </div>
             </div>
 
             {video.description && (
