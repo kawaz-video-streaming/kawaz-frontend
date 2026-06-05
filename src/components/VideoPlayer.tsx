@@ -94,6 +94,8 @@ export const VideoPlayer = ({
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
   const [spriteDims, setSpriteDims] = useState<{ w: number; h: number } | null>(null);
+  const spriteImgRef = useRef<HTMLImageElement | null>(null);
+  const thumbCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [skipFeedback, setSkipFeedback] = useState<{ side: 'left' | 'right'; seconds: number } | null>(null);
 
   // Playback state (driven by video element events)
@@ -558,18 +560,20 @@ export const VideoPlayer = ({
   useEffect(() => {
     if (!spriteUrl) return;
     const img = new Image();
-    img.onload = () => setSpriteDims({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onload = () => {
+      spriteImgRef.current = img;
+      setSpriteDims({ w: img.naturalWidth, h: img.naturalHeight });
+    };
     img.src = spriteUrl;
   }, [spriteUrl]);
 
   // Reconstruct the ORIGINAL sprite height from VTT metadata to derive scaleY — the
   // ratio by which Android TV has squished the sprite vertically (naturalHeight capped
-  // at the GPU texture limit, e.g. 8192 px, while width is never downscaled).
-  // We do NOT use the reconstructed height as background-size, because the TV's CSS
-  // compositing engine hits the same GPU limit and clamps large background-size values
-  // exactly like it clamps naturalHeight — landing in the wrong quadrant.
-  // Instead we work in loaded-image coordinate space: scale positionY down by scaleY
-  // and compensate the squish with a CSS transform: scaleY(1/scaleY) on the inner div.
+  // at the GPU texture limit, while width is never downscaled).
+  // Used by the canvas drawImage to read from the correct source rect in the squished
+  // loaded image and stretch it back to the original tile dimensions on the canvas.
+  // CSS background-size/position approaches all fail on TV because both image loading
+  // and CSS compositing hit the same GPU texture height cap.
   const spriteBgDims = (() => {
     if (!spriteDims || !hoverThumb || duration <= 0) return spriteDims;
     const tileW = hoverThumb.width;
@@ -590,6 +594,30 @@ export const VideoPlayer = ({
   const scaleY = spriteBgDims && spriteDims && spriteBgDims.h > 0
     ? spriteDims.h / spriteBgDims.h
     : 1;
+
+  // Draw the correct tile onto the thumbnail canvas. Using drawImage instead of CSS
+  // background-image because drawImage reads decoded pixel data directly — it is immune
+  // to the Android TV GPU texture height cap that breaks CSS background-size and
+  // CSS transforms on background-image elements.
+  // Source rect is in loaded-image coords (positionY * scaleY); destination rect
+  // stretches it back to the full tile size, undoing the TV's vertical squish.
+  useEffect(() => {
+    const canvas = thumbCanvasRef.current;
+    const img = spriteImgRef.current;
+    if (!canvas || !img || !hoverThumb) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const tileW = hoverThumb.width;
+    const tileH = hoverThumb.height;
+    if (!tileW || !tileH) return;
+    ctx.clearRect(0, 0, tileW, tileH);
+    ctx.drawImage(
+      img,
+      hoverThumb.positionX, hoverThumb.positionY * scaleY,  // source origin (loaded-image coords)
+      tileW, tileH * scaleY,                                 // source size (squished tile)
+      0, 0, tileW, tileH,                                    // destination (full tile on canvas)
+    );
+  }, [hoverThumb, scaleY]);
 
   const handleSeekbarMouseMove = (e: React.MouseEvent<HTMLInputElement>) => {
     if (!duration) return;
@@ -737,31 +765,12 @@ export const VideoPlayer = ({
             className="pointer-events-none absolute z-20"
             style={{ bottom: 68, left: thumbLeft }}
           >
-            {/* Outer div clips to thumbW×thumbH; inner div works in loaded-image coords.
-                When TV has squished the sprite (scaleY < 1), the inner div is height=thumbH*scaleY
-                and CSS scaleY(1/scaleY) stretches it back — GPU matrix transform, no texture limit.
-                backgroundSize stays at loaded-image dims so CSS compositing never exceeds the GPU cap. */}
-            <div style={{
-              width: thumbW, height: thumbH,
-              overflow: 'hidden',
-              backgroundColor: '#000',
-              borderRadius: 4,
-              boxShadow: '0 2px 10px rgba(0,0,0,0.7)',
-            }}>
-              <div style={{
-                width: thumbW,
-                height: scaleY < 1 ? thumbH * scaleY : thumbH,
-                // Use background-image so the browser never applies #xywh= media-fragment
-                // spatial clipping (Android TV WebView does this on <img> src, breaking the crop).
-                backgroundImage: `url(${hoverThumb.uris[0].split('#')[0]})`,
-                backgroundPosition: `-${hoverThumb.positionX}px -${scaleY < 1 ? (hoverThumb.positionY * scaleY).toFixed(2) : hoverThumb.positionY}px`,
-                backgroundRepeat: 'no-repeat',
-                // Explicit loaded-image size fixes background-size:auto rendering at half-size
-                // on some Android TV WebViews that treat the image as 2×.
-                backgroundSize: spriteDims ? `${spriteDims.w}px ${spriteDims.h}px` : 'auto',
-                ...(scaleY < 1 ? { transform: `scaleY(${(1 / scaleY).toFixed(6)})`, transformOrigin: 'top left' } : {}),
-              }} />
-            </div>
+            <canvas
+              ref={thumbCanvasRef}
+              width={thumbW}
+              height={thumbH}
+              style={{ display: 'block', backgroundColor: '#000', borderRadius: 4, boxShadow: '0 2px 10px rgba(0,0,0,0.7)' }}
+            />
             <div style={{ textAlign: 'center', color: '#fff', fontSize: 12, marginTop: 4, textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
               {formatTime(hoverTime)}
             </div>
