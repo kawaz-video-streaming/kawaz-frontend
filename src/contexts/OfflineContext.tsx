@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import {
   listOfflineEntries,
   removeOfflineEntry,
+  deleteCachedSprite,
   storeVideo,
   type OfflineEntry,
   type OfflineMetadata,
@@ -115,7 +116,11 @@ export const OfflineProvider = ({ children }: { children: React.ReactNode }) => 
   }, [processNext]);
 
   const deleteEntry = async (offlineUri: string) => {
+    const entry = entriesRef.current.find(e => e.offlineUri === offlineUri);
     await removeOfflineEntry(offlineUri);
+    if (entry?.thumbnailsUrl) {
+      void deleteCachedSprite(entry.thumbnailsUrl.replace('thumbnails.vtt', 'thumbnails.jpg'));
+    }
     entriesRef.current = entriesRef.current.filter(e => e.offlineUri !== offlineUri);
     setEntries(entriesRef.current);
   };
