@@ -73,6 +73,17 @@ TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`.
 
 `VideoPlayer` lazily loads `shaka-player/dist/shaka-player.ui.js` (the full Shaka bundle with built-in UI). It uses `shaka.ui.Overlay` to render the player controls — including the audio language selector — directly in the player. The CSS for the controls comes from `shaka-player/dist/controls.css` (imported statically at the top of the component). Custom Shaka type declarations are in `src/types/shaka-player.d.ts`.
 
+### Offline Downloads (native only, non-TV)
+
+Offline download feature allows users to download videos for offline playback on Android and iOS. Disabled on TV (`isTV`) and web.
+
+- **`src/lib/offlineStorage.ts`** — Shaka v5 offline wrapper. `storeVideo()` fetches the thumbnail as base64, stores all DASH tracks (no filtering), and saves full metadata in Shaka's `appMetadata`. Returns a `StoreOperation` with `.abort()`. `listOfflineEntries()` reads IndexedDB on startup. `removeOfflineEntry()` deletes by `offlineUri`.
+- **`src/contexts/OfflineContext.tsx`** — `OfflineProvider` + `useOffline()` hook. Manages a sequential download queue (`queueRef`, `isProcessingRef`), exposes `downloadQueue: DownloadProgress[]`, `startDownload`, `cancelDownload(mediaId)`, `deleteEntry`, `isDownloaded`, `isDownloading`, `isQueued`. Downloads run one at a time; subsequent requests are queued automatically.
+- **`src/components/DownloadButton.tsx`** — three states: idle (download icon), queued (clock icon), downloading (progress ring + cancel), downloaded (check + delete confirm). `compact` prop for card overlays (icon-only circular button).
+- **`src/pages/DownloadsPage.tsx`** — `/downloads` route. Shows full download queue (downloading + queued items with per-item cancel), completed downloads with stored thumbnail, size, duration, genres, and play/delete actions.
+- All video content (segments, subtitles, image tracks) stored in Shaka's IndexedDB. Thumbnail stored as base64 in `appMetadata`. Everything survives app restarts.
+- `VideoPage` uses `offlineEntry.offlineUri` instead of the stream URL when content is downloaded. If the API is also unreachable, shows a minimal player with stored metadata.
+
 ### Collections
 
 `src/lib/collections.ts` exports `buildTopographicList(collections)` which returns a depth-annotated flat list for rendering a tree-indented `<select>` in collection pickers. Used in UploadPage, VideoPage, and CreateCollectionPage.
@@ -93,6 +104,7 @@ TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`.
   /admin/genres           → GenreAdminPage (admin)
   /admin/newsletter       → NewsletterPage (admin)
   /account                → AccountPage (protected)
+  /downloads              → DownloadsPage (native only, all users)
 ```
 
 After login, users land on `/profiles`. Selecting a profile stores it in `AuthContext.selectedProfile` and navigates to `/`.

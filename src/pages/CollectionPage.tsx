@@ -1,5 +1,7 @@
 import { Check, ChevronRight, FolderOpen, Image, Pencil, Trash2, X } from 'lucide-react';
-import { mediaThumbnailUrl } from '../api/media';
+import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
+import { isNative, isTV } from '../lib/platform';
+import { DownloadButton } from '../components/DownloadButton';
 import { collectionThumbnailUrl } from '../api/mediaCollection';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router';
@@ -579,6 +581,27 @@ export const CollectionPage = () => {
                     focalPoint={item.data.thumbnailFocalPoint}
                     aspectRatio={collection.kind === 'collection' ? 2 / 3 : 16 / 9}
                   />
+                  {isNative && !isTV && (
+                    <div className="absolute bottom-1.5 right-1.5">
+                      <DownloadButton
+                        compact
+                        mediaId={item.data._id}
+                        playUrl={mediaStreamUrl(`${item.data._id}/output.mpd`, special)}
+                        thumbnailUrl={mediaThumbnailUrl(item.data._id, special)}
+                        special={special}
+                        metadata={{
+                          title: item.data.title,
+                          description: item.data.description,
+                          genres: item.data.genres,
+                          kind: item.data.kind,
+                          episodeNumber: item.data.episodeNumber,
+                          thumbnailFocalPoint: item.data.thumbnailFocalPoint,
+                          collectionId: item.data.collectionId,
+                          durationInMs: item.data.durationInMs,
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1 p-3">
                   <p className="text-sm font-semibold leading-tight">{item.data.title}</p>
