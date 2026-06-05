@@ -2,6 +2,7 @@ import type { offline } from 'shaka-player/dist/shaka-player.ui.js';
 import type { AudioStream, Coordinates, MediaKind, SubtitleStream } from '../types/api';
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
+const THUMBNAIL_CACHE_NAME = 'kawaz-thumbnails-v1';
 
 export type OfflineMetadata = {
   title: string;
@@ -11,6 +12,10 @@ export type OfflineMetadata = {
   episodeNumber?: number;
   thumbnailFocalPoint: Coordinates;
   collectionId?: string;
+  seasonTitle?: string;
+  showTitle?: string;
+  chaptersUrl?: string;
+  thumbnailsUrl?: string;
   durationInMs: number;
   audioStreams?: AudioStream[];
   subtitleStreams?: SubtitleStream[];
@@ -23,6 +28,8 @@ export type OfflineEntry = {
   size: number;
   downloadedAt: number;
   thumbnailDataUrl?: string;
+  chaptersVttText?: string;
+  thumbnailsVttText?: string;
 } & OfflineMetadata;
 
 type AppMetadata = OfflineMetadata & {
@@ -30,11 +37,48 @@ type AppMetadata = OfflineMetadata & {
   special: boolean;
   downloadedAt: number;
   thumbnailDataUrl?: string;
+  chaptersVttText?: string;
+  thumbnailsVttText?: string;
 };
 
 export type StoreOperation = {
   promise: Promise<OfflineEntry>;
   abort: () => void;
+};
+
+const cacheSpriteJpeg = async (spriteUrl: string): Promise<void> => {
+  try {
+    if (!('caches' in window)) return;
+    const cache = await caches.open(THUMBNAIL_CACHE_NAME);
+    if (await cache.match(spriteUrl)) return;
+    const res = await fetch(spriteUrl, { credentials: 'include' });
+    if (!res.ok) return;
+    await cache.put(spriteUrl, res);
+  } catch { /* ignore */ }
+};
+
+export const deleteCachedSprite = async (spriteUrl: string): Promise<void> => {
+  try {
+    if (!('caches' in window)) return;
+    const cache = await caches.open(THUMBNAIL_CACHE_NAME);
+    await cache.delete(spriteUrl);
+  } catch { /* ignore */ }
+};
+
+export const buildOfflineThumbnailsUrl = async (vttText: string, spriteUrl: string): Promise<string | undefined> => {
+  try {
+    if (!('caches' in window)) return undefined;
+    const cache = await caches.open(THUMBNAIL_CACHE_NAME);
+    const cached = await cache.match(spriteUrl);
+    if (!cached) return undefined;
+    const blob = await cached.blob();
+    const spriteBlobUrl = URL.createObjectURL(blob);
+    const modifiedVtt = vttText.replace(/thumbnails\.jpg/g, spriteBlobUrl);
+    const vttBlob = new Blob([modifiedVtt], { type: 'text/vtt' });
+    return URL.createObjectURL(vttBlob);
+  } catch {
+    return undefined;
+  }
 };
 
 const fetchThumbnailAsDataUrl = async (url: string): Promise<string | undefined> => {
@@ -83,6 +127,8 @@ const toEntry = (stored: offline.StoredContent, meta: AppMetadata): OfflineEntry
   size: stored.size ?? 0,
   downloadedAt: meta.downloadedAt,
   thumbnailDataUrl: meta.thumbnailDataUrl,
+  chaptersVttText: meta.chaptersVttText,
+  thumbnailsVttText: meta.thumbnailsVttText,
   title: meta.title,
   description: meta.description,
   genres: meta.genres,
@@ -90,6 +136,9 @@ const toEntry = (stored: offline.StoredContent, meta: AppMetadata): OfflineEntry
   episodeNumber: meta.episodeNumber,
   thumbnailFocalPoint: meta.thumbnailFocalPoint,
   collectionId: meta.collectionId,
+  seasonTitle: meta.seasonTitle,
+  showTitle: meta.showTitle,
+  thumbnailsUrl: meta.thumbnailsUrl,
   durationInMs: meta.durationInMs,
   audioStreams: meta.audioStreams,
   subtitleStreams: meta.subtitleStreams,
@@ -127,6 +176,26 @@ export const storeVideo = (
 
     const thumbnailDataUrl = await fetchThumbnailAsDataUrl(thumbnailUrl);
 
+    let chaptersVttText: string | undefined;
+    if (metadata.chaptersUrl) {
+      try {
+        const res = await fetch(metadata.chaptersUrl, { credentials: 'include' });
+        if (res.ok) chaptersVttText = await res.text();
+      } catch { /* ignore */ }
+    }
+
+    let thumbnailsVttText: string | undefined;
+    if (metadata.thumbnailsUrl) {
+      try {
+        const vttRes = await fetch(metadata.thumbnailsUrl, { credentials: 'include' });
+        if (vttRes.ok) {
+          thumbnailsVttText = await vttRes.text();
+          const spriteUrl = metadata.thumbnailsUrl.replace('thumbnails.vtt', 'thumbnails.jpg');
+          await cacheSpriteJpeg(spriteUrl);
+        }
+      } catch { /* ignore — thumbnails work online if offline caching fails */ }
+    }
+
     const player = new shaka.Player();
     const storage = new shaka.offline.Storage(player);
     const meta: AppMetadata = {
@@ -135,6 +204,8 @@ export const storeVideo = (
       special,
       downloadedAt: Date.now(),
       thumbnailDataUrl,
+      chaptersVttText,
+      thumbnailsVttText,
     };
 
     storage.configure({

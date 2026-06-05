@@ -1,6 +1,7 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
 import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
 import { isNative, isTV } from '../lib/platform';
+import { buildOfflineThumbnailsUrl } from '../lib/offlineStorage';
 import { useOffline } from '../contexts/OfflineContext';
 import { DownloadButton } from '../components/DownloadButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -107,6 +108,27 @@ export const VideoPage = () => {
   const [newThumbnail, setNewThumbnail] = useState<File | null>(null);
   const [newThumbnailPreview, setNewThumbnailPreview] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [offlineChaptersUrl, setOfflineChaptersUrl] = useState<string | undefined>(undefined);
+  const [offlineThumbnailsUrl, setOfflineThumbnailsUrl] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!offlineEntry?.chaptersVttText) return;
+    const blob = new Blob([offlineEntry.chaptersVttText], { type: 'text/vtt' });
+    const url = URL.createObjectURL(blob);
+    setOfflineChaptersUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [offlineEntry?.chaptersVttText]);
+
+  useEffect(() => {
+    if (!offlineEntry?.thumbnailsVttText || !offlineEntry.thumbnailsUrl) return;
+    const spriteUrl = offlineEntry.thumbnailsUrl.replace('thumbnails.vtt', 'thumbnails.jpg');
+    let vttBlobUrl: string | undefined;
+    void buildOfflineThumbnailsUrl(offlineEntry.thumbnailsVttText, spriteUrl).then(url => {
+      vttBlobUrl = url;
+      setOfflineThumbnailsUrl(url);
+    });
+    return () => { if (vttBlobUrl) URL.revokeObjectURL(vttBlobUrl); };
+  }, [offlineEntry?.thumbnailsVttText, offlineEntry?.thumbnailsUrl]);
 
   const collectionOptions = useMemo(() => editKind === 'episode'
     ? (collections ?? []).filter((collection) => collection.kind === 'season')
@@ -131,6 +153,8 @@ export const VideoPage = () => {
   useEffect(() => {
     setEditing(false);
     setShowDeleteConfirm(false);
+    setOfflineChaptersUrl(undefined);
+    setOfflineThumbnailsUrl(undefined);
     if (newThumbnailPreview) {
       URL.revokeObjectURL(newThumbnailPreview);
     }
@@ -269,7 +293,10 @@ export const VideoPage = () => {
       <div className="mx-auto max-w-6xl">
         <VideoPlayer
           manifestUrl={offlineEntry.offlineUri}
+          chaptersUrl={offlineChaptersUrl ?? offlineEntry.chaptersUrl}
+          thumbnailsUrl={offlineThumbnailsUrl ?? offlineEntry.thumbnailsUrl}
           posterUrl={offlineEntry.thumbnailDataUrl}
+          special={offlineEntry.special}
           className="mb-6 rounded-xl"
         />
         <h1 className="text-2xl font-bold tracking-tight">{offlineEntry.title}</h1>
@@ -303,6 +330,13 @@ export const VideoPage = () => {
   const manifestUrl = offlineUri ?? mediaStreamUrl(video.playUrl, special);
   const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3;
 
+  const episodeSeason = video.kind === 'episode'
+    ? (collections ?? []).find(c => c._id === video.collectionId)
+    : undefined;
+  const episodeShow = episodeSeason
+    ? (collections ?? []).find(c => c._id === episodeSeason.collectionId)
+    : undefined;
+
   return (
     <div className="mx-auto max-w-6xl">
       {routeCollectionId && collections && (() => {
@@ -335,10 +369,14 @@ export const VideoPage = () => {
       <VideoPlayer
         key={manifestVersion}
         manifestUrl={manifestUrl}
-        chaptersUrl={video.chaptersUrl ? mediaStreamUrl(video.chaptersUrl, special) : undefined}
-        thumbnailsUrl={video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined}
+        chaptersUrl={offlineUri
+          ? (offlineChaptersUrl ?? (video.chaptersUrl ? mediaStreamUrl(video.chaptersUrl, special) : undefined))
+          : (video.chaptersUrl ? mediaStreamUrl(video.chaptersUrl, special) : undefined)}
+        thumbnailsUrl={offlineUri
+          ? (offlineThumbnailsUrl ?? (video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined))
+          : (video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined)}
         posterUrl={offlineEntry?.thumbnailDataUrl ?? thumbnailSrc}
-        special={special && !offlineUri}
+        special={special}
         className="mb-6 rounded-xl"
       />
 
@@ -553,6 +591,10 @@ export const VideoPage = () => {
                     episodeNumber: video.episodeNumber,
                     thumbnailFocalPoint: video.thumbnailFocalPoint,
                     collectionId: video.collectionId,
+                    seasonTitle: episodeSeason?.title,
+                    showTitle: episodeShow?.title,
+                    chaptersUrl: video.chaptersUrl ? mediaStreamUrl(video.chaptersUrl, special) : undefined,
+                    thumbnailsUrl: video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined,
                     durationInMs: video.durationInMs,
                     audioStreams: video.audioStreams,
                     subtitleStreams: video.subtitleStreams,
