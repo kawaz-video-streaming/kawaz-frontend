@@ -120,15 +120,12 @@ export const VideoPage = () => {
   }, [offlineEntry?.chaptersVttText]);
 
   useEffect(() => {
-    if (!offlineEntry?.thumbnailsVttText || !offlineEntry.thumbnailsUrl) return;
-    const spriteUrl = offlineEntry.thumbnailsUrl.replace('thumbnails.vtt', 'thumbnails.jpg');
-    let vttBlobUrl: string | undefined;
-    void buildOfflineThumbnailsUrl(offlineEntry.thumbnailsVttText, spriteUrl).then(url => {
-      vttBlobUrl = url;
-      setOfflineThumbnailsUrl(url);
-    });
-    return () => { if (vttBlobUrl) URL.revokeObjectURL(vttBlobUrl); };
-  }, [offlineEntry?.thumbnailsVttText, offlineEntry?.thumbnailsUrl]);
+    if (!offlineEntry?.thumbnailsVttText || !offlineEntry.spriteDataUrl) return;
+    const url = buildOfflineThumbnailsUrl(offlineEntry.thumbnailsVttText, offlineEntry.spriteDataUrl);
+    if (!url) return;
+    setOfflineThumbnailsUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [offlineEntry?.thumbnailsVttText, offlineEntry?.spriteDataUrl]);
 
   const collectionOptions = useMemo(() => editKind === 'episode'
     ? (collections ?? []).filter((collection) => collection.kind === 'season')
