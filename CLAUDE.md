@@ -77,12 +77,12 @@ TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`.
 
 Offline download feature allows users to download videos for offline playback on Android and iOS. Disabled on TV (`isTV`) and web.
 
-- **`src/lib/offlineStorage.ts`** — Shaka v5 offline wrapper. `storeVideo()` fetches the thumbnail as base64, stores all DASH tracks (no filtering), and saves full metadata in Shaka's `appMetadata`. Returns a `StoreOperation` with `.abort()`. `listOfflineEntries()` reads IndexedDB on startup. `removeOfflineEntry()` deletes by `offlineUri`.
-- **`src/contexts/OfflineContext.tsx`** — `OfflineProvider` + `useOffline()` hook. Manages a sequential download queue (`queueRef`, `isProcessingRef`), exposes `downloadQueue: DownloadProgress[]`, `startDownload`, `cancelDownload(mediaId)`, `deleteEntry`, `isDownloaded`, `isDownloading`, `isQueued`. Downloads run one at a time; subsequent requests are queued automatically.
-- **`src/components/DownloadButton.tsx`** — three states: idle (download icon), queued (clock icon), downloading (progress ring + cancel), downloaded (check + delete confirm). `compact` prop for card overlays (icon-only circular button).
+- **`src/lib/offlineStorage.ts`** — Shaka v5 offline wrapper. `storeVideo()` fetches the thumbnail as base64, fetches and stores chapters/thumbnails VTT text and caches the sprite JPG, stores all DASH tracks (no filtering), and saves full metadata in Shaka's `appMetadata`. Returns a `StoreOperation` with `.abort()`. `listOfflineEntries()` reads IndexedDB on startup. `removeOfflineEntry()` deletes by `offlineUri`. Chapter/thumbnail URLs follow the pattern `{mediaId}/chapters.vtt` and `{mediaId}/thumbnails.vtt`.
+- **`src/contexts/OfflineContext.tsx`** — `OfflineProvider` + `useOffline()` hook. Manages a sequential download queue (`queueRef`, `isProcessingRef`), exposes `entriesLoaded: boolean` (false on native until IndexedDB scan completes), `downloadQueue: DownloadProgress[]`, `startDownload`, `cancelDownload(mediaId)`, `deleteEntry`, `isDownloaded`, `isDownloading`, `isQueued`. Downloads run one at a time; subsequent requests are queued automatically.
+- **`src/components/DownloadButton.tsx`** — three states: idle (download icon), queued (clock icon), downloading (progress ring + cancel), downloaded (check + delete confirm). `compact` prop for card overlays (icon-only circular button). Card-level download buttons (HomePage, CollectionPage) include `chaptersUrl`, `thumbnailsUrl`, `seasonTitle`, and `showTitle` in metadata.
 - **`src/pages/DownloadsPage.tsx`** — `/downloads` route. Shows full download queue (downloading + queued items with per-item cancel), completed downloads with stored thumbnail, size, duration, genres, and play/delete actions.
 - All video content (segments, subtitles, image tracks) stored in Shaka's IndexedDB. Thumbnail stored as base64 in `appMetadata`. Everything survives app restarts.
-- `VideoPage` uses `offlineEntry.offlineUri` instead of the stream URL when content is downloaded. If the API is also unreachable, shows a minimal player with stored metadata.
+- `VideoPage` waits for `entriesLoaded` before rendering the player on native, so downloaded content always plays from local cache rather than the network stream. If the API is unreachable, shows a minimal player with stored metadata.
 
 ### Collections
 

@@ -74,7 +74,7 @@ export const VideoPage = () => {
   const { id, collectionId: routeCollectionId } = useParams<{ id: string; collectionId?: string; }>();
   const navigate = useNavigate();
   const { isAdmin, specialPool } = useAuth();
-  const { entries } = useOffline();
+  const { entries, entriesLoaded } = useOffline();
   const offlineEntry = entries.find(e => e.mediaId === (id ?? ''));
   const offlineUri = offlineEntry?.offlineUri ?? null;
   const { data: video, isError, isLoading } = useVideo(id ?? '');
@@ -268,8 +268,9 @@ export const VideoPage = () => {
     });
   };
 
+  const siblingCollectionId = routeCollectionId ?? (video?.kind === 'episode' ? video.collectionId : undefined);
   const siblings = allVideos
-    ?.filter((v) => v.collectionId === routeCollectionId)
+    ?.filter((v) => v.collectionId === siblingCollectionId)
     .sort((a, b) => {
       const aNum = a.episodeNumber ?? Infinity;
       const bNum = b.episodeNumber ?? Infinity;
@@ -279,8 +280,11 @@ export const VideoPage = () => {
   const currentIndex = siblings.findIndex((v) => v._id === id);
   const prevVideo = currentIndex > 0 ? siblings[currentIndex - 1] : null;
   const nextVideo = currentIndex < siblings.length - 1 ? siblings[currentIndex + 1] : null;
+  const nextEpisodePath = nextVideo && siblingCollectionId
+    ? `/collections/${siblingCollectionId}/videos/${nextVideo._id}`
+    : null;
 
-  if (isLoading) {
+  if (isLoading || (isNative && !isTV && !entriesLoaded)) {
     return (
       <div className="flex items-center justify-center py-32 text-muted-foreground">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-red-500" />
@@ -289,6 +293,12 @@ export const VideoPage = () => {
   }
 
   if (isError && offlineEntry) {
+    const nextOfflineEntry = offlineEntry.kind === 'episode'
+      ? entries
+          .filter(e => e.collectionId === offlineEntry.collectionId && e.kind === 'episode' && e.mediaId !== offlineEntry.mediaId)
+          .sort((a, b) => (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0))
+          .find(e => (e.episodeNumber ?? 0) > (offlineEntry.episodeNumber ?? 0))
+      : undefined;
     return (
       <div className="mx-auto max-w-6xl">
         <VideoPlayer
@@ -298,6 +308,8 @@ export const VideoPage = () => {
           posterUrl={offlineEntry.thumbnailDataUrl}
           special={offlineEntry.special}
           className="mb-6 rounded-xl"
+          nextEpisodeTitle={nextOfflineEntry?.title}
+          onNextEpisode={nextOfflineEntry ? () => navigate(`/videos/${nextOfflineEntry.mediaId}`) : undefined}
         />
         <h1 className="text-2xl font-bold tracking-tight">{offlineEntry.title}</h1>
         {offlineEntry.description && (
@@ -378,6 +390,8 @@ export const VideoPage = () => {
         posterUrl={offlineEntry?.thumbnailDataUrl ?? thumbnailSrc}
         special={special}
         className="mb-6 rounded-xl"
+        nextEpisodeTitle={nextVideo?.title}
+        onNextEpisode={nextEpisodePath ? () => navigate(nextEpisodePath) : undefined}
       />
 
       {routeCollectionId && (prevVideo || nextVideo) && (

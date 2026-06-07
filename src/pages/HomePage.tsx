@@ -403,6 +403,8 @@ export const HomePage = () => {
                   thumbnailFocalPoint: item.data.thumbnailFocalPoint,
                   collectionId: item.data.collectionId,
                   durationInMs: (item.data as VideoListItem).durationInMs,
+                  chaptersUrl: mediaStreamUrl(`${item.data._id}/chapters.vtt`, special),
+                  thumbnailsUrl: mediaStreamUrl(`${item.data._id}/thumbnails.vtt`, special),
                 }}
               />
             </div>

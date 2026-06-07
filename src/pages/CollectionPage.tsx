@@ -598,6 +598,16 @@ export const CollectionPage = () => {
                           thumbnailFocalPoint: item.data.thumbnailFocalPoint,
                           collectionId: item.data.collectionId,
                           durationInMs: item.data.durationInMs,
+                          seasonTitle: item.data.kind === 'episode'
+                            ? allCollections?.find(c => c._id === item.data.collectionId)?.title
+                            : undefined,
+                          showTitle: (() => {
+                            if (item.data.kind !== 'episode') return undefined;
+                            const season = allCollections?.find(c => c._id === item.data.collectionId);
+                            return allCollections?.find(c => c._id === season?.collectionId)?.title;
+                          })(),
+                          chaptersUrl: mediaStreamUrl(`${item.data._id}/chapters.vtt`, special),
+                          thumbnailsUrl: mediaStreamUrl(`${item.data._id}/thumbnails.vtt`, special),
                         }}
                       />
                     </div>
