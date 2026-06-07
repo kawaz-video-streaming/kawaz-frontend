@@ -6,7 +6,7 @@ import { SystemBars } from '../plugins/systemBars';
 import { prefetchFirstSegments, formatVideoError } from '../lib/videoUtils';
 import { useTVControls } from '../hooks/useTVControls';
 import { useVideoKeyboard } from '../hooks/useVideoKeyboard';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List, RotateCcw, RotateCw } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List, RotateCcw, RotateCw, X, ChevronRight } from 'lucide-react';
 
 const SkipBackIcon = ({ size = 22 }: { size?: number }) => (
   <span className="relative inline-flex" style={{ width: size, height: size }}>
@@ -63,6 +63,8 @@ interface VideoPlayerProps {
   posterUrl?: string;
   special?: boolean;
   className?: string;
+  nextEpisodeTitle?: string;
+  onNextEpisode?: () => void;
 }
 
 export const VideoPlayer = ({
@@ -72,6 +74,8 @@ export const VideoPlayer = ({
   posterUrl,
   special = false,
   className,
+  nextEpisodeTitle,
+  onNextEpisode,
 }: VideoPlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -105,6 +109,8 @@ export const VideoPlayer = ({
   const [bufferedEnd, setBufferedEnd] = useState(0);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
+
+  const [nextEpisodeDismissed, setNextEpisodeDismissed] = useState(false);
 
   // Controls visibility
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -271,6 +277,7 @@ export const VideoPlayer = ({
     const setupPlayer = async () => {
       setIsLoadingPlayer(true);
       setPlayerError(null);
+      setNextEpisodeDismissed(false);
       setChapters([]);
       setAudioTracks([]);
       setCaptionTracks([]);
@@ -1077,6 +1084,55 @@ export const VideoPlayer = ({
           </div>
         )}
 
+        {/* Next episode overlay — appears in the last 5 minutes */}
+        {onNextEpisode && duration > 0 && currentTime > 0 && (
+          <>
+            {/* Full card (before dismiss) */}
+            <div
+              className={cn(
+                'absolute bottom-20 right-4 z-20 flex max-w-[200px] flex-col gap-2 rounded-xl bg-black/80 p-3 backdrop-blur-sm transition-all duration-500',
+                duration - currentTime < 300 && !nextEpisodeDismissed
+                  ? 'pointer-events-auto opacity-100 translate-y-0'
+                  : 'pointer-events-none opacity-0 translate-y-2',
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Up Next</p>
+                <button
+                  onClick={() => setNextEpisodeDismissed(true)}
+                  className="shrink-0 rounded p-0.5 text-white/50 transition-colors hover:text-white"
+                  aria-label="Dismiss"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              {nextEpisodeTitle && (
+                <p className="line-clamp-2 text-xs font-medium leading-tight text-white">{nextEpisodeTitle}</p>
+              )}
+              <button
+                onClick={onNextEpisode}
+                className="flex items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-white/90 active:scale-95"
+              >
+                <Play size={11} fill="currentColor" />
+                Play Next
+              </button>
+            </div>
+
+            {/* Compact pill after dismiss */}
+            <button
+              onClick={onNextEpisode}
+              className={cn(
+                'absolute bottom-20 right-4 z-20 flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition-all duration-500 hover:bg-black/90 active:scale-95',
+                duration - currentTime < 300 && nextEpisodeDismissed
+                  ? 'pointer-events-auto opacity-100 translate-y-0'
+                  : 'pointer-events-none opacity-0 translate-y-2',
+              )}
+              aria-label="Play next episode"
+            >
+              Next <ChevronRight size={12} />
+            </button>
+          </>
+        )}
 
       </div>
 

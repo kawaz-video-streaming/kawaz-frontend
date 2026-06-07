@@ -138,6 +138,7 @@ const toEntry = (stored: offline.StoredContent, meta: AppMetadata): OfflineEntry
   collectionId: meta.collectionId,
   seasonTitle: meta.seasonTitle,
   showTitle: meta.showTitle,
+  chaptersUrl: meta.chaptersUrl,
   thumbnailsUrl: meta.thumbnailsUrl,
   durationInMs: meta.durationInMs,
   audioStreams: meta.audioStreams,

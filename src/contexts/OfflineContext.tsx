@@ -27,6 +27,7 @@ export interface DownloadProgress {
 
 interface OfflineContextValue {
   entries: OfflineEntry[];
+  entriesLoaded: boolean;
   downloadQueue: DownloadProgress[];
   startDownload: (mediaId: string, playUrl: string, thumbnailUrl: string, special: boolean, metadata: OfflineMetadata) => void;
   cancelDownload: (mediaId: string) => void;
@@ -39,6 +40,7 @@ interface OfflineContextValue {
 
 const OfflineContext = createContext<OfflineContextValue>({
   entries: [],
+  entriesLoaded: true,
   downloadQueue: [],
   startDownload: () => {},
   cancelDownload: () => {},
@@ -51,6 +53,7 @@ const OfflineContext = createContext<OfflineContextValue>({
 
 export const OfflineProvider = ({ children }: { children: React.ReactNode }) => {
   const [entries, setEntries] = useState<OfflineEntry[]>([]);
+  const [entriesLoaded, setEntriesLoaded] = useState(!isNative || isTV);
   const [downloadQueue, setDownloadQueue] = useState<DownloadProgress[]>([]);
 
   const queueRef = useRef<QueueItem[]>([]);
@@ -60,7 +63,7 @@ export const OfflineProvider = ({ children }: { children: React.ReactNode }) => 
 
   useEffect(() => {
     if (!isNative || isTV) return;
-    void listOfflineEntries().then(loaded => { entriesRef.current = loaded; setEntries(loaded); }).catch(console.error);
+    void listOfflineEntries().then(loaded => { entriesRef.current = loaded; setEntries(loaded); }).catch(console.error).finally(() => setEntriesLoaded(true));
   }, []);
 
   const processNext = useCallback(() => {
@@ -140,6 +143,7 @@ export const OfflineProvider = ({ children }: { children: React.ReactNode }) => 
     <OfflineContext.Provider
       value={{
         entries,
+        entriesLoaded,
         downloadQueue,
         startDownload,
         cancelDownload,
