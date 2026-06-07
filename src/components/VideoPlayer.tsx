@@ -312,6 +312,8 @@ export const VideoPlayer = ({
 
         player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
           const uri = request.uris[0];
+          // Android WebView may silently fail HEAD requests on blob: URLs; GET is always safe.
+          if (uri.startsWith('blob:') && request.method === 'HEAD') request.method = 'GET';
           const isOwn = uri.startsWith('/') || uri.startsWith(window.location.origin) || (BACKEND_BASE !== '' && uri.startsWith(BACKEND_BASE));
           if (!isOwn) {
             request.allowCrossSiteCredentials = false;

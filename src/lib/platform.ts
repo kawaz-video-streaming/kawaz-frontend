@@ -1,6 +1,8 @@
 import { Capacitor } from '@capacitor/core'
 
 export const isNative = Capacitor.isNativePlatform()
+export const isAndroid = Capacitor.getPlatform() === 'android'
+export const isIOS = Capacitor.getPlatform() === 'ios'
 
 // Fire TV / Android TV WebViews sometimes include "Mobile Safari" in their UA
 // (same as phones), but TV devices have no touch screen — maxTouchPoints === 0.

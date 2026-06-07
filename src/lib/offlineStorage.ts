@@ -60,7 +60,9 @@ export const buildOfflineThumbnailsUrl = (
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     spriteUrl = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
     const modifiedVtt = vttText.replace(/thumbnails\.jpg/g, spriteUrl);
-    const vttUrl = URL.createObjectURL(new Blob([modifiedVtt], { type: 'text/vtt' }));
+    // Use data URL for the VTT so Shaka resolves cue URIs without a blob: base URL,
+    // which can cause URI resolution/xywh parsing issues in some WebView versions.
+    const vttUrl = `data:text/vtt;base64,${btoa(modifiedVtt)}`;
     return { vttUrl, spriteUrl };
   } catch {
     if (spriteUrl) URL.revokeObjectURL(spriteUrl);
