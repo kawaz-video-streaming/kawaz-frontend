@@ -47,12 +47,23 @@ export type StoreOperation = {
   abort: () => void;
 };
 
-export const buildOfflineThumbnailsUrl = (vttText: string, spriteDataUrl: string): string | undefined => {
+export const buildOfflineThumbnailsUrl = (
+  vttText: string,
+  spriteDataUrl: string,
+): { vttUrl: string; spriteUrl: string } | undefined => {
+  let spriteUrl: string | undefined;
   try {
-    const modifiedVtt = vttText.replace(/thumbnails\.jpg/g, spriteDataUrl);
-    const vttBlob = new Blob([modifiedVtt], { type: 'text/vtt' });
-    return URL.createObjectURL(vttBlob);
+    const [header, b64] = spriteDataUrl.split(',');
+    const mimeType = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg';
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    spriteUrl = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+    const modifiedVtt = vttText.replace(/thumbnails\.jpg/g, spriteUrl);
+    const vttUrl = URL.createObjectURL(new Blob([modifiedVtt], { type: 'text/vtt' }));
+    return { vttUrl, spriteUrl };
   } catch {
+    if (spriteUrl) URL.revokeObjectURL(spriteUrl);
     return undefined;
   }
 };

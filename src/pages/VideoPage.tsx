@@ -108,24 +108,24 @@ export const VideoPage = () => {
   const [newThumbnail, setNewThumbnail] = useState<File | null>(null);
   const [newThumbnailPreview, setNewThumbnailPreview] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [offlineChaptersUrl, setOfflineChaptersUrl] = useState<string | undefined>(undefined);
-  const [offlineThumbnailsUrl, setOfflineThumbnailsUrl] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (!offlineEntry?.chaptersVttText) return;
+  const offlineChaptersUrl = useMemo(() => {
+    if (!offlineEntry?.chaptersVttText) return undefined;
     const blob = new Blob([offlineEntry.chaptersVttText], { type: 'text/vtt' });
-    const url = URL.createObjectURL(blob);
-    setOfflineChaptersUrl(url);
-    return () => URL.revokeObjectURL(url);
+    return URL.createObjectURL(blob);
   }, [offlineEntry?.chaptersVttText]);
+  useEffect(() => () => { if (offlineChaptersUrl) URL.revokeObjectURL(offlineChaptersUrl); }, [offlineChaptersUrl]);
 
-  useEffect(() => {
-    if (!offlineEntry?.thumbnailsVttText || !offlineEntry.spriteDataUrl) return;
-    const url = buildOfflineThumbnailsUrl(offlineEntry.thumbnailsVttText, offlineEntry.spriteDataUrl);
-    if (!url) return;
-    setOfflineThumbnailsUrl(url);
-    return () => URL.revokeObjectURL(url);
+  const thumbnailBlobPair = useMemo(() => {
+    if (!offlineEntry?.thumbnailsVttText || !offlineEntry.spriteDataUrl) return undefined;
+    return buildOfflineThumbnailsUrl(offlineEntry.thumbnailsVttText, offlineEntry.spriteDataUrl);
   }, [offlineEntry?.thumbnailsVttText, offlineEntry?.spriteDataUrl]);
+  const offlineThumbnailsUrl = thumbnailBlobPair?.vttUrl;
+  useEffect(() => () => {
+    if (thumbnailBlobPair) {
+      URL.revokeObjectURL(thumbnailBlobPair.vttUrl);
+      URL.revokeObjectURL(thumbnailBlobPair.spriteUrl);
+    }
+  }, [thumbnailBlobPair]);
 
   const collectionOptions = useMemo(() => editKind === 'episode'
     ? (collections ?? []).filter((collection) => collection.kind === 'season')
@@ -150,8 +150,6 @@ export const VideoPage = () => {
   useEffect(() => {
     setEditing(false);
     setShowDeleteConfirm(false);
-    setOfflineChaptersUrl(undefined);
-    setOfflineThumbnailsUrl(undefined);
     if (newThumbnailPreview) {
       URL.revokeObjectURL(newThumbnailPreview);
     }
