@@ -1,7 +1,7 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
 import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
 import { isNative, isTV } from '../lib/platform';
-import { buildOfflineThumbnailsUrl } from '../lib/offlineStorage';
+import { parseOfflineThumbnailCues, type OfflineThumbnailCue } from '../lib/offlineStorage';
 import { useOffline } from '../contexts/OfflineContext';
 import { DownloadButton } from '../components/DownloadButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -115,17 +115,10 @@ export const VideoPage = () => {
   }, [offlineEntry?.chaptersVttText]);
   useEffect(() => () => { if (offlineChaptersUrl) URL.revokeObjectURL(offlineChaptersUrl); }, [offlineChaptersUrl]);
 
-  const thumbnailBlobPair = useMemo(() => {
-    if (!offlineEntry?.thumbnailsVttText || !offlineEntry.spriteDataUrl) return undefined;
-    return buildOfflineThumbnailsUrl(offlineEntry.thumbnailsVttText, offlineEntry.spriteDataUrl);
-  }, [offlineEntry?.thumbnailsVttText, offlineEntry?.spriteDataUrl]);
-  const offlineThumbnailsUrl = thumbnailBlobPair?.vttUrl;
-  useEffect(() => () => {
-    if (thumbnailBlobPair) {
-      URL.revokeObjectURL(thumbnailBlobPair.vttUrl);
-      URL.revokeObjectURL(thumbnailBlobPair.spriteUrl);
-    }
-  }, [thumbnailBlobPair]);
+  const offlineThumbnailCues = useMemo<OfflineThumbnailCue[]>(
+    () => offlineEntry?.thumbnailsVttText ? parseOfflineThumbnailCues(offlineEntry.thumbnailsVttText) : [],
+    [offlineEntry?.thumbnailsVttText],
+  );
 
   const collectionOptions = useMemo(() => editKind === 'episode'
     ? (collections ?? []).filter((collection) => collection.kind === 'season')
@@ -299,7 +292,8 @@ export const VideoPage = () => {
         <VideoPlayer
           manifestUrl={offlineEntry.offlineUri}
           chaptersUrl={offlineChaptersUrl ?? offlineEntry.chaptersUrl}
-          thumbnailsUrl={offlineThumbnailsUrl ?? offlineEntry.thumbnailsUrl}
+          offlineThumbnailCues={offlineThumbnailCues}
+          offlineSpriteDataUrl={offlineEntry.spriteDataUrl}
           posterUrl={offlineEntry.thumbnailDataUrl}
           special={offlineEntry.special}
           className="mb-6 rounded-xl"
@@ -379,9 +373,9 @@ export const VideoPage = () => {
         chaptersUrl={offlineUri
           ? (offlineChaptersUrl ?? (video.chaptersUrl ? mediaStreamUrl(video.chaptersUrl, special) : undefined))
           : (video.chaptersUrl ? mediaStreamUrl(video.chaptersUrl, special) : undefined)}
-        thumbnailsUrl={offlineUri
-          ? (offlineThumbnailsUrl ?? (video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined))
-          : (video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined)}
+        thumbnailsUrl={offlineUri ? undefined : (video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined)}
+        offlineThumbnailCues={offlineUri ? offlineThumbnailCues : undefined}
+        offlineSpriteDataUrl={offlineUri ? offlineEntry?.spriteDataUrl : undefined}
         posterUrl={offlineEntry?.thumbnailDataUrl ?? thumbnailSrc}
         special={special}
         className="mb-6 rounded-xl"

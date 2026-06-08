@@ -47,27 +47,41 @@ export type StoreOperation = {
   abort: () => void;
 };
 
-export const buildOfflineThumbnailsUrl = (
-  vttText: string,
-  spriteDataUrl: string,
-): { vttUrl: string; spriteUrl: string } | undefined => {
-  let spriteUrl: string | undefined;
-  try {
-    const [header, b64] = spriteDataUrl.split(',');
-    const mimeType = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg';
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    spriteUrl = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
-    const modifiedVtt = vttText.replace(/thumbnails\.jpg/g, spriteUrl);
-    // Use data URL for the VTT so Shaka resolves cue URIs without a blob: base URL,
-    // which can cause URI resolution/xywh parsing issues in some WebView versions.
-    const vttUrl = `data:text/vtt;base64,${btoa(modifiedVtt)}`;
-    return { vttUrl, spriteUrl };
-  } catch {
-    if (spriteUrl) URL.revokeObjectURL(spriteUrl);
-    return undefined;
+export interface OfflineThumbnailCue {
+  startTime: number;
+  endTime: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const parseVttTime = (s: string): number => {
+  const parts = s.trim().split(':');
+  const sec = parseFloat(parts[parts.length - 1]);
+  const min = parts.length >= 2 ? parseInt(parts[parts.length - 2]) : 0;
+  const hr = parts.length >= 3 ? parseInt(parts[parts.length - 3]) : 0;
+  return hr * 3600 + min * 60 + sec;
+};
+
+export const parseOfflineThumbnailCues = (vttText: string): OfflineThumbnailCue[] => {
+  const cues: OfflineThumbnailCue[] = [];
+  const lines = vttText.split('\n');
+  for (let i = 0; i < lines.length - 1; i++) {
+    const line = lines[i].trim();
+    if (!line.includes(' --> ')) continue;
+    const arrowIdx = line.indexOf(' --> ');
+    const startTime = parseVttTime(line.slice(0, arrowIdx));
+    const endTime = parseVttTime(line.slice(arrowIdx + 5).split(' ')[0]);
+    const payload = lines[i + 1]?.trim() ?? '';
+    const xywh = payload.split('#xywh=')[1]?.split(',');
+    if (xywh?.length === 4) {
+      const [x, y, w, h] = xywh.map(v => parseInt(v));
+      if (!isNaN(x) && !isNaN(y) && !isNaN(w) && !isNaN(h))
+        cues.push({ startTime, endTime, x, y, w, h });
+    }
   }
+  return cues;
 };
 
 const fetchAsDataUrl = async (url: string): Promise<string | undefined> => {
