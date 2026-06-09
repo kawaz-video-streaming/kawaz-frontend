@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { isTV } from '../lib/platform';
+import type { OfflineThumbnailCue } from '../lib/offlineStorage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import { SystemBars } from '../plugins/systemBars';
@@ -60,6 +61,8 @@ interface VideoPlayerProps {
   manifestUrl: string;
   chaptersUrl?: string;
   thumbnailsUrl?: string;
+  offlineThumbnailCues?: OfflineThumbnailCue[];
+  offlineSpriteDataUrl?: string;
   posterUrl?: string;
   special?: boolean;
   className?: string;
@@ -71,6 +74,8 @@ export const VideoPlayer = ({
   manifestUrl,
   chaptersUrl,
   thumbnailsUrl,
+  offlineThumbnailCues,
+  offlineSpriteDataUrl,
   posterUrl,
   special = false,
   className,
@@ -312,6 +317,8 @@ export const VideoPlayer = ({
 
         player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
           const uri = request.uris[0];
+          // Android WebView may silently fail HEAD requests on blob: URLs; GET is always safe.
+          if (uri.startsWith('blob:') && request.method === 'HEAD') request.method = 'GET';
           const isOwn = uri.startsWith('/') || uri.startsWith(window.location.origin) || (BACKEND_BASE !== '' && uri.startsWith(BACKEND_BASE));
           if (!isOwn) {
             request.allowCrossSiteCredentials = false;
@@ -375,7 +382,7 @@ export const VideoPlayer = ({
           try { await player.addChaptersTrack(chaptersUrl, 'und'); void refreshChapters(); }
           catch (e) { console.warn('Failed to load chapters track:', e); }
         }
-        if (thumbnailsUrl) {
+        if (thumbnailsUrl && !offlineThumbnailCues?.length) {
           try { await player.addThumbnailsTrack(thumbnailsUrl); }
           catch (e) { console.warn('Failed to load thumbnails track:', e); }
         }
@@ -539,6 +546,12 @@ export const VideoPlayer = ({
   };
 
   const getThumb = async (time: number): Promise<import('shaka-player').ThumbnailData | null> => {
+    if (offlineThumbnailCues?.length) {
+      const cue = offlineThumbnailCues.find(c => time >= c.startTime && time < c.endTime)
+        ?? offlineThumbnailCues[offlineThumbnailCues.length - 1];
+      return { startTime: cue.startTime, endTime: cue.endTime, uris: ['offline'],
+        width: cue.w, height: cue.h, positionX: cue.x, positionY: cue.y, imageWidth: 0, imageHeight: 0 };
+    }
     const player = playerRef.current;
     if (!player) return null;
     const tracks = player.getImageTracks();
@@ -563,7 +576,7 @@ export const VideoPlayer = ({
   // sprite width (~1600px) fits within GPU texture limits; naturalHeight may be
   // silently downscaled for very tall sprites (4-hour movies produce ~12 960px sheets
   // that exceed the ~4096px Android TV texture height limit).
-  const spriteUrl = hoverThumb?.uris[0].split('#')[0] ?? '';
+  const spriteUrl = hoverThumb ? (offlineSpriteDataUrl ?? hoverThumb.uris[0].split('#')[0]) : '';
   useEffect(() => {
     if (!spriteUrl) return;
     const img = new Image();

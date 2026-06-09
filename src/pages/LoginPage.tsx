@@ -153,23 +153,25 @@ export const LoginPage = () => {
       const code = url.searchParams.get('code')
       const error = url.searchParams.get('error')
 
+      const provider = url.searchParams.get('provider') ?? 'google'
+      const providerLabel = provider === 'apple' ? 'Apple' : 'Google'
+
       if (url.searchParams.get('pending') === 'true') {
         setInlineMessage({ type: 'success', text: 'Your account is pending admin approval.' })
       } else if (error === 'conflict') {
         setInlineMessage({ type: 'error', text: 'This Google account is already linked to a username/password account. Please sign in manually.' })
       } else if (error) {
-        toast.error('Google sign-in failed. Please try again.', toastError)
+        toast.error(`${providerLabel} sign-in failed. Please try again.`, toastError)
       } else if (code) {
-        // Exchange the one-time code for the session cookie
-        void apiRequest('/auth/google/native/exchange', {
+        void apiRequest<{ role?: string; username?: string }>('/auth/google/native/exchange', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code }),
-        }).then(() => {
-          login()
+        }).then((data) => {
+          login(data.role, data.username)
           void navigate('/profiles')
         }).catch(() => {
-          toast.error('Google sign-in failed. Please try again.', toastError)
+          toast.error(`${providerLabel} sign-in failed. Please try again.`, toastError)
         })
       }
     })
@@ -213,6 +215,14 @@ export const LoginPage = () => {
     // Mobile native: open OAuth in Chrome Custom Tabs (Google-allowed)
     // Backend must redirect to com.kawaz.plus://auth/callback on completion
     await Browser.open({ url: apiUrl('/auth/google/login?return=native'), presentationStyle: 'popover' })
+  }
+
+  const handleAppleClick = async () => {
+    if (!isNative) {
+      window.location.href = apiUrl('/auth/apple/login')
+      return
+    }
+    await Browser.open({ url: apiUrl('/auth/apple/login?return=native'), presentationStyle: 'popover' })
   }
 
   const usernameValid = validateUsername(username)
@@ -277,7 +287,8 @@ export const LoginPage = () => {
         throw new Error(data?.error || `Request failed with status ${response.status}`)
       }
 
-      login(undefined, username)
+      const data = await response.json().catch(() => null) as { role?: string; username?: string } | null
+      login(data?.role, data?.username ?? username)
       void navigate('/profiles')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Authentication failed', toastError)
@@ -296,7 +307,7 @@ export const LoginPage = () => {
     <div className="dark relative flex min-h-screen items-center justify-center bg-zinc-950 px-4">
       <div className="absolute inset-0 bg-linear-to-br from-zinc-900 via-zinc-950 to-black" />
 
-      <div className="relative w-full max-w-sm">
+      <div className="relative w-full max-w-sm md:max-w-md">
         <div className="mb-8 text-center">
           <h1 className="text-5xl font-extrabold tracking-tight text-white">
             Kawaz<span className="text-red-500">+</span>
@@ -465,6 +476,20 @@ export const LoginPage = () => {
                     </svg>
                     {isTV ? 'Sign in with Google on another device' : 'Sign in with Google'}
                   </button>
+
+                  {!isTV && (
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => { void handleAppleClick() }}
+                      className="flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-700 bg-black py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <svg width="17" height="17" viewBox="0 0 814 1000" aria-hidden="true" fill="currentColor">
+                        <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-37.5-155.5-125.4a396.5 396.5 0 0 1-52.1-195.3c0-122.4 63.5-187.4 128.3-224.6 65.8-38.4 152.5-45.5 209.4-45.5 57 0 119.3 14.1 159.2 37.1 36.8 20.6 109 48.3 109 48.3zM554.7 88c32.2-38.5 55.7-91.8 55.7-145.1 0-7.8-.7-15.7-2-23.3-52.1 2-113.9 34.7-150.8 75.8-29.9 33.2-56.6 86.1-56.6 140.1 0 8.3 1.4 16.6 2 19.1 3.2.6 8.4 1.3 13.7 1.3 46.5 0 105.4-31.1 138-67.9z"/>
+                      </svg>
+                      Sign in with Apple
+                    </button>
+                  )}
                 </>
               )}
 

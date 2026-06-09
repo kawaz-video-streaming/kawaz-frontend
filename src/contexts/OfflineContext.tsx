@@ -1,3 +1,6 @@
+import { App } from '@capacitor/app';
+import { registerPlugin } from '@capacitor/core';
+import { toast } from 'sonner';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   listOfflineEntries,
@@ -7,7 +10,13 @@ import {
   type OfflineMetadata,
   type StoreOperation,
 } from '../lib/offlineStorage';
-import { isNative, isTV } from '../lib/platform';
+import { isAndroid, isIOS, isNative, isTV } from '../lib/platform';
+
+interface DownloadServicePlugin {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+}
+const DownloadService = registerPlugin<DownloadServicePlugin>('DownloadService');
 
 interface QueueItem {
   mediaId: string;
@@ -59,6 +68,8 @@ export const OfflineProvider = ({ children }: { children: React.ReactNode }) => 
   const entriesRef = useRef<OfflineEntry[]>([]);
   const operationRef = useRef<StoreOperation | null>(null);
   const isProcessingRef = useRef(false);
+  const serviceRunningRef = useRef(false);
+  const backgroundedRef = useRef(false);
 
   useEffect(() => {
     if (!isNative || isTV) return;
@@ -75,6 +86,11 @@ export const OfflineProvider = ({ children }: { children: React.ReactNode }) => 
       prev.map(d => d.mediaId === item.mediaId ? { ...d, status: 'downloading' } : d),
     );
 
+    if (isAndroid && !serviceRunningRef.current) {
+      serviceRunningRef.current = true;
+      void DownloadService.start();
+    }
+
     const op = storeVideo(item.playUrl, item.mediaId, item.special, item.metadata, item.thumbnailUrl, pct => {
       setDownloadQueue(prev =>
         prev.map(d => d.mediaId === item.mediaId ? { ...d, progress: pct } : d),
@@ -84,13 +100,26 @@ export const OfflineProvider = ({ children }: { children: React.ReactNode }) => 
 
     op.promise
       .then(entry => { entriesRef.current = [...entriesRef.current, entry]; setEntries(entriesRef.current); })
-      .catch(err => { if (err?.message !== 'Aborted') console.error('Download failed:', err); })
+      .catch(err => { if (!backgroundedRef.current && err?.message !== 'Aborted') console.error('Download failed:', err); })
       .finally(() => {
-        queueRef.current = queueRef.current.filter(q => q.mediaId !== item.mediaId);
         operationRef.current = null;
         isProcessingRef.current = false;
-        setDownloadQueue(prev => prev.filter(d => d.mediaId !== item.mediaId));
-        processNext();
+        if (backgroundedRef.current) {
+          // Aborted due to iOS backgrounding — keep item in queue, reset to queued state
+          backgroundedRef.current = false;
+          setDownloadQueue(prev =>
+            prev.map(d => d.mediaId === item.mediaId ? { ...d, status: 'queued', progress: 0 } : d),
+          );
+          // processNext() will be called by the appStateChange foreground handler
+        } else {
+          queueRef.current = queueRef.current.filter(q => q.mediaId !== item.mediaId);
+          setDownloadQueue(prev => prev.filter(d => d.mediaId !== item.mediaId));
+          if (isAndroid && queueRef.current.length === 0 && serviceRunningRef.current) {
+            serviceRunningRef.current = false;
+            void DownloadService.stop();
+          }
+          processNext();
+        }
       });
   }, []);
 
@@ -98,8 +127,12 @@ export const OfflineProvider = ({ children }: { children: React.ReactNode }) => 
     if (entriesRef.current.some(e => e.mediaId === mediaId)) return;
     if (queueRef.current.some(q => q.mediaId === mediaId)) return;
 
+    const wasEmpty = queueRef.current.length === 0;
     queueRef.current = [...queueRef.current, { mediaId, playUrl, thumbnailUrl, special, metadata }];
     setDownloadQueue(prev => [...prev, { mediaId, title: metadata.title, progress: 0, status: 'queued' }]);
+    if (isIOS && wasEmpty) {
+      toast('Keep the app open to complete the download', { duration: 6000 });
+    }
     processNext();
   }, [processNext]);
 
@@ -115,6 +148,27 @@ export const OfflineProvider = ({ children }: { children: React.ReactNode }) => 
       isProcessingRef.current = false;
       processNext();
     }
+  }, [processNext]);
+
+  useEffect(() => {
+    if (!isIOS) return;
+
+    let handle: { remove: () => void } | null = null;
+
+    void App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive && isProcessingRef.current) {
+        backgroundedRef.current = true;
+        operationRef.current?.abort();
+        toast('Download paused — return to the app to resume', { duration: 4000 });
+      } else if (isActive) {
+        // Let Shaka's rejection/finally chain settle before restarting
+        setTimeout(() => {
+          if (!isProcessingRef.current && queueRef.current.length > 0) processNext();
+        }, 300);
+      }
+    }).then(h => { handle = h; });
+
+    return () => { handle?.remove(); };
   }, [processNext]);
 
   const deleteEntry = async (offlineUri: string) => {

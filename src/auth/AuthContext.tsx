@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { apiRequest, AuthError } from '../api/client'
 
@@ -37,6 +37,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [role, setRole] = useState<string | null>(null)
   const [username, setUsername] = useState<string | null>(null)
   const [specialPool, setSpecialPool] = useState(false)
+  const justLoggedInRef = useRef(false)
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile | null>(() => {
     const stored = localStorage.getItem(PROFILE_KEY)
     return stored ? JSON.parse(stored) : null
@@ -46,6 +47,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // The cookie is sent automatically; the backend is the source of truth.
   useEffect(() => {
     if (!isAuthenticated) return
+    if (justLoggedInRef.current) {
+      justLoggedInRef.current = false
+      return
+    }
     apiRequest<{ role?: string; username?: string }>('/user/me')
       .then((data) => {
         setRole(data.role ?? null)
@@ -60,6 +65,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [isAuthenticated])
 
   const login = useCallback((newRole?: string, newUsername?: string) => {
+    justLoggedInRef.current = true
     localStorage.setItem(AUTH_KEY, 'true')
     setIsAuthenticated(true)
     setRole(newRole ?? null)
