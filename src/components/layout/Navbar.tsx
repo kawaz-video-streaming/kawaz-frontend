@@ -98,7 +98,7 @@ export const Navbar = () => {
         {/* Left: Admin dropdown — flex-1 so center stays naturally centered */}
         <div className="flex flex-1 items-center">
           {isAdmin && (
-            <div ref={adminMenuRef} className="relative hidden lg:block landscape:block">
+            <div ref={adminMenuRef} className="relative hidden md:block landscape:block">
               <button
                 onClick={() => setAdminMenuOpen((o) => !o)}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -179,7 +179,7 @@ export const Navbar = () => {
           {isAdmin && (
             <button
               onClick={toggleSpecialPool}
-              className={`relative hidden lg:flex landscape:flex rounded-lg p-2 transition-colors hover:bg-accent ${specialPool ? 'text-purple-500' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`relative hidden md:flex landscape:flex rounded-lg p-2 transition-colors hover:bg-accent ${specialPool ? 'text-purple-500' : 'text-muted-foreground hover:text-foreground'}`}
               aria-label={specialPool ? 'Switch to regular pool' : 'Switch to special pool'}
             >
               <Database size={16} />
@@ -191,7 +191,7 @@ export const Navbar = () => {
 
           {/* Processing panel (admin only) — hidden on mobile, BottomNav handles it there */}
           {isAdmin && (
-            <div ref={processingRef} className="relative hidden lg:block landscape:block">
+            <div ref={processingRef} className="relative hidden md:block landscape:block">
               <button
                 onClick={() => setProcessingOpen((o) => !o)}
                 className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -210,7 +210,7 @@ export const Navbar = () => {
 
           {/* Pending signups panel (admin only) — hidden on mobile, BottomNav handles it there */}
           {isAdmin && (
-            <div ref={signupsRef} className="relative hidden lg:block landscape:block">
+            <div ref={signupsRef} className="relative hidden md:block landscape:block">
               <button
                 onClick={() => setSignupsOpen((o) => !o)}
                 className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
