@@ -330,7 +330,13 @@ export const VideoPlayer = ({
             // Backend URIs (absolute BACKEND_BASE URLs) need credentials enabled explicitly
             if (BACKEND_BASE !== '' && uri.startsWith(BACKEND_BASE)) request.allowCrossSiteCredentials = true;
             const bearerHeader = authHeaders()['Authorization'];
-            if (bearerHeader) request.headers['Authorization'] = bearerHeader;
+            if (bearerHeader) {
+              request.headers['Authorization'] = bearerHeader;
+              // Also append token as query param — iOS WKWebView on older versions
+              // silently drops the Authorization header for cross-origin requests.
+              const token = bearerHeader.slice(7);
+              request.uris = request.uris.map(u => u.includes('token=') ? u : u + (u.includes('?') ? `&token=${token}` : `?token=${token}`));
+            }
             if (special && !uri.includes('special=true')) {
               request.uris = request.uris.map(u => u + (u.includes('?') ? '&special=true' : '?special=true'));
             }
