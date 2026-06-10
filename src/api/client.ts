@@ -22,6 +22,10 @@ const TOKEN_KEY = 'kawaz_token'
 export const storeToken = (token: string) => localStorage.setItem(TOKEN_KEY, token)
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
 const getToken = () => localStorage.getItem(TOKEN_KEY)
+export const authHeaders = (): Record<string, string> => {
+  const token = getToken()
+  return token !== null ? { Authorization: `Bearer ${token}` } : {}
+}
 
 export const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const token = getToken()

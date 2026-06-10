@@ -1,5 +1,6 @@
 import type { offline } from 'shaka-player/dist/shaka-player.ui.js';
 import type { AudioStream, Coordinates, MediaKind, SubtitleStream } from '../types/api';
+import { authHeaders } from '../api/client';
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
 
@@ -86,7 +87,7 @@ export const parseOfflineThumbnailCues = (vttText: string): OfflineThumbnailCue[
 
 const fetchAsDataUrl = async (url: string): Promise<string | undefined> => {
   try {
-    const res = await fetch(url, { credentials: 'include' });
+    const res = await fetch(url, { credentials: 'include', headers: authHeaders() });
     if (!res.ok) return undefined;
     const blob = await res.blob();
     return new Promise(resolve => {
@@ -101,7 +102,7 @@ const fetchAsDataUrl = async (url: string): Promise<string | undefined> => {
 };
 
 const buildRequestFilter = (special: boolean) =>
-  (_type: number, request: { uris: string[]; allowCrossSiteCredentials: boolean }) => {
+  (_type: number, request: { uris: string[]; method: string; allowCrossSiteCredentials: boolean; headers: Record<string, string> }) => {
     const uri = request.uris[0];
     const isOwn =
       uri.startsWith('/') ||
@@ -113,6 +114,8 @@ const buildRequestFilter = (special: boolean) =>
       if (BACKEND_BASE !== '' && uri.startsWith(BACKEND_BASE)) {
         request.allowCrossSiteCredentials = true;
       }
+      const bearerHeader = authHeaders()['Authorization'];
+      if (bearerHeader) request.headers['Authorization'] = bearerHeader;
       if (special && !uri.includes('special=true')) {
         request.uris = request.uris.map(u =>
           u + (u.includes('?') ? '&special=true' : '?special=true'),
@@ -184,7 +187,7 @@ export const storeVideo = (
     let chaptersVttText: string | undefined;
     if (metadata.chaptersUrl) {
       try {
-        const res = await fetch(metadata.chaptersUrl, { credentials: 'include' });
+        const res = await fetch(metadata.chaptersUrl, { credentials: 'include', headers: authHeaders() });
         if (res.ok) chaptersVttText = await res.text();
       } catch { /* ignore */ }
     }
@@ -193,7 +196,7 @@ export const storeVideo = (
     let spriteDataUrl: string | undefined;
     if (metadata.thumbnailsUrl) {
       try {
-        const vttRes = await fetch(metadata.thumbnailsUrl, { credentials: 'include' });
+        const vttRes = await fetch(metadata.thumbnailsUrl, { credentials: 'include', headers: authHeaders() });
         if (vttRes.ok) {
           thumbnailsVttText = await vttRes.text();
           const spriteUrl = metadata.thumbnailsUrl.replace('thumbnails.vtt', 'thumbnails.jpg');

@@ -11,6 +11,7 @@ import { getObjectPositionFromFocalPoint } from '../lib/focalPoints';
 import type { CollectionListItem, VideoListItem, Coordinates } from '../types/api';
 import { isNative, isTV } from '../lib/platform';
 import { DownloadButton } from '../components/DownloadButton';
+import { AuthImage } from '../components/AuthImage';
 
 const formatDuration = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000);
@@ -34,7 +35,7 @@ const ItemThumbnail = ({
 }) => {
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number; } | null>(null);
   return (
-    <img
+    <AuthImage
       src={src}
       alt={title}
       loading="lazy"

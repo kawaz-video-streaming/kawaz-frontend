@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import { SystemBars } from '../plugins/systemBars';
 import { prefetchFirstSegments, formatVideoError } from '../lib/videoUtils';
+import { authHeaders } from '../api/client';
 import { useTVControls } from '../hooks/useTVControls';
 import { useVideoKeyboard } from '../hooks/useVideoKeyboard';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List, RotateCcw, RotateCw, X, ChevronRight } from 'lucide-react';
@@ -325,6 +326,8 @@ export const VideoPlayer = ({
           } else {
             // Backend URIs (absolute BACKEND_BASE URLs) need credentials enabled explicitly
             if (BACKEND_BASE !== '' && uri.startsWith(BACKEND_BASE)) request.allowCrossSiteCredentials = true;
+            const bearerHeader = authHeaders()['Authorization'];
+            if (bearerHeader) request.headers['Authorization'] = bearerHeader;
             if (special && !uri.includes('special=true')) {
               request.uris = request.uris.map(u => u + (u.includes('?') ? '&special=true' : '?special=true'));
             }

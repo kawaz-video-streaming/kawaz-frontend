@@ -6,6 +6,7 @@ import { Sun, Moon, LogOut, UserCircle2, Users, Loader2, UserPlus, Search, Datab
 import { useAuth } from '../../auth/useAuth';
 import { useTheme } from '../../theme/ThemeContext';
 import { avatarImageUrl } from '../../api/avatar';
+import { AuthImage } from '../AuthImage';
 import { usePendingMedia } from '../../hooks/usePendingMedia';
 import { usePendingUsers } from '../../hooks/usePendingUsers';
 import { MediaProcessingPanel } from '../MediaProcessingPanel';
@@ -260,7 +261,7 @@ export const Navbar = () => {
               aria-label="Account menu"
             >
               {selectedProfile ? (
-                <img src={avatarImageUrl(selectedProfile.avatarId, isAdmin && specialPool)} alt={selectedProfile.name} className="h-full w-full object-cover" style={{ transform: 'translateZ(0)', imageRendering: 'auto' }} />
+                <AuthImage src={avatarImageUrl(selectedProfile.avatarId, isAdmin && specialPool)} alt={selectedProfile.name} className="h-full w-full object-cover" style={{ transform: 'translateZ(0)', imageRendering: 'auto' }} />
               ) : (
                 <UserCircle2 size={18} />
               )}

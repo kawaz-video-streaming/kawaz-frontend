@@ -1,6 +1,8 @@
+import { authHeaders } from '../api/client';
+
 export const prefetchFirstSegments = async (manifestUrl: string, special: boolean) => {
   try {
-    const res = await fetch(manifestUrl, { credentials: 'include' });
+    const res = await fetch(manifestUrl, { credentials: 'include', headers: authHeaders() });
     if (!res.ok) return;
     const text = await res.text();
     const manifestPath = manifestUrl.includes('?')
@@ -32,7 +34,7 @@ export const prefetchFirstSegments = async (manifestUrl: string, special: boolea
       urls.push(base + firstSeg + sp);
     }
 
-    await Promise.all(urls.map(u => fetch(u, { credentials: 'include' })));
+    await Promise.all(urls.map(u => fetch(u, { credentials: 'include', headers: authHeaders() })));
   } catch {
     // best-effort
   }

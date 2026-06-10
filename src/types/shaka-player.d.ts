@@ -61,7 +61,7 @@ declare module 'shaka-player' {
     attach(video: HTMLMediaElement): Promise<void>
     load(uri: string): Promise<void>
     getNetworkingEngine(): {
-      registerRequestFilter(filter: (type: number, request: { uris: string[]; method: string; allowCrossSiteCredentials: boolean }) => void): void
+      registerRequestFilter(filter: (type: number, request: { uris: string[]; method: string; allowCrossSiteCredentials: boolean; headers: Record<string, string> }) => void): void
       registerResponseFilter(filter: (type: number, response: { uri: string; data: ArrayBuffer }) => void): void
     } | null
     addChaptersTrack(uri: string, language: string, mimeType?: string): Promise<TextTrack>
@@ -120,7 +120,7 @@ declare module 'shaka-player/dist/shaka-player.ui.js' {
       constructor(player?: Player)
       configure(config: object | string, value?: unknown): boolean
       getNetworkingEngine(): {
-        registerRequestFilter(filter: (type: number, request: { uris: string[]; method: string; allowCrossSiteCredentials: boolean }) => void): void
+        registerRequestFilter(filter: (type: number, request: { uris: string[]; method: string; allowCrossSiteCredentials: boolean; headers: Record<string, string> }) => void): void
       } | null
       list(): Promise<StoredContent[]>
       store(uri: string, appMetadata?: object, mimeType?: string | null): StoreOperation
