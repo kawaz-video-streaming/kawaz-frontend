@@ -97,7 +97,7 @@ export const BottomNav = () => {
 
       {/* Bottom bar */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-50 md:hidden landscape:hidden border-t border-border bg-background/95 backdrop-blur-md${Capacitor.isNativePlatform() ? ' portrait:pb-8' : ''}`}
+        className={`fixed bottom-0 left-0 right-0 z-50 lg:hidden landscape:hidden border-t border-border bg-background/95 backdrop-blur-md${Capacitor.isNativePlatform() ? ' portrait:pb-8' : ''}`}
       >
         <div className="flex items-center justify-around">
 
