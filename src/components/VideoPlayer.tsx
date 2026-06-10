@@ -811,7 +811,7 @@ export const VideoPlayer = ({
         }}
         onMouseLeave={() => { if (!pausedRef.current) scheduleHide(); }}
       >
-        <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} />
+        <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} playsInline />
 
         {/* Thumbnail preview */}
         {hoverThumb && hoverTime !== null && (
