@@ -385,7 +385,14 @@ export const VideoPlayer = ({
         video.addEventListener('canplay', onProgress);
 
         if (isDisposed) return;
-        await player.load(manifestUrl);
+        // Bake token into the manifest URL directly so the very first request
+        // is authenticated even if iOS WKWebView drops the Authorization header
+        // before the request filter has a chance to act.
+        const bearerForLoad = authHeaders()['Authorization'];
+        const manifestToLoad = bearerForLoad && !manifestUrl.includes('token=')
+          ? manifestUrl + (manifestUrl.includes('?') ? `&token=${bearerForLoad.slice(7)}` : `?token=${bearerForLoad.slice(7)}`)
+          : manifestUrl;
+        await player.load(manifestToLoad);
         if (isDisposed) return;
 
         refreshPlayerState();

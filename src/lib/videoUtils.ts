@@ -1,8 +1,16 @@
 import { authHeaders } from '../api/client';
 
+const withTokenParam = (url: string): string => {
+  const bearer = authHeaders()['Authorization'];
+  if (!bearer) return url;
+  const token = bearer.slice(7);
+  return url.includes('token=') ? url : url + (url.includes('?') ? `&token=${token}` : `?token=${token}`);
+};
+
 export const prefetchFirstSegments = async (manifestUrl: string, special: boolean) => {
   try {
-    const res = await fetch(manifestUrl, { credentials: 'include', headers: authHeaders() });
+    const url = withTokenParam(manifestUrl);
+    const res = await fetch(url, { credentials: 'include', headers: authHeaders() });
     if (!res.ok) return;
     const text = await res.text();
     const manifestPath = manifestUrl.includes('?')
