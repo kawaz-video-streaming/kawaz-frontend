@@ -17,22 +17,32 @@ export const apiUrl = (path: string) => `${BASE}/api${path}`
 
 export const specialParam = (special: boolean) => special ? '?special=true' : ''
 
+const TOKEN_KEY = 'kawaz_token'
+
+export const storeToken = (token: string) => localStorage.setItem(TOKEN_KEY, token)
+export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
+const getToken = () => localStorage.getItem(TOKEN_KEY)
+
 export const apiRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const token = getToken()
   const response = await fetch(apiUrl(path), {
     ...init,
     credentials: 'include',
     headers: {
       ...(init?.headers as Record<string, string> | undefined),
+      ...(token !== null ? { Authorization: `Bearer ${token}` } : {}),
     },
   })
   return handleResponse<T>(response)
 }
 
 export const apiUpload = async <T>(path: string, formData: FormData, method = 'POST'): Promise<T> => {
+  const token = getToken()
   const response = await fetch(apiUrl(path), {
     method,
     credentials: 'include',
     body: formData,
+    ...(token !== null ? { headers: { Authorization: `Bearer ${token}` } } : {}),
   })
   return handleResponse<T>(response)
 }
