@@ -32,9 +32,9 @@ export const resolveAuthImageUrl = resolveUrl
 type AuthImageProps = ImgHTMLAttributes<HTMLImageElement> & { src: string }
 
 export const AuthImage = ({ src, ...props }: AuthImageProps) => {
-  const isPassthrough = src.startsWith('blob:') || src.startsWith('data:')
-
-  const [url, setUrl] = useState(() => isPassthrough ? src : (cache.get(src) ?? ''))
+  // Start with the cached blob URL if available, otherwise the original src so the
+  // browser begins loading immediately (no visible delay on any platform).
+  const [url, setUrl] = useState(() => cache.get(src) ?? src)
 
   useEffect(() => {
     if (src.startsWith('blob:') || src.startsWith('data:')) {
@@ -43,8 +43,10 @@ export const AuthImage = ({ src, ...props }: AuthImageProps) => {
     }
     const cached = cache.get(src)
     if (cached) { setUrl(cached); return }
+    // Show original src immediately while fetching the auth-headered version in background
+    setUrl(src)
     let active = true
-    resolveUrl(src).then(u => { if (active) setUrl(u) })
+    resolveUrl(src).then(u => { if (active && u) setUrl(u) })
     return () => { active = false }
   }, [src])
 

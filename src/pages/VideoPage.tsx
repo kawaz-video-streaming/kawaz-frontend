@@ -112,7 +112,9 @@ export const VideoPage = () => {
   const [posterBlobUrl, setPosterBlobUrl] = useState('');
   useEffect(() => {
     if (!video) return;
-    void resolveAuthImageUrl(mediaThumbnailUrl(video._id, isAdmin && specialPool)).then(setPosterBlobUrl);
+    const src = mediaThumbnailUrl(video._id, isAdmin && specialPool);
+    setPosterBlobUrl(src);
+    void resolveAuthImageUrl(src).then(u => { if (u) setPosterBlobUrl(u); });
   }, [video, isAdmin, specialPool]);
   const offlineChaptersUrl = useMemo(() => {
     if (!offlineEntry?.chaptersVttText) return undefined;
