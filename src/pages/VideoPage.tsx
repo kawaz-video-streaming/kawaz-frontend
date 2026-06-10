@@ -109,6 +109,11 @@ export const VideoPage = () => {
   const [newThumbnail, setNewThumbnail] = useState<File | null>(null);
   const [newThumbnailPreview, setNewThumbnailPreview] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [posterBlobUrl, setPosterBlobUrl] = useState('');
+  useEffect(() => {
+    if (!video) return;
+    void resolveAuthImageUrl(mediaThumbnailUrl(video._id, isAdmin && specialPool)).then(setPosterBlobUrl);
+  }, [video, isAdmin, specialPool]);
   const offlineChaptersUrl = useMemo(() => {
     if (!offlineEntry?.chaptersVttText) return undefined;
     const blob = new Blob([offlineEntry.chaptersVttText], { type: 'text/vtt' });
@@ -329,8 +334,6 @@ export const VideoPage = () => {
 
   const special = isAdmin && specialPool;
   const thumbnailSrc = mediaThumbnailUrl(video._id, special);
-  const [posterBlobUrl, setPosterBlobUrl] = useState('')
-  useEffect(() => { void resolveAuthImageUrl(thumbnailSrc).then(setPosterBlobUrl) }, [thumbnailSrc])
   const manifestUrl = offlineUri ?? mediaStreamUrl(video.playUrl, special);
   const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3;
 
