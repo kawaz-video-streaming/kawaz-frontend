@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { apiRequest, AuthError, storeToken, clearToken } from '../api/client'
+import { clearAuthImageCache } from '../components/AuthImage'
 
 const AUTH_KEY = 'kawaz_authed'
 const PROFILE_KEY = 'kawaz_profile'
@@ -76,6 +77,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const logout = useCallback(() => {
     localStorage.removeItem(AUTH_KEY)
     clearToken()
+    clearAuthImageCache()
     setIsAuthenticated(false)
     setRole(null)
     setUsername(null)

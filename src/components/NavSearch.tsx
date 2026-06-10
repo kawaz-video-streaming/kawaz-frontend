@@ -7,6 +7,7 @@ import { useVideos } from '../hooks/useVideos'
 import { useCollections } from '../hooks/useCollections'
 import { mediaThumbnailUrl } from '../api/media'
 import { collectionThumbnailUrl } from '../api/mediaCollection'
+import { AuthImage } from './AuthImage'
 import { useAuth } from '../auth/useAuth'
 import type { VideoListItem, CollectionListItem } from '../types/api'
 
@@ -116,7 +117,7 @@ export const NavSearch = ({ open, onClose }: NavSearchProps) => {
                   className="flex w-full items-center gap-4 py-3 text-left transition-colors hover:bg-accent/50 rounded-xl px-3"
                 >
                   <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
-                    <img
+                    <AuthImage
                       src={
                         item.type === 'collection'
                           ? collectionThumbnailUrl(item.data._id, special)

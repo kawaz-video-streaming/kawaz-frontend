@@ -13,6 +13,7 @@ import { useDeleteCollection } from '../hooks/useDeleteCollection';
 import { useVideos } from '../hooks/useVideos';
 import { useGenres } from '../hooks/useGenres';
 import { useAuth } from '../auth/useAuth';
+import { AuthImage } from '../components/AuthImage';
 import { getFocalCropArea, getObjectPositionFromFocalPoint } from '../lib/focalPoints';
 import { parsePositiveInt } from '../lib/parsePositiveInt';
 import { toast } from 'sonner';
@@ -44,7 +45,7 @@ const FocalPointPicker = ({
     <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Click the image to set which part stays visible in thumbnails.</p>
       <div className={`relative mx-auto cursor-crosshair overflow-hidden rounded-lg border border-border ${aspectRatio >= 1 ? 'max-w-[450px]' : 'max-w-[300px]'}`} onClick={handleClick}>
-        <img
+        <AuthImage
           src={src}
           alt="Thumbnail"
           className="block w-full"
@@ -80,7 +81,7 @@ const ItemThumbnail = ({
 }) => {
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number; } | null>(null);
   return (
-    <img
+    <AuthImage
       src={src}
       alt={title}
       loading="lazy"

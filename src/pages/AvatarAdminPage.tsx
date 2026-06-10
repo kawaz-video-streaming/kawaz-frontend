@@ -7,6 +7,7 @@ import { useAvatarCategories } from '../hooks/useAvatarCategories'
 import { useCreateAvatarCategory } from '../hooks/useCreateAvatarCategory'
 import { useDeleteAvatarCategory } from '../hooks/useDeleteAvatarCategory'
 import { avatarImageUrl } from '../api/avatar'
+import { AuthImage } from '../components/AuthImage'
 import { useAuth } from '../auth/useAuth'
 import type { Avatar, AvatarCategory } from '../types/api'
 
@@ -140,7 +141,7 @@ const AvatarCard = ({ avatar, onDelete }: { avatar: Avatar; onDelete: (id: strin
   return (
   <div className="relative flex flex-col items-center gap-2 p-2">
     <div className="h-24 w-24 sm:h-36 sm:w-36 lg:h-48 lg:w-48 overflow-hidden rounded-full ring-1 ring-border">
-      <img src={avatarImageUrl(avatar._id, isAdmin && specialPool)} alt={avatar.name} className="h-full w-full object-cover" />
+      <AuthImage src={avatarImageUrl(avatar._id, isAdmin && specialPool)} alt={avatar.name} className="h-full w-full object-cover" />
     </div>
     <span className="w-24 sm:w-36 lg:w-48 truncate text-center text-xs font-medium">{avatar.name}</span>
     <button

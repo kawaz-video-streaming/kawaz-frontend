@@ -21,6 +21,7 @@ import { getFocalCropArea } from '../lib/focalPoints';
 import { buildTopographicList, buildSeasonGroups } from '../lib/collections';
 import { parsePositiveInt } from '../lib/parsePositiveInt';
 import { toast } from 'sonner';
+import { AuthImage, resolveAuthImageUrl } from '../components/AuthImage';
 
 const FocalPointPicker = ({
   src,
@@ -53,7 +54,7 @@ const FocalPointPicker = ({
     <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Click the image to set which part stays visible in thumbnails.</p>
       <div className={`relative mx-auto cursor-crosshair overflow-hidden rounded-lg border border-border ${aspectRatio >= 1 ? 'max-w-[450px]' : 'max-w-[300px]'}`} onClick={handleClick}>
-        <img src={src} alt="Thumbnail" className="block w-full" draggable={false} onLoad={handleLoad} />
+        <AuthImage src={src} alt="Thumbnail" className="block w-full" draggable={false} onLoad={handleLoad} />
         {crop && (
           <div
             className="pointer-events-none absolute rounded-sm"
@@ -328,6 +329,8 @@ export const VideoPage = () => {
 
   const special = isAdmin && specialPool;
   const thumbnailSrc = mediaThumbnailUrl(video._id, special);
+  const [posterBlobUrl, setPosterBlobUrl] = useState('')
+  useEffect(() => { void resolveAuthImageUrl(thumbnailSrc).then(setPosterBlobUrl) }, [thumbnailSrc])
   const manifestUrl = offlineUri ?? mediaStreamUrl(video.playUrl, special);
   const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3;
 
@@ -376,7 +379,7 @@ export const VideoPage = () => {
         thumbnailsUrl={offlineUri ? undefined : (video.thumbnailsUrl ? mediaStreamUrl(video.thumbnailsUrl, special) : undefined)}
         offlineThumbnailCues={offlineUri ? offlineThumbnailCues : undefined}
         offlineSpriteDataUrl={offlineUri ? offlineEntry?.spriteDataUrl : undefined}
-        posterUrl={offlineEntry?.thumbnailDataUrl ?? thumbnailSrc}
+        posterUrl={offlineEntry?.thumbnailDataUrl ?? posterBlobUrl}
         special={special}
         className="mb-6 rounded-xl"
         nextEpisodeTitle={nextVideo?.title}
