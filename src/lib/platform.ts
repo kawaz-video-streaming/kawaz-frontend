@@ -10,3 +10,8 @@ export const isIOS = Capacitor.getPlatform() === 'ios'
 export const isTV =
   Capacitor.isNativePlatform() &&
   navigator.maxTouchPoints === 0
+
+// MPEG-DASH via Shaka requires Managed Media Source (iOS 17.1+) on iPhone.
+// Without it Shaka cannot set up a SourceBuffer and playback fails silently.
+export const isDashSupported =
+  !isNative || !isIOS || typeof (window as any).ManagedMediaSource !== 'undefined'
