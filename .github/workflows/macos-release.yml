@@ -15,6 +15,21 @@ jobs:
       - name: Select Xcode 26
         run: sudo xcode-select -s /Applications/Xcode_26.0.app
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env.native
+        run: echo "VITE_BACKEND_URL=https://kawazplus.com" > .env.native
+
+      - name: Build web app for native
+        run: npm run build:native
+
       - name: Install ImageMagick
         run: brew install imagemagick
 
