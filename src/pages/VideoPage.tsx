@@ -1,6 +1,6 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
 import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
-import { isNative, isTV } from '../lib/platform';
+import { isDashSupported, isNative, isTV } from '../lib/platform';
 import { parseOfflineThumbnailCues, type OfflineThumbnailCue } from '../lib/offlineStorage';
 import { useOffline } from '../contexts/OfflineContext';
 import { DownloadButton } from '../components/DownloadButton';
@@ -375,6 +375,11 @@ export const VideoPage = () => {
         );
       })()}
 
+      {!offlineUri && !isDashSupported ? (
+        <div className="mb-6 flex aspect-video w-full items-center justify-center rounded-xl bg-black/60 px-6 text-center text-sm text-muted-foreground">
+          Video playback requires iOS 17.1 or later. Please update your device in Settings → General → Software Update.
+        </div>
+      ) : (
       <VideoPlayer
         key={manifestVersion}
         manifestUrl={manifestUrl}
@@ -390,6 +395,7 @@ export const VideoPage = () => {
         nextEpisodeTitle={nextVideo?.title}
         onNextEpisode={nextEpisodePath ? () => navigate(nextEpisodePath) : undefined}
       />
+      )}
 
       {routeCollectionId && (prevVideo || nextVideo) && (
         <div className="mb-4 flex items-center justify-between gap-2">
