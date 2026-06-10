@@ -6,6 +6,7 @@ import { cn } from '../lib/utils';
 import { SystemBars } from '../plugins/systemBars';
 import { prefetchFirstSegments, formatVideoError } from '../lib/videoUtils';
 import { authHeaders } from '../api/client';
+import { resolveAuthImageUrl } from './AuthImage';
 import { useTVControls } from '../hooks/useTVControls';
 import { useVideoKeyboard } from '../hooks/useVideoKeyboard';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List, RotateCcw, RotateCw, X, ChevronRight } from 'lucide-react';
@@ -582,12 +583,17 @@ export const VideoPlayer = ({
   const spriteUrl = hoverThumb ? (offlineSpriteDataUrl ?? hoverThumb.uris[0].split('#')[0]) : '';
   useEffect(() => {
     if (!spriteUrl) return;
-    const img = new Image();
-    img.onload = () => {
-      spriteImgRef.current = img;
-      setSpriteDims({ w: img.naturalWidth, h: img.naturalHeight });
-    };
-    img.src = spriteUrl;
+    let active = true;
+    resolveAuthImageUrl(spriteUrl).then(blobUrl => {
+      if (!active) return;
+      const img = new Image();
+      img.onload = () => {
+        spriteImgRef.current = img;
+        setSpriteDims({ w: img.naturalWidth, h: img.naturalHeight });
+      };
+      img.src = blobUrl || spriteUrl;
+    });
+    return () => { active = false; };
   }, [spriteUrl]);
 
   // Reconstruct the ORIGINAL sprite height from VTT metadata to derive scaleY — the
