@@ -1,11 +1,12 @@
 import { Capacitor } from '@capacitor/core';
 import { isTV } from '../lib/platform';
-import type { OfflineThumbnailCue } from '../lib/offlineStorage';
+import { parseOfflineThumbnailCues, type OfflineThumbnailCue } from '../lib/offlineStorage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import { SystemBars } from '../plugins/systemBars';
 import { prefetchFirstSegments, formatVideoError } from '../lib/videoUtils';
 import { authHeaders } from '../api/client';
+import { resolveAuthImageUrl } from './AuthImage';
 import { useTVControls } from '../hooks/useTVControls';
 import { useVideoKeyboard } from '../hooks/useVideoKeyboard';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Captions, Languages, List, RotateCcw, RotateCw, X, ChevronRight } from 'lucide-react';
@@ -105,6 +106,8 @@ export const VideoPlayer = ({
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
   const [spriteDims, setSpriteDims] = useState<{ w: number; h: number } | null>(null);
   const spriteImgRef = useRef<HTMLImageElement | null>(null);
+  const [onlineCues, setOnlineCues] = useState<OfflineThumbnailCue[]>([]);
+  const [onlineSpriteUrl, setOnlineSpriteUrl] = useState('');
   const thumbCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [skipFeedback, setSkipFeedback] = useState<{ side: 'left' | 'right'; seconds: number } | null>(null);
 
@@ -385,11 +388,6 @@ export const VideoPlayer = ({
           try { await player.addChaptersTrack(chaptersUrl, 'und'); void refreshChapters(); }
           catch (e) { console.warn('Failed to load chapters track:', e); }
         }
-        if (thumbnailsUrl && !offlineThumbnailCues?.length) {
-          try { await player.addThumbnailsTrack(thumbnailsUrl); }
-          catch (e) { console.warn('Failed to load thumbnails track:', e); }
-        }
-
         if (isTV) {
           requestAnimationFrame(() => container.querySelector<HTMLButtonElement>('.kawaz-center-play-btn')?.focus());
         }
@@ -444,7 +442,33 @@ export const VideoPlayer = ({
         }
       })();
     };
-  }, [manifestUrl, chaptersUrl, thumbnailsUrl, special]);
+  }, [manifestUrl, chaptersUrl, special]);
+
+  // Pre-fetch VTT + sprite for online playback so seek thumbnails use the same
+  // canvas path as offline — avoids relying on Shaka's getThumbnails() API and
+  // eliminates auth issues with the sprite Image() object.
+  useEffect(() => {
+    if (!thumbnailsUrl || (offlineThumbnailCues?.length ?? 0) > 0) return;
+    let active = true;
+    setOnlineCues([]);
+    setOnlineSpriteUrl('');
+    const run = async () => {
+      try {
+        const res = await fetch(thumbnailsUrl, { credentials: 'include', headers: authHeaders() });
+        if (!res.ok || !active) return;
+        const text = await res.text();
+        const cues = parseOfflineThumbnailCues(text);
+        if (!active || !cues.length) return;
+        setOnlineCues(cues);
+        const spriteSource = thumbnailsUrl.replace('thumbnails.vtt', 'thumbnails.jpg');
+        resolveAuthImageUrl(spriteSource).then(blobUrl => {
+          if (active && blobUrl) setOnlineSpriteUrl(blobUrl);
+        });
+      } catch { /* ignore */ }
+    };
+    void run();
+    return () => { active = false; };
+  }, [thumbnailsUrl, offlineThumbnailCues?.length]);
 
   // Fullscreen API sync (non-TV only; TV uses CSS class only)
   useEffect(() => {
@@ -549,17 +573,13 @@ export const VideoPlayer = ({
   };
 
   const getThumb = async (time: number): Promise<import('shaka-player').ThumbnailData | null> => {
-    if (offlineThumbnailCues?.length) {
-      const cue = offlineThumbnailCues.find(c => time >= c.startTime && time < c.endTime)
-        ?? offlineThumbnailCues[offlineThumbnailCues.length - 1];
+    const cues = offlineThumbnailCues?.length ? offlineThumbnailCues : onlineCues;
+    if (cues.length) {
+      const cue = cues.find(c => time >= c.startTime && time < c.endTime) ?? cues[cues.length - 1];
       return { startTime: cue.startTime, endTime: cue.endTime, uris: ['offline'],
         width: cue.w, height: cue.h, positionX: cue.x, positionY: cue.y, imageWidth: 0, imageHeight: 0 };
     }
-    const player = playerRef.current;
-    if (!player) return null;
-    const tracks = player.getImageTracks();
-    if (!tracks.length) return null;
-    return await player.getThumbnails(tracks[0].id, time);
+    return null;
   };
 
   const updateHoverThumb = (time: number, clientX: number) => {
@@ -579,15 +599,22 @@ export const VideoPlayer = ({
   // sprite width (~1600px) fits within GPU texture limits; naturalHeight may be
   // silently downscaled for very tall sprites (4-hour movies produce ~12 960px sheets
   // that exceed the ~4096px Android TV texture height limit).
-  const spriteUrl = hoverThumb ? (offlineSpriteDataUrl ?? hoverThumb.uris[0].split('#')[0]) : '';
+  const effectiveSpriteUrl = offlineSpriteDataUrl ?? onlineSpriteUrl;
+  const spriteUrl = hoverThumb ? (effectiveSpriteUrl || hoverThumb.uris[0].split('#')[0]) : '';
   useEffect(() => {
     if (!spriteUrl) return;
-    const img = new Image();
-    img.onload = () => {
-      spriteImgRef.current = img;
-      setSpriteDims({ w: img.naturalWidth, h: img.naturalHeight });
+    let active = true;
+    const load = (src: string) => {
+      const img = new Image();
+      img.onload = () => { if (active) { spriteImgRef.current = img; setSpriteDims({ w: img.naturalWidth, h: img.naturalHeight }); } };
+      img.src = src;
     };
-    img.src = spriteUrl;
+    if (spriteUrl.startsWith('blob:') || spriteUrl.startsWith('data:')) {
+      load(spriteUrl);
+    } else {
+      resolveAuthImageUrl(spriteUrl).then(blobUrl => { if (active) load(blobUrl || spriteUrl); });
+    }
+    return () => { active = false; };
   }, [spriteUrl]);
 
   // Reconstruct the ORIGINAL sprite height from VTT metadata to derive scaleY — the
