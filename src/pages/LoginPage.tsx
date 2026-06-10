@@ -112,12 +112,13 @@ export const LoginPage = () => {
           status: 'pending' | 'slow_down' | 'approved' | 'denied'
           role?: string
           username?: string
+          token?: string
         }>(`/auth/google/device/poll?device_code=${encodeURIComponent(deviceFlow.deviceCode)}`)
 
         if (data.status === 'approved') {
           stopPolling()
           setDeviceFlow(null)
-          login(data.role, data.username)
+          login(data.role, data.username, data.token)
           void navigate('/profiles')
         } else if (data.status === 'denied') {
           stopPolling()
@@ -163,12 +164,12 @@ export const LoginPage = () => {
       } else if (error) {
         toast.error(`${providerLabel} sign-in failed. Please try again.`, toastError)
       } else if (code) {
-        void apiRequest<{ role?: string; username?: string }>('/auth/google/native/exchange', {
+        void apiRequest<{ role?: string; username?: string; token?: string }>('/auth/google/native/exchange', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code }),
         }).then((data) => {
-          login(data.role, data.username)
+          login(data.role, data.username, data.token)
           void navigate('/profiles')
         }).catch(() => {
           toast.error(`${providerLabel} sign-in failed. Please try again.`, toastError)
@@ -287,8 +288,8 @@ export const LoginPage = () => {
         throw new Error(data?.error || `Request failed with status ${response.status}`)
       }
 
-      const data = await response.json().catch(() => null) as { role?: string; username?: string } | null
-      login(data?.role, data?.username ?? username)
+      const data = await response.json().catch(() => null) as { role?: string; username?: string; token?: string } | null
+      login(data?.role, data?.username ?? username, data?.token)
       void navigate('/profiles')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Authentication failed', toastError)

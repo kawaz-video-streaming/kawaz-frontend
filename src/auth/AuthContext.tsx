@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { apiRequest, AuthError } from '../api/client'
+import { apiRequest, AuthError, storeToken, clearToken } from '../api/client'
 
 const AUTH_KEY = 'kawaz_authed'
 const PROFILE_KEY = 'kawaz_profile'
@@ -18,7 +18,7 @@ interface AuthContextValue {
   specialPool: boolean
   selectProfile: (profile: SelectedProfile) => void
   toggleSpecialPool: () => void
-  login: (role?: string, username?: string) => void
+  login: (role?: string, username?: string, token?: string) => void
   logout: () => void
 }
 
@@ -64,16 +64,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       })
   }, [isAuthenticated])
 
-  const login = useCallback((newRole?: string, newUsername?: string) => {
+  const login = useCallback((newRole?: string, newUsername?: string, token?: string) => {
     justLoggedInRef.current = true
     localStorage.setItem(AUTH_KEY, 'true')
     setIsAuthenticated(true)
     setRole(newRole ?? null)
     setUsername(newUsername ?? null)
+    if (token) storeToken(token)
   }, [])
 
   const logout = useCallback(() => {
     localStorage.removeItem(AUTH_KEY)
+    clearToken()
     setIsAuthenticated(false)
     setRole(null)
     setUsername(null)
