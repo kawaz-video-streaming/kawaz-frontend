@@ -7,7 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Input } from '../components/ui/input'
 import { useAuth } from '../auth/useAuth'
-import { isNative, isTV } from '../lib/platform'
+import { isIOS, isNative, isTV } from '../lib/platform'
 
 type Mode = 'login' | 'signup' | 'forgot'
 
@@ -78,6 +78,7 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false)
   const [inlineMessage, setInlineMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [deviceFlow, setDeviceFlow] = useState<DeviceFlowState | null>(null)
+  const [pollingNonce, setPollingNonce] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -140,6 +141,57 @@ export const LoginPage = () => {
     pollRef.current = setInterval(poll, deviceFlow.interval * 1000)
     return stopPolling
   }, [deviceFlow, login, navigate, stopPolling])
+
+  // iOS native: poll backend until OAuth completes (SFSafariViewController can't handle custom schemes)
+  useEffect(() => {
+    if (!pollingNonce) return
+    const nonce = pollingNonce
+
+    const poll = async () => {
+      try {
+        const data = await apiRequest<{
+          status: 'pending' | 'success' | 'pending_approval' | 'error'
+          code?: string
+          provider?: string
+          reason?: string
+        }>(`/auth/native/poll?nonce=${encodeURIComponent(nonce)}`)
+
+        if (data.status === 'pending') return
+
+        void Browser.close()
+        setPollingNonce(null)
+
+        if (data.status === 'pending_approval') {
+          setInlineMessage({ type: 'success', text: 'Your account is pending admin approval.' })
+        } else if (data.status === 'error') {
+          if (data.reason === 'conflict') {
+            setInlineMessage({ type: 'error', text: 'This Google account is already linked to a username/password account. Please sign in manually.' })
+          } else {
+            const providerLabel = data.provider === 'apple' ? 'Apple' : 'Google'
+            toast.error(`${providerLabel} sign-in failed. Please try again.`, toastError)
+          }
+        } else if (data.status === 'success' && data.code) {
+          const providerLabel = data.provider === 'apple' ? 'Apple' : 'Google'
+          try {
+            const exchanged = await apiRequest<{ role?: string; username?: string; token?: string }>('/auth/google/native/exchange', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: data.code }),
+            })
+            login(exchanged.role, exchanged.username, exchanged.token)
+            void navigate('/profiles')
+          } catch {
+            toast.error(`${providerLabel} sign-in failed. Please try again.`, toastError)
+          }
+        }
+      } catch {
+        // network hiccup — keep polling
+      }
+    }
+
+    const interval = setInterval(poll, 2_000)
+    return () => clearInterval(interval)
+  }, [pollingNonce, login, navigate])
 
   // Listen for deep link callback after Chrome Custom Tabs OAuth (mobile native)
   useEffect(() => {
@@ -213,14 +265,25 @@ export const LoginPage = () => {
       return
     }
 
-    // Mobile native: open OAuth in Chrome Custom Tabs (Google-allowed)
-    // Backend must redirect to com.kawaz.plus://auth/callback on completion
+    if (isIOS) {
+      const nonce = crypto.randomUUID()
+      setPollingNonce(nonce)
+      await Browser.open({ url: apiUrl(`/auth/google/login?return=native&nonce=${nonce}`), presentationStyle: 'popover' })
+      return
+    }
+    // Android: open OAuth in Chrome Custom Tabs, redirect back via custom scheme
     await Browser.open({ url: apiUrl('/auth/google/login?return=native'), presentationStyle: 'popover' })
   }
 
   const handleAppleClick = async () => {
     if (!isNative) {
       window.location.href = apiUrl('/auth/apple/login')
+      return
+    }
+    if (isIOS) {
+      const nonce = crypto.randomUUID()
+      setPollingNonce(nonce)
+      await Browser.open({ url: apiUrl(`/auth/apple/login?return=native&nonce=${nonce}`), presentationStyle: 'popover' })
       return
     }
     await Browser.open({ url: apiUrl('/auth/apple/login?return=native'), presentationStyle: 'popover' })
