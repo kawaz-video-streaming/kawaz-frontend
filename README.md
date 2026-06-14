@@ -13,7 +13,7 @@ React and Vite frontend for the Kawaz+ video streaming platform.
 - Admin: media upload (presigned S3), collection creation, avatar catalog management, genre management, newsletter broadcast
 - Admin subtitle management — add VTT subtitle tracks to existing media, toggle tracks on/off, rename labels
 - Live media processing panel (admin) — polls in-flight uploads with circular SVG progress bars
-- Pending signup queue (admin) — approve (user or special role) or deny new user registrations
+- Pending signup queue (admin) — approve or deny new user registrations
 - Account management — self-service account deletion with confirmation flow
 - Responsive layout: sticky Navbar (desktop `lg+`) + bottom sheet BottomNav (mobile)
 - Native apps via Capacitor: Android, iOS, Android TV / Fire TV
