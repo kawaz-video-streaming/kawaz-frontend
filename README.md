@@ -12,7 +12,6 @@ React and Vite frontend for the Kawaz+ video streaming platform.
 - TMDB metadata search — auto-fill title, description, genres, and thumbnail from The Movie Database for movies, shows, seasons, and episodes
 - Admin: media upload (presigned S3), collection creation, avatar catalog management, genre management, newsletter broadcast
 - Admin subtitle management — add VTT subtitle tracks to existing media, toggle tracks on/off, rename labels
-- Special pool toggle — admins can switch between the main and demo (special) data pools
 - Live media processing panel (admin) — polls in-flight uploads with circular SVG progress bars
 - Pending signup queue (admin) — approve (user or special role) or deny new user registrations
 - Account management — self-service account deletion with confirmation flow
@@ -173,7 +172,7 @@ All requests go through `VITE_BACKEND_URL`. Full API documentation is available 
 
 **Admin**
 - `GET /admin/pending` — list pending user signups
-- `POST /admin/pending/:username/approve/:role` — approve signup with role (user|special)
+- `POST /admin/pending/:username/approve/:role` — approve signup with assigned role
 - `POST /admin/pending/:username/deny` — deny signup
 - `POST /admin/newsletter` — send HTML email to all approved users
 
