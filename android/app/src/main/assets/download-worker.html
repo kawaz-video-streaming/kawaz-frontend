@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body>
+<script src="/assets/shaka.js"></script>
+<script>
+(function () {
+  shaka.polyfill.installAll();
+
+  var activeOps = {};
+
+  function buildFilter(token, special, backendUrl) {
+    return function (type, request) {
+      var uri = request.uris[0];
+      var isOwn = uri.startsWith('https://localhost') ||
+        uri.startsWith('/') ||
+        (backendUrl && uri.startsWith(backendUrl));
+      if (!isOwn) {
+        request.allowCrossSiteCredentials = false;
+      } else {
+        request.headers['Authorization'] = 'Bearer ' + token;
+        request.uris = request.uris.map(function (u) {
+          return u.includes('token=') ? u : u + (u.includes('?') ? '&' : '?') + 'token=' + token;
+        });
+        if (special) {
+          request.uris = request.uris.map(function (u) {
+            return u.includes('special=true') ? u : u + (u.includes('?') ? '&' : '?') + 'special=true';
+          });
+        }
+      }
+    };
+  }
+
+  async function fetchDataUrl(url, token) {
+    try {
+      var r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+      if (!r.ok) return undefined;
+      var blob = await r.blob();
+      return await new Promise(function (resolve) {
+        var fr = new FileReader();
+        fr.onloadend = function () { resolve(fr.result); };
+        fr.onerror = function () { resolve(undefined); };
+        fr.readAsDataURL(blob);
+      });
+    } catch (e) { return undefined; }
+  }
+
+  window.startDownload = async function (mediaId, url, token, special, backendUrl, meta) {
+    meta.mediaId = mediaId;
+    meta.special = special;
+    meta.downloadedAt = Date.now();
+
+    var thumbnailUrl = meta._thumbnailUrl;
+    delete meta._thumbnailUrl;
+    var authHeader = { 'Authorization': 'Bearer ' + token };
+
+    if (thumbnailUrl) meta.thumbnailDataUrl = await fetchDataUrl(thumbnailUrl, token);
+
+    if (meta.chaptersUrl) {
+      try {
+        var cr = await fetch(meta.chaptersUrl, { headers: authHeader });
+        if (cr.ok) meta.chaptersVttText = await cr.text();
+      } catch (e) {}
+    }
+    if (meta.thumbnailsUrl) {
+      try {
+        var tr = await fetch(meta.thumbnailsUrl, { headers: authHeader });
+        if (tr.ok) {
+          meta.thumbnailsVttText = await tr.text();
+          var spriteUrl = meta.thumbnailsUrl.replace('thumbnails.vtt', 'thumbnails.jpg');
+          meta.spriteDataUrl = await fetchDataUrl(spriteUrl, token);
+        }
+      } catch (e) {}
+    }
+
+    var player = new shaka.Player();
+    var storage = new shaka.offline.Storage(player);
+
+    player.getNetworkingEngine().registerRequestFilter(buildFilter(token, special, backendUrl));
+    storage.configure({
+      offline: {
+        progressCallback: function (content, progress) {
+          Android.onProgress(mediaId, Math.round(progress * 100));
+        },
+        trackSelectionCallback: function (tracks) { return tracks; },
+      },
+    });
+
+    var op = storage.store(url, meta);
+    activeOps[mediaId] = op;
+
+    try {
+      var stored = await op.promise;
+      Android.onComplete(mediaId, stored.offlineUri || '');
+    } catch (e) {
+      Android.onError(mediaId, (e && e.message) || 'Download failed');
+    } finally {
+      delete activeOps[mediaId];
+      try { await storage.destroy(); } catch (e) {}
+      try { await player.destroy(); } catch (e) {}
+    }
+  };
+
+  window.cancelDownload = function (mediaId) {
+    var op = activeOps[mediaId];
+    if (op) try { op.abort(); } catch (e) {}
+  };
+})();
+</script>
+</body>
+</html>
