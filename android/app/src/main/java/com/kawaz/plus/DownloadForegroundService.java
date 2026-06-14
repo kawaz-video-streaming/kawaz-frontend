@@ -105,7 +105,6 @@ public class DownloadForegroundService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        initWebView();
     }
 
     private void initWebView() {
@@ -163,10 +162,18 @@ public class DownloadForegroundService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Notification notification = buildNotification("Downloading media", "");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
         } else {
             startForeground(NOTIFICATION_ID, notification);
+        }
+
+        // WebView must be created after startForeground — initialising it in a non-foreground
+        // service crashes on modern Android (especially Samsung One UI).
+        if (downloadWebView == null) {
+            initWebView();
         }
 
         if (intent != null) {
