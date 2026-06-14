@@ -389,7 +389,7 @@ export const VideoPlayer = ({
         // is authenticated even if iOS WKWebView drops the Authorization header
         // before the request filter has a chance to act.
         const bearerForLoad = authHeaders()['Authorization'];
-        const manifestToLoad = bearerForLoad && !manifestUrl.includes('token=')
+        const manifestToLoad = bearerForLoad && !manifestUrl.includes('token=') && !manifestUrl.startsWith('offline:')
           ? manifestUrl + (manifestUrl.includes('?') ? `&token=${bearerForLoad.slice(7)}` : `?token=${bearerForLoad.slice(7)}`)
           : manifestUrl;
         await player.load(manifestToLoad);

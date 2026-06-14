@@ -13,6 +13,17 @@ export default defineConfig({
   ],
   build: {
     chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('shaka-player')) return 'shaka';
+        },
+        chunkFileNames: (info) => {
+          if (info.name === 'shaka') return 'assets/shaka.js';
+          return 'assets/[name]-[hash].js';
+        },
+      },
+    },
   },
   server: {
     host: true,

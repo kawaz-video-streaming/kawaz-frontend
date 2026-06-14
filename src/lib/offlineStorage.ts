@@ -115,7 +115,11 @@ const buildRequestFilter = (special: boolean) =>
         request.allowCrossSiteCredentials = true;
       }
       const bearerHeader = authHeaders()['Authorization'];
-      if (bearerHeader) request.headers['Authorization'] = bearerHeader;
+      if (bearerHeader) {
+        request.headers['Authorization'] = bearerHeader;
+        const token = bearerHeader.slice(7);
+        request.uris = request.uris.map(u => u.includes('token=') ? u : u + (u.includes('?') ? `&token=${token}` : `?token=${token}`));
+      }
       if (special && !uri.includes('special=true')) {
         request.uris = request.uris.map(u =>
           u + (u.includes('?') ? '&special=true' : '?special=true'),
