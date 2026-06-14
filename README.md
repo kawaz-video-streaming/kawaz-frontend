@@ -1,5 +1,7 @@
 # Kawaz Frontend
 
+**Version:** 1.0.80
+
 React and Vite frontend for the Kawaz+ video streaming platform.
 
 ## Features
