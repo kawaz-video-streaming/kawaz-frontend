@@ -18,10 +18,6 @@ export default defineConfig({
         manualChunks: (id) => {
           if (id.includes('shaka-player')) return 'shaka';
         },
-        chunkFileNames: (info) => {
-          if (info.name === 'shaka') return 'assets/shaka.js';
-          return 'assets/[name]-[hash].js';
-        },
       },
     },
   },

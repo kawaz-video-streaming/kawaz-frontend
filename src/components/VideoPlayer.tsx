@@ -357,9 +357,18 @@ export const VideoPlayer = ({
             lowLatencyMode: false, stallEnabled: true, stallThreshold: 1,
             gapDetectionThreshold: 0.5, smallGapLimit: 0.5, jumpLargeGaps: true,
             extrapolateDuration: true, startAtFirstSegment: true,
-            bufferingGoal: 15, rebufferingGoal: 2,
+            bufferingGoal: isTV ? 60 : 15,
+            rebufferingGoal: isTV ? 4 : 2,
+            bufferBehind: 30,
           },
           manifest: { dash: { ignoreMinBufferTime: true } },
+          ...(isTV && {
+            abr: {
+              defaultBandwidthEstimate: 20_000_000,
+              switchInterval: 10,
+              bandwidthDowngradeTarget: 0.85,
+            },
+          }),
         });
 
         const onTracksChanged = () => { refreshPlayerState(); void refreshChapters(); };
