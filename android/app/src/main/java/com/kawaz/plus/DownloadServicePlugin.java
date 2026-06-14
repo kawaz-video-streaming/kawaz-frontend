@@ -74,7 +74,9 @@ public class DownloadServicePlugin extends Plugin {
         intent.putExtra(DownloadForegroundService.EXTRA_THUMBNAIL_URL, thumbnailUrl);
         intent.putExtra(DownloadForegroundService.EXTRA_METADATA, metadataJson);
 
-        getContext().startForegroundService(intent);
+        // startForegroundService must be called on the main thread — Capacitor dispatches plugin
+        // methods on a background thread, which causes mAllowStartForeground=false on Android 12+.
+        getActivity().runOnUiThread(() -> getContext().startForegroundService(intent));
 
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).setDownloadActive(true);

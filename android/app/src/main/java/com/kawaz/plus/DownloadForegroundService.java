@@ -162,12 +162,20 @@ public class DownloadForegroundService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Notification notification = buildNotification("Downloading media", "");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
-        } else {
-            startForeground(NOTIFICATION_ID, notification);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING);
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (Exception e) {
+            // ForegroundServiceStartNotAllowedException — app was backgrounded during the gap
+            // between startForegroundService() and onStartCommand(), or the daily time limit
+            // for the service type has been exhausted. Notify JS so it can clean up.
+            notifyErrorAndStop(intent);
+            return START_NOT_STICKY;
         }
 
         // WebView must be created after startForeground — initialising it in a non-foreground
@@ -243,6 +251,29 @@ public class DownloadForegroundService extends Service {
             "window.__m);";
 
         downloadWebView.post(() -> downloadWebView.evaluateJavascript(js, null));
+    }
+
+    private void notifyErrorAndStop(Intent intent) {
+        // Notify for the item in the incoming intent (not yet queued when startForeground throws)
+        if (intent != null && intent.hasExtra(EXTRA_MEDIA_ID)) {
+            String mediaId = intent.getStringExtra(EXTRA_MEDIA_ID);
+            if (mediaId != null && callback != null) {
+                final String id = mediaId;
+                mainHandler.post(() -> { try { callback.onError(id, "Download service unavailable"); } catch (Exception ignored) {} });
+            }
+        }
+        // Drain anything already in the queue from previous calls
+        Bundle b;
+        while ((b = downloadQueue.poll()) != null) {
+            final String mediaId = b.getString(EXTRA_MEDIA_ID);
+            if (mediaId != null && callback != null) {
+                final String id = mediaId;
+                mainHandler.post(() -> { try { callback.onError(id, "Download service unavailable"); } catch (Exception ignored) {} });
+            }
+        }
+        queuedIds.clear();
+        currentMediaId = null;
+        stopSelf();
     }
 
     private void handleCancel(String mediaId) {
