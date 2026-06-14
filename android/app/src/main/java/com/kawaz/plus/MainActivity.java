@@ -18,7 +18,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    protected void onPause() {
+    public void onPause() {
         super.onPause();
         // Capacitor pauses WebView JS timers on background; keep them running during active downloads
         if (downloadActive) {
