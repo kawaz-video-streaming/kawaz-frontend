@@ -289,7 +289,7 @@ export const HomePage = () => {
   const allItems: PageItem[] = useMemo(() => [
     ...movies.map((video): PageItem => ({ type: 'video', data: video })),
     ...topLevelCollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
-  ], [movies, topLevelCollections]);
+  ].sort((a, b) => b.data._id.localeCompare(a.data._id)), [movies, topLevelCollections]);
 
   const newestItems = useMemo(() => [
     ...topLevelCollections.map((collection): PageItem => ({ type: 'collection', data: collection })),
