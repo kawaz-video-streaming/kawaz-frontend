@@ -155,6 +155,20 @@ export function useSpatialNavigation() {
         }
       }
 
+      // Phase 0b (up/down only, scoped to data-spatial-root): prefer elements whose
+      // bounding box overlaps the focused element's horizontal range. Without this,
+      // a full-width seekbar (whose center sits at the page midpoint) competes on raw
+      // distance with small icon buttons off to the side, producing inconsistent jumps
+      // when moving between the seekbar and the bottom control row.
+      if (dir === 'up' || dir === 'down') {
+        if (spatialRoot && spatialRoot.contains(focused)) {
+          const sameColumn = candidates.filter(c => c.rect.left < focusedRect.right && c.rect.right > focusedRect.left)
+          if (sameColumn.length > 0) {
+            nearest = findNearest(focusedRect, sameColumn, dir)
+          }
+        }
+      }
+
       // Phase 1 (up/down only): stay inside the same scrollable container first.
       // This lets D-pad navigate through all sections before escaping to the filter
       // buttons or navbar above/below the scroll zone.

@@ -1,5 +1,6 @@
 import z from 'zod';
 import { apiRequest, apiUpload, apiUrl, authHeaders, specialParam } from './client';
+import { srtToVtt } from '../lib/videoUtils';
 import type { Coordinates, MediaKind, PendingMediaItem, TmdbCollectionDetails, TmdbEpisodeDetails, TmdbMovieDetails, TmdbSeasonDetails, TmdbShowDetails } from '../types/api';
 
 export interface UploadMediaParams {
@@ -20,7 +21,7 @@ const initiateUploadResponseSchema = z.object({
   thumbnailUploadUrl: z.string(),
 });
 
-const putToStorage = (url: string, file: File): Promise<void> =>
+const putToStorage = (url: string, file: File | Blob): Promise<void> =>
   new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);
@@ -188,7 +189,9 @@ export const addSubtitle = async (
     `/media/${mediaId}/subtitle/initiate${sp}`,
     { method: 'POST' },
   );
-  await putToStorage(uploadUrl, file);
+  const isSrt = file.name.toLowerCase().endsWith('.srt');
+  const uploadBody = isSrt ? new Blob([srtToVtt(await file.text())], { type: 'text/vtt' }) : file;
+  await putToStorage(uploadUrl, uploadBody);
   await apiRequest(`/media/${mediaId}/subtitle/complete${sp}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

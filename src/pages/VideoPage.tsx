@@ -749,7 +749,7 @@ export const VideoPage = () => {
               <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-3">
                 <input
                   type="file"
-                  accept=".vtt"
+                  accept=".vtt,.srt"
                   onChange={e => setNewSubFile(e.target.files?.[0] ?? null)}
                   className="text-sm file:mr-3 file:rounded file:border-0 file:bg-red-500/10 file:px-2 file:py-1 file:text-xs file:font-medium file:text-red-500"
                 />
