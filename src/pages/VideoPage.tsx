@@ -750,7 +750,20 @@ export const VideoPage = () => {
                 <input
                   type="file"
                   accept=".vtt"
-                  onChange={e => setNewSubFile(e.target.files?.[0] ?? null)}
+                  onChange={e => {
+                    const file = e.target.files?.[0] ?? null;
+                    // `accept` only filters the browse dialog — drag-and-drop can still
+                    // drop any file type onto this input, so guard here too.
+                    if (file && !file.name.toLowerCase().endsWith('.vtt')) {
+                      toast.error('Only WebVTT (.vtt) subtitle files are supported', {
+                        style: { background: '#dc2626', color: '#fff', border: '1px solid #b91c1c' },
+                      });
+                      e.target.value = '';
+                      setNewSubFile(null);
+                      return;
+                    }
+                    setNewSubFile(file);
+                  }}
                   className="text-sm file:mr-3 file:rounded file:border-0 file:bg-red-500/10 file:px-2 file:py-1 file:text-xs file:font-medium file:text-red-500"
                 />
                 <div className="flex gap-2">

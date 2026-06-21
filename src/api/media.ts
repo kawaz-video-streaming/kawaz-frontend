@@ -20,7 +20,7 @@ const initiateUploadResponseSchema = z.object({
   thumbnailUploadUrl: z.string(),
 });
 
-const putToStorage = (url: string, file: File): Promise<void> =>
+const putToStorage = (url: string, file: File | Blob): Promise<void> =>
   new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);
@@ -188,6 +188,7 @@ export const addSubtitle = async (
     `/media/${mediaId}/subtitle/initiate${sp}`,
     { method: 'POST' },
   );
+  if (!file.name.toLowerCase().endsWith('.vtt')) throw new Error('Only WebVTT (.vtt) subtitle files are supported');
   await putToStorage(uploadUrl, file);
   await apiRequest(`/media/${mediaId}/subtitle/complete${sp}`, {
     method: 'POST',

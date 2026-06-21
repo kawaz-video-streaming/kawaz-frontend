@@ -104,6 +104,7 @@ export const VideoPlayer = ({
 
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [spriteDims, setSpriteDims] = useState<{ w: number; h: number } | null>(null);
   const spriteImgRef = useRef<HTMLImageElement | null>(null);
   const [onlineCues, setOnlineCues] = useState<OfflineThumbnailCue[]>([]);
@@ -156,7 +157,9 @@ export const VideoPlayer = ({
     setControlsVisible(true);
     controlsVisibleSyncRef.current = true;
     scheduleHide();
-    if (isTV) {
+    // Only steal focus back into the player while it's fullscreen — outside of
+    // fullscreen, the user needs the d-pad to navigate to the rest of the page.
+    if (isTV && isFullscreenRef.current) {
       requestAnimationFrame(() => {
         const container = containerRef.current;
         if (!container) return;
@@ -187,6 +190,7 @@ export const VideoPlayer = ({
     const onPause = () => {
       pausedRef.current = true;
       setPaused(true);
+      setIsBuffering(false);
       setControlsVisible(true);
       controlsVisibleSyncRef.current = true;
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
@@ -357,8 +361,8 @@ export const VideoPlayer = ({
             lowLatencyMode: false, stallEnabled: true, stallThreshold: 1,
             gapDetectionThreshold: 0.5, smallGapLimit: 0.5, jumpLargeGaps: true,
             extrapolateDuration: true, startAtFirstSegment: true,
-            bufferingGoal: isTV ? 60 : 15,
-            rebufferingGoal: isTV ? 4 : 2,
+            bufferingGoal: 60,
+            rebufferingGoal: 4,
             bufferBehind: 30,
           },
           manifest: { dash: { ignoreMinBufferTime: true } },
@@ -380,8 +384,15 @@ export const VideoPlayer = ({
           setPlayerError(`Could not play this video stream.${code}`);
         };
         const onVideoError = () => { console.error('HTML video error', video.error); setPlayerError(formatVideoError(video)); };
-        const onStall = () => { clearStallRecovery(); stallRecoveryTimer = window.setTimeout(attemptPlaybackRecovery, 1200); };
-        const onProgress = () => { clearStallRecovery(); if (!isDisposed) setPlayerError(null); };
+        const onStall = () => {
+          clearStallRecovery();
+          if (!isDisposed) setIsBuffering(true);
+          stallRecoveryTimer = window.setTimeout(attemptPlaybackRecovery, 1200);
+        };
+        const onProgress = () => {
+          clearStallRecovery();
+          if (!isDisposed) { setPlayerError(null); setIsBuffering(false); }
+        };
 
         player.addEventListener('trackschanged', onTracksChanged);
         player.addEventListener('error', onPlayerError);
@@ -822,6 +833,7 @@ export const VideoPlayer = ({
       <div
         ref={containerRef}
         data-spatial-root={isTV ? '' : undefined}
+        tabIndex={isTV ? 0 : undefined}
         className={cn(
           'kawaz-player-inner relative w-full bg-black',
           isTV && 'kawaz-tv-player',
@@ -832,6 +844,19 @@ export const VideoPlayer = ({
           if (!controlsVisibleSyncRef.current) showControls();
         }}
         onMouseLeave={() => { if (!pausedRef.current) scheduleHide(); }}
+        onFocus={(e) => {
+          // D-pad navigated back onto the player itself (controls were hidden and
+          // had no focusable children) — reveal controls and hand focus to the
+          // center play button so the user can re-enter fullscreen from here.
+          if (isTV && e.target === e.currentTarget) {
+            setControlsVisible(true);
+            controlsVisibleSyncRef.current = true;
+            scheduleHide();
+            requestAnimationFrame(() => {
+              containerRef.current?.querySelector<HTMLButtonElement>('.kawaz-center-play-btn')?.focus();
+            });
+          }
+        }}
       >
         <video ref={videoRef} className="aspect-video w-full object-cover" poster={posterUrl} playsInline />
 
@@ -908,9 +933,18 @@ export const VideoPlayer = ({
               className="kawaz-center-play-btn pointer-events-auto rounded-full bg-black/30 p-2 sm:p-4 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"
               tabIndex={controlsVisible ? 0 : -1}
               onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-              aria-label={paused ? 'Play' : 'Pause'}
+              aria-label={isBuffering ? 'Loading' : paused ? 'Play' : 'Pause'}
             >
-              {paused ? <Play size={36} fill="white" /> : <Pause size={36} fill="white" />}
+              {isBuffering ? (
+                <div
+                  className="h-9 w-9 animate-spin rounded-full border-[3px] border-white/25 border-t-white"
+                  aria-hidden="true"
+                />
+              ) : paused ? (
+                <Play size={36} fill="white" />
+              ) : (
+                <Pause size={36} fill="white" />
+              )}
             </button>
             <button
               className="pointer-events-auto flex items-center justify-center rounded-full bg-black/30 p-2 sm:p-3 text-white transition-transform hover:bg-black/50 active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-500"

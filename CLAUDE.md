@@ -73,6 +73,12 @@ TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`.
 
 Seek-bar thumbnail previews: `VideoPlayer` pre-fetches the VTT and sprite itself (with Authorization header) rather than using `player.addThumbnailsTrack()`. The VTT is parsed into `OfflineThumbnailCue[]` via `parseOfflineThumbnailCues` and the sprite is resolved to a blob URL — this is the same canvas `drawImage` path used for offline playback, making both modes consistent and auth-safe.
 
+Buffering: `streaming.bufferingGoal`/`rebufferingGoal` are set to `60`/`4` for all platforms (segments are 4s each, so this keeps ~15 segments buffered ahead). A center-button spinner (`isBuffering` state, driven by the video's `waiting`/`stalled`/`playing`/`canplay` events) replaces the play/pause icon while stalled.
+
+Subtitle upload (`addSubtitle` in `src/api/media.ts`): accepts `.vtt` only — rejects any other extension (the upload UI in `VideoPage.tsx` guards this too, since drag-and-drop bypasses the file input's `accept` filter). The backend never inspects file content and the DASH manifest always declares the track as `text/vtt`, so non-VTT files would otherwise upload successfully but fail to play.
+
+TV D-pad navigation inside the player (`useSpatialNavigation.ts`): up/down moves are scoped to a column-overlap phase when the focused element is inside `[data-spatial-root]` (the player), so the full-width seekbar and right-anchored dropdown menus (chapters/captions/audio) are reliably reachable instead of competing on raw nearest-distance with off-column buttons. Outside fullscreen, the player no longer steals focus on every keypress — `VideoPlayer`'s container also carries `tabIndex={isTV ? 0 : undefined}` so the d-pad can still land back on it to re-enter.
+
 ### Offline Downloads (native only, non-TV)
 
 Offline download feature allows users to download videos for offline playback on Android and iOS. Disabled on TV (`isTV`) and web.
