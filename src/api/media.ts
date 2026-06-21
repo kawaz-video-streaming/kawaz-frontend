@@ -1,6 +1,5 @@
 import z from 'zod';
 import { apiRequest, apiUpload, apiUrl, authHeaders, specialParam } from './client';
-import { srtToVtt } from '../lib/videoUtils';
 import type { Coordinates, MediaKind, PendingMediaItem, TmdbCollectionDetails, TmdbEpisodeDetails, TmdbMovieDetails, TmdbSeasonDetails, TmdbShowDetails } from '../types/api';
 
 export interface UploadMediaParams {
@@ -189,9 +188,8 @@ export const addSubtitle = async (
     `/media/${mediaId}/subtitle/initiate${sp}`,
     { method: 'POST' },
   );
-  const isSrt = file.name.toLowerCase().endsWith('.srt');
-  const uploadBody = isSrt ? new Blob([srtToVtt(await file.text())], { type: 'text/vtt' }) : file;
-  await putToStorage(uploadUrl, uploadBody);
+  if (!file.name.toLowerCase().endsWith('.vtt')) throw new Error('Only WebVTT (.vtt) subtitle files are supported');
+  await putToStorage(uploadUrl, file);
   await apiRequest(`/media/${mediaId}/subtitle/complete${sp}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

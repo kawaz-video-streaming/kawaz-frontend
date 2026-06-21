@@ -48,17 +48,6 @@ export const prefetchFirstSegments = async (manifestUrl: string, special: boolea
   }
 };
 
-// Converts SRT cue timestamps (HH:MM:SS,mmm) to WebVTT's (HH:MM:SS.mmm) and adds the
-// required "WEBVTT" header. Shaka only accepts WebVTT text tracks — feeding it raw SRT
-// produces a TEXT/INVALID_TEXT_CUE runtime error.
-export function srtToVtt(srtText: string): string {
-  const body = srtText
-    .replace(/^﻿/, '')
-    .replace(/\r\n/g, '\n')
-    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-  return `WEBVTT\n\n${body.trim()}\n`;
-}
-
 export function formatVideoError(video: HTMLVideoElement | null): string {
   const error = video?.error;
   if (!error) return 'Playback failed during buffering.';
