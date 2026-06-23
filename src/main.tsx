@@ -10,6 +10,11 @@ import { App } from './App'
 import { isTV } from './lib/platform'
 import './index.css'
 
+// Ask the browser/WebView to exempt this origin's storage (localStorage, IndexedDB offline
+// downloads) from automatic "best-effort" eviction under disk-space pressure. Not a guarantee —
+// a critically full device can still be evicted — but reduces the odds this origin is picked first.
+void navigator.storage?.persist?.()
+
 if (Capacitor.isNativePlatform()) {
   if (isTV) {
     // Target 1920px layout for TV regardless of DPR — matches standard 1080p TV resolution

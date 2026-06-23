@@ -1,4 +1,5 @@
 import { Check, ChevronRight, FolderOpen, Image, Pencil, Trash2, X } from 'lucide-react';
+import { isNetworkError } from '../api/client';
 import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
 import { isNative, isTV } from '../lib/platform';
 import { DownloadButton } from '../components/DownloadButton';
@@ -114,7 +115,7 @@ export const CollectionPage = () => {
   const navigate = useNavigate();
   const { isAdmin, specialPool } = useAuth();
   const special = isAdmin && specialPool;
-  const { data: collection, isLoading, isError } = useCollection(id ?? '');
+  const { data: collection, isLoading, isError, error: collectionError } = useCollection(id ?? '');
   const { data: allCollections } = useCollections();
   const { data: allVideos } = useVideos();
   const { mutate: update, isPending: isUpdating } = useUpdateCollection(id ?? '');
@@ -342,6 +343,16 @@ export const CollectionPage = () => {
   }
 
   if (isError || !collection) {
+    if (isNetworkError(collectionError)) {
+      return (
+        <div className="flex flex-col items-center justify-center py-32 text-center">
+          <p className="text-lg font-semibold">Can&apos;t reach the server</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The service may be temporarily unavailable. Please try again in a moment.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">
         <p className="text-lg font-semibold">Collection not found</p>

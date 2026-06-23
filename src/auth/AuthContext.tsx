@@ -1,7 +1,9 @@
 import { createContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { apiRequest, AuthError, storeToken, clearToken } from '../api/client'
+import { App } from '@capacitor/app'
+import { apiRequest, AuthError, setUnauthorizedHandler, storeToken, clearToken, tokenReady } from '../api/client'
 import { clearAuthImageCache } from '../components/AuthImage'
+import { isNative } from '../lib/platform'
 
 const AUTH_KEY = 'kawaz_authed'
 const PROFILE_KEY = 'kawaz_profile'
@@ -44,15 +46,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return stored ? JSON.parse(stored) : null
   })
 
-  // On mount, if we think the user is authenticated, verify with the server and restore role + username.
-  // The cookie is sent automatically; the backend is the source of truth.
-  useEffect(() => {
-    if (!isAuthenticated) return
-    if (justLoggedInRef.current) {
-      justLoggedInRef.current = false
-      return
-    }
-    apiRequest<{ role?: string; username?: string }>('/user/me')
+  const validateSession = useCallback(() => {
+    // Wait for the Preferences-backed token to finish hydrating into memory first — otherwise a
+    // momentarily-missing cookie (the more evictable of the two credentials) would look like an
+    // invalid session before the more durable Preferences token even got a chance to be sent.
+    void tokenReady.then(() => apiRequest<{ role?: string; username?: string }>('/user/me'))
       .then((data) => {
         setRole(data.role ?? null)
         setUsername(data.username ?? null)
@@ -63,7 +61,38 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           setIsAuthenticated(false)
         }
       })
-  }, [isAuthenticated])
+  }, [])
+
+  // On mount, if we think the user is authenticated, verify with the server and restore role + username.
+  // The cookie is sent automatically; the backend is the source of truth.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    if (justLoggedInRef.current) {
+      justLoggedInRef.current = false
+      return
+    }
+    validateSession()
+  }, [isAuthenticated, validateSession])
+
+  // Native sessions can sit backgrounded for days without the app ever remounting, so the mount-time
+  // check above never re-fires on its own — re-validate whenever the app comes back to the foreground.
+  useEffect(() => {
+    if (!isNative) return
+    let handle: { remove: () => void } | null = null
+    void App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive && isAuthenticated) validateSession()
+    }).then((h) => { handle = h })
+    return () => handle?.remove()
+  }, [isAuthenticated, validateSession])
+
+  // Any 401 anywhere (not just /user/me) re-checks against /user/me rather than logging out directly —
+  // some endpoints (e.g. requireAdmin) also respond 401 for permission reasons, not just an invalid token.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (isAuthenticated) validateSession()
+    })
+    return () => setUnauthorizedHandler(() => {})
+  }, [isAuthenticated, validateSession])
 
   const login = useCallback((newRole?: string, newUsername?: string, token?: string) => {
     justLoggedInRef.current = true

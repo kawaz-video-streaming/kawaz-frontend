@@ -53,6 +53,12 @@ The project targets Android and iOS via Capacitor. Platform directories (`androi
 
 `AuthContext` holds `isAuthenticated`, `isAdmin`, `username`, `selectedProfile`, `login()`, `logout()`, and `selectProfile()`. Backed by `localStorage` for the auth flag; role/username are in-memory only. On logout, `queryClient.clear()` wipes the TanStack Query cache so no user's data leaks to the next session. `ProtectedRoute` enforces authentication — unauthenticated users are redirected to `/login`, authenticated users on public routes are redirected to `/profiles`.
 
+The bearer token (`src/api/client.ts`) is stored via `@capacitor/preferences` rather than `localStorage` — on native this writes to `UserDefaults`/`SharedPreferences`, outside the WebView's evictable "best-effort" storage quota, so it survives disk-pressure cleanups that can wipe `localStorage`/cookies/IndexedDB together. Preferences reads are async, so `client.ts` exports a `tokenReady` promise that callers await before relying on the in-memory token cache (`AuthContext.validateSession()` awaits it before calling `/user/me`).
+
+Session re-validation against `/user/me` happens in three places, all funneling through `validateSession()`: on mount, on native `appStateChange` resume (a long-backgrounded WebView never remounts, so the mount-time check alone can go unrun for days), and whenever any request anywhere gets a `401` (`setUnauthorizedHandler` in `client.ts`) — the last one re-checks via `/user/me` rather than logging out directly, since some endpoints (e.g. `requireAdmin`) also respond `401` for permission reasons unrelated to token validity.
+
+`main.tsx` calls `navigator.storage.persist()` on startup to request eviction-exemption for the origin's storage (helps both the auth token and offline downloads survive disk-pressure cleanup, though it's not a guarantee on a critically full device).
+
 ### Data Fetching
 
 TanStack Query is used for all data fetching. Query hooks live in `src/hooks/`.

@@ -1,4 +1,5 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
+import { isNetworkError } from '../api/client';
 import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
 import { isDashSupported, isNative, isTV } from '../lib/platform';
 import { parseOfflineThumbnailCues, type OfflineThumbnailCue } from '../lib/offlineStorage';
@@ -78,7 +79,7 @@ export const VideoPage = () => {
   const { entries, entriesLoaded } = useOffline();
   const offlineEntry = entries.find(e => e.mediaId === (id ?? ''));
   const offlineUri = offlineEntry?.offlineUri ?? null;
-  const { data: video, isError, isLoading } = useVideo(id ?? '');
+  const { data: video, isError, error: videoError, isLoading } = useVideo(id ?? '');
   const { mutate: update, isPending: isUpdating } = useUpdateMedia(id ?? '');
   const { mutate: remove, isPending: isDeleting } = useDeleteMedia();
   const { data: collections } = useCollections();
@@ -324,6 +325,16 @@ export const VideoPage = () => {
   }
 
   if (isError || !video) {
+    if (isNetworkError(videoError)) {
+      return (
+        <div className="flex flex-col items-center justify-center py-32 text-center">
+          <p className="text-lg font-semibold">Can&apos;t reach the server</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The service may be temporarily unavailable. Please try again in a moment.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">
         <p className="text-lg font-semibold">Video not found</p>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
 import { useVideos } from '../hooks/useVideos';
 import { useCollections } from '../hooks/useCollections';
+import { isNetworkError } from '../api/client';
 import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
 import { collectionThumbnailUrl } from '../api/mediaCollection';
 import { useAuth } from '../auth/useAuth';
@@ -258,7 +259,7 @@ export const HomePage = () => {
   const navigate = useNavigate();
   const { isAdmin, specialPool } = useAuth();
   const special = isAdmin && specialPool;
-  const { data: videos, isLoading, isError } = useVideos();
+  const { data: videos, isLoading, isError, error: videosError } = useVideos();
   const { data: collections } = useCollections();
   const [selectedKind, setSelectedKind] = useState<string>('All');
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
@@ -514,7 +515,9 @@ export const HomePage = () => {
         )}
         {isError && (
           <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
-            Failed to load content.
+            {isNetworkError(videosError)
+              ? "Can't reach the server. The service may be temporarily unavailable — please try again in a moment."
+              : 'Failed to load content.'}
           </div>
         )}
         {!isLoading && visibleSections.length === 0 && (

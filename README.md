@@ -6,7 +6,7 @@ React and Vite frontend for the Kawaz+ video streaming platform.
 
 ## Features
 
-- Cookie-based authentication backed by `kawaz-token` HttpOnly cookie; Google OAuth (web + Android native + TV device flow)
+- Cookie-based authentication backed by `kawaz-token` HttpOnly cookie, with a Capacitor Preferences-backed bearer token as a durable fallback on native; Google OAuth (web + Android native + TV device flow)
 - Netflix-style profile picker (per-user profiles with avatar selection)
 - Home page with genre-filtered video grid and full-screen search overlay
 - Video playback via Shaka Player (MPEG-DASH) with audio language and caption track switching
