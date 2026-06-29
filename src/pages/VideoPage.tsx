@@ -17,6 +17,13 @@ import { useUpdateSubtitle } from '../hooks/useUpdateSubtitle';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
 import { useAuth } from '../auth/useAuth';
+import { useContinueWatching } from '../hooks/useContinueWatching';
+import { useUpdateWatchProgress } from '../hooks/useUpdateWatchProgress';
+import { useRemoveWatchProgress } from '../hooks/useRemoveWatchProgress';
+import { useWatchlist } from '../hooks/useWatchlist';
+import { useAddToWatchlist } from '../hooks/useAddToWatchlist';
+import { useRemoveFromWatchlist } from '../hooks/useRemoveFromWatchlist';
+import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { getFocalCropArea } from '../lib/focalPoints';
 import { buildTopographicList, buildSeasonGroups } from '../lib/collections';
@@ -75,7 +82,7 @@ const FocalPointPicker = ({
 export const VideoPage = () => {
   const { id, collectionId: routeCollectionId } = useParams<{ id: string; collectionId?: string; }>();
   const navigate = useNavigate();
-  const { isAdmin, specialPool } = useAuth();
+  const { isAdmin, specialPool, selectedProfile } = useAuth();
   const { entries, entriesLoaded } = useOffline();
   const offlineEntry = entries.find(e => e.mediaId === (id ?? ''));
   const offlineUri = offlineEntry?.offlineUri ?? null;
@@ -88,6 +95,35 @@ export const VideoPage = () => {
 
   const { mutate: addSub, isPending: isAddingSub } = useAddSubtitle(id ?? '');
   const { mutate: updateSub } = useUpdateSubtitle(id ?? '');
+
+  const profileName = selectedProfile?.name ?? '';
+  const { data: continueWatchingItems } = useContinueWatching(profileName);
+  const initialPositionInMs = continueWatchingItems?.find((item) => item._id === id)?.positionInMs ?? 0;
+  const { mutate: updateProgress } = useUpdateWatchProgress();
+  const { mutate: removeProgress } = useRemoveWatchProgress();
+  const { data: watchlistItems } = useWatchlist(profileName);
+  const isInWatchlist = watchlistItems?.some((item) => item._id === id) ?? false;
+  const { mutate: addToWatchlist } = useAddToWatchlist();
+  const { mutate: removeFromWatchlist } = useRemoveFromWatchlist();
+
+  const handleProgressUpdate = (positionInMs: number) => {
+    if (!profileName || !id || offlineEntry) return;
+    updateProgress({ profileName, mediaId: id, positionInMs });
+  };
+
+  const handleFinished = () => {
+    if (!profileName || !id) return;
+    removeProgress({ profileName, mediaId: id });
+  };
+
+  const handleWatchlistToggle = () => {
+    if (!profileName || !id) return;
+    if (isInWatchlist) {
+      removeFromWatchlist({ profileName, mediaId: id });
+    } else {
+      addToWatchlist({ profileName, mediaId: id });
+    }
+  };
 
   const [manifestVersion, setManifestVersion] = useState(() => Date.now());
   const [showAddSubtitle, setShowAddSubtitle] = useState(false);
@@ -405,6 +441,9 @@ export const VideoPage = () => {
         className="mb-6 rounded-xl"
         nextEpisodeTitle={nextVideo?.title}
         onNextEpisode={nextEpisodePath ? () => navigate(nextEpisodePath) : undefined}
+        initialPositionInMs={initialPositionInMs}
+        onProgressUpdate={handleProgressUpdate}
+        onFinished={handleFinished}
       />
       )}
 
@@ -605,6 +644,15 @@ export const VideoPage = () => {
             <div className="flex items-start justify-between gap-4">
               <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
               <div className="flex shrink-0 items-center gap-1">
+              {profileName && (
+                <button
+                  onClick={handleWatchlistToggle}
+                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-foreground"
+                  title={isInWatchlist ? 'Remove from My List' : 'Add to My List'}
+                >
+                  {isInWatchlist ? <BookmarkCheck size={20} className="text-red-500" /> : <Bookmark size={20} />}
+                </button>
+              )}
               {isNative && !isTV && (
                 <DownloadButton
                   mediaId={video._id}

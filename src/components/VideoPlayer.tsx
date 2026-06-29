@@ -70,6 +70,9 @@ interface VideoPlayerProps {
   className?: string;
   nextEpisodeTitle?: string;
   onNextEpisode?: () => void;
+  initialPositionInMs?: number;
+  onProgressUpdate?: (positionInMs: number) => void;
+  onFinished?: () => void;
 }
 
 export const VideoPlayer = ({
@@ -83,6 +86,9 @@ export const VideoPlayer = ({
   className,
   nextEpisodeTitle,
   onNextEpisode,
+  initialPositionInMs,
+  onProgressUpdate,
+  onFinished,
 }: VideoPlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -101,6 +107,12 @@ export const VideoPlayer = ({
   const lastTapRef = useRef<{ time: number; side: 'left' | 'right' } | null>(null);
   const skipFeedbackTimerRef = useRef<number | null>(null);
   const skipAccumulatedRef = useRef(0);
+  const progressThrottleRef = useRef<number | null>(null);
+  const finishedFiredRef = useRef(false);
+  const onProgressUpdateRef = useRef(onProgressUpdate);
+  const onFinishedRef = useRef(onFinished);
+  onProgressUpdateRef.current = onProgressUpdate;
+  onFinishedRef.current = onFinished;
 
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
@@ -182,7 +194,22 @@ export const VideoPlayer = ({
     const video = videoRef.current;
     if (!video) return;
 
-    const onTimeUpdate = () => setCurrentTime(video.currentTime);
+    const PROGRESS_INTERVAL_MS = 15_000;
+    const onTimeUpdate = () => {
+      const t = video.currentTime;
+      setCurrentTime(t);
+      const dur = video.duration;
+      if (Number.isFinite(dur) && dur > 0 && t >= dur * 0.9 && !finishedFiredRef.current) {
+        finishedFiredRef.current = true;
+        onFinishedRef.current?.();
+      }
+      if (!progressThrottleRef.current) {
+        progressThrottleRef.current = window.setTimeout(() => {
+          progressThrottleRef.current = null;
+          if (!video.paused) onProgressUpdateRef.current?.(Math.round(video.currentTime * 1000));
+        }, PROGRESS_INTERVAL_MS);
+      }
+    };
     const onProgress = () => {
       if (video.buffered.length > 0) setBufferedEnd(video.buffered.end(video.buffered.length - 1));
     };
@@ -194,6 +221,8 @@ export const VideoPlayer = ({
       setControlsVisible(true);
       controlsVisibleSyncRef.current = true;
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+      if (progressThrottleRef.current) { window.clearTimeout(progressThrottleRef.current); progressThrottleRef.current = null; }
+      onProgressUpdateRef.current?.(Math.round(video.currentTime * 1000));
     };
     const onPlay = () => {
       pausedRef.current = false;
@@ -218,6 +247,7 @@ export const VideoPlayer = ({
       video.removeEventListener('pause', onPause);
       video.removeEventListener('play', onPlay);
       video.removeEventListener('volumechange', onVolumeChange);
+      if (progressThrottleRef.current) { window.clearTimeout(progressThrottleRef.current); progressThrottleRef.current = null; }
     };
   }, [scheduleHide]);
 
@@ -296,6 +326,7 @@ export const VideoPlayer = ({
       setCaptionTracks([]);
       setActiveCaptionId(null);
       setSpriteDims(null);
+      finishedFiredRef.current = false;
 
       void prefetchFirstSegments(manifestUrl, special);
 
@@ -414,6 +445,10 @@ export const VideoPlayer = ({
           : manifestUrl;
         await player.load(manifestToLoad);
         if (isDisposed) return;
+
+        if (initialPositionInMs && initialPositionInMs > 0) {
+          video.currentTime = initialPositionInMs / 1000;
+        }
 
         refreshPlayerState();
 

@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router';
 import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
 import { useVideos } from '../hooks/useVideos';
 import { useCollections } from '../hooks/useCollections';
+import { useContinueWatching } from '../hooks/useContinueWatching';
+import { useWatchlist } from '../hooks/useWatchlist';
 import { isNetworkError } from '../api/client';
 import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
 import { collectionThumbnailUrl } from '../api/mediaCollection';
 import { useAuth } from '../auth/useAuth';
 import { ORIENTATION_CONFIG } from '../hooks/useThumbnailOrientation';
 import { getObjectPositionFromFocalPoint } from '../lib/focalPoints';
-import type { CollectionListItem, VideoListItem, Coordinates } from '../types/api';
+import type { CollectionListItem, VideoListItem, Coordinates, ContinueWatchingItem } from '../types/api';
 import { isNative, isTV } from '../lib/platform';
 import { DownloadButton } from '../components/DownloadButton';
 import { AuthImage } from '../components/AuthImage';
@@ -257,10 +259,12 @@ const SectionCarousel = ({
 
 export const HomePage = () => {
   const navigate = useNavigate();
-  const { isAdmin, specialPool } = useAuth();
+  const { isAdmin, specialPool, selectedProfile } = useAuth();
   const special = isAdmin && specialPool;
   const { data: videos, isLoading, isError, error: videosError } = useVideos();
   const { data: collections } = useCollections();
+  const { data: continueWatchingItems } = useContinueWatching(selectedProfile?.name ?? '');
+  const { data: watchlistItems } = useWatchlist(selectedProfile?.name ?? '');
   const [selectedKind, setSelectedKind] = useState<string>('All');
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
@@ -345,6 +349,56 @@ export const HomePage = () => {
 
   const toggleGenre = (genre: string) =>
     setSelectedGenres((prev) => prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]);
+
+  const renderContinueWatchingCard = (item: PageItem) => {
+    const video = item.data as ContinueWatchingItem;
+    const pct = Math.min(100, Math.round((video.positionInMs / video.durationInMs) * 100));
+    return (
+      <button
+        key={video._id}
+        onClick={() => void navigate(`/videos/${video._id}`)}
+        className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
+      >
+        <div className={`relative w-full ${config.paddingClass}`}>
+          <ItemThumbnail
+            src={mediaThumbnailUrl(video._id, special)}
+            title={video.title}
+            focalPoint={video.thumbnailFocalPoint}
+            aspectRatio={config.aspectRatio}
+          />
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+            <div className="h-full bg-red-500" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+        <div className="portrait:hidden flex flex-col gap-0.5 p-2.5">
+          <p className="text-sm font-semibold leading-tight">{video.title}</p>
+          <p className="text-xs text-muted-foreground">{formatDuration(video.durationInMs - video.positionInMs)} left</p>
+        </div>
+      </button>
+    );
+  };
+
+  const renderWatchlistCard = (item: PageItem) =>
+    item.type === 'video' ? (
+      <button
+        key={item.data._id}
+        onClick={() => void navigate(`/videos/${item.data._id}`)}
+        className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
+      >
+        <div className={`relative w-full ${config.paddingClass}`}>
+          <ItemThumbnail
+            src={mediaThumbnailUrl(item.data._id, special)}
+            title={item.data.title}
+            focalPoint={item.data.thumbnailFocalPoint}
+            aspectRatio={config.aspectRatio}
+          />
+        </div>
+        <div className="portrait:hidden flex flex-col gap-0.5 p-2.5">
+          <p className="text-sm font-semibold leading-tight">{item.data.title}</p>
+          <p className="text-xs text-muted-foreground">{formatDuration((item.data as VideoListItem).durationInMs)}</p>
+        </div>
+      </button>
+    ) : null;
 
   const renderItemCard = (item: PageItem) =>
     item.type === 'collection' ? (
@@ -528,8 +582,32 @@ export const HomePage = () => {
           </div>
         )}
 
-        {visibleSections.length > 0 && (
+        {(continueWatchingItems && continueWatchingItems.length > 0) || (watchlistItems && watchlistItems.length > 0) || visibleSections.length > 0 ? (
           <div className="space-y-6 pb-8">
+            {continueWatchingItems && continueWatchingItems.length > 0 && (
+              <section key="continue-watching">
+                <div className="mb-3">
+                  <h2 className="text-lg font-semibold tracking-tight">Continue Watching</h2>
+                </div>
+                <SectionCarousel
+                  sectionKey="continue-watching"
+                  items={continueWatchingItems.map((v): PageItem => ({ type: 'video', data: v }))}
+                  renderItemCard={renderContinueWatchingCard}
+                />
+              </section>
+            )}
+            {watchlistItems && watchlistItems.length > 0 && (
+              <section key="my-list">
+                <div className="mb-3">
+                  <h2 className="text-lg font-semibold tracking-tight">My List</h2>
+                </div>
+                <SectionCarousel
+                  sectionKey="my-list"
+                  items={watchlistItems.map((v): PageItem => ({ type: 'video', data: v }))}
+                  renderItemCard={renderWatchlistCard}
+                />
+              </section>
+            )}
             {visibleSections.map((section) => (
               <section key={section.key}>
                 <div className="mb-3">
@@ -543,7 +621,7 @@ export const HomePage = () => {
               </section>
             ))}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
