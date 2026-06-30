@@ -98,11 +98,11 @@ export const VideoPage = () => {
 
   const profileName = selectedProfile?.name ?? '';
   const { data: continueWatchingItems } = useContinueWatching(profileName);
-  const initialPositionInMs = continueWatchingItems?.find((item) => item._id === id)?.positionInMs ?? 0;
+  const initialPositionInMs = continueWatchingItems?.find((item) => item.mediaId === id)?.positionInMs ?? 0;
   const { mutate: updateProgress } = useUpdateWatchProgress();
   const { mutate: removeProgress } = useRemoveWatchProgress();
   const { data: watchlistItems } = useWatchlist(profileName);
-  const isInWatchlist = watchlistItems?.some((item) => item._id === id) ?? false;
+  const isInWatchlist = watchlistItems?.includes(id ?? '') ?? false;
   const { mutate: addToWatchlist } = useAddToWatchlist();
   const { mutate: removeFromWatchlist } = useRemoveFromWatchlist();
 

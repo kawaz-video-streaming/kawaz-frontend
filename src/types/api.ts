@@ -86,7 +86,8 @@ export interface WatchProgressEntry {
   updatedAt: string
 }
 
-export interface ContinueWatchingItem extends VideoListItem {
+export interface ContinueWatchingItem {
+  mediaId: string
   positionInMs: number
 }
 

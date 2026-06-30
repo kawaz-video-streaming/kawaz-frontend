@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { getWatchlist } from '../api/user'
-import type { VideoListItem } from '../types/api'
 
 export const useWatchlist = (profileName: string) =>
-  useQuery<VideoListItem[]>({
+  useQuery<string[]>({
     queryKey: ['watchlist', profileName],
     queryFn: () => getWatchlist(profileName),
     enabled: profileName.length > 0,

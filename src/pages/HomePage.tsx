@@ -11,7 +11,7 @@ import { collectionThumbnailUrl } from '../api/mediaCollection';
 import { useAuth } from '../auth/useAuth';
 import { ORIENTATION_CONFIG } from '../hooks/useThumbnailOrientation';
 import { getObjectPositionFromFocalPoint } from '../lib/focalPoints';
-import type { CollectionListItem, VideoListItem, Coordinates, ContinueWatchingItem } from '../types/api';
+import type { CollectionListItem, VideoListItem, Coordinates } from '../types/api';
 import { isNative, isTV } from '../lib/platform';
 import { DownloadButton } from '../components/DownloadButton';
 import { AuthImage } from '../components/AuthImage';
@@ -257,6 +257,8 @@ const SectionCarousel = ({
   );
 };
 
+type EnrichedContinueWatchingItem = VideoListItem & { positionInMs: number }
+
 export const HomePage = () => {
   const navigate = useNavigate();
   const { isAdmin, specialPool, selectedProfile } = useAuth();
@@ -265,6 +267,24 @@ export const HomePage = () => {
   const { data: collections } = useCollections();
   const { data: continueWatchingItems } = useContinueWatching(selectedProfile?.name ?? '');
   const { data: watchlistItems } = useWatchlist(selectedProfile?.name ?? '');
+
+  const continueWatchingVideoItems = useMemo((): EnrichedContinueWatchingItem[] => {
+    if (!continueWatchingItems || !videos) return []
+    return continueWatchingItems
+      .map(({ mediaId, positionInMs }) => {
+        const video = videos.find((v) => v._id === mediaId)
+        if (!video) return null
+        return { ...video, positionInMs }
+      })
+      .filter((v): v is EnrichedContinueWatchingItem => v !== null)
+  }, [continueWatchingItems, videos])
+
+  const watchlistVideoItems = useMemo((): VideoListItem[] => {
+    if (!watchlistItems || !videos) return []
+    return watchlistItems
+      .map((id) => videos.find((v) => v._id === id))
+      .filter((v): v is VideoListItem => v !== undefined)
+  }, [watchlistItems, videos])
   const [selectedKind, setSelectedKind] = useState<string>('All');
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
@@ -351,7 +371,7 @@ export const HomePage = () => {
     setSelectedGenres((prev) => prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]);
 
   const renderContinueWatchingCard = (item: PageItem) => {
-    const video = item.data as ContinueWatchingItem;
+    const video = item.data as EnrichedContinueWatchingItem;
     const pct = Math.min(100, Math.round((video.positionInMs / video.durationInMs) * 100));
     return (
       <button
@@ -582,28 +602,28 @@ export const HomePage = () => {
           </div>
         )}
 
-        {(continueWatchingItems && continueWatchingItems.length > 0) || (watchlistItems && watchlistItems.length > 0) || visibleSections.length > 0 ? (
+        {continueWatchingVideoItems.length > 0 || watchlistVideoItems.length > 0 || visibleSections.length > 0 ? (
           <div className="space-y-6 pb-8">
-            {continueWatchingItems && continueWatchingItems.length > 0 && (
+            {continueWatchingVideoItems.length > 0 && (
               <section key="continue-watching">
                 <div className="mb-3">
                   <h2 className="text-lg font-semibold tracking-tight">Continue Watching</h2>
                 </div>
                 <SectionCarousel
                   sectionKey="continue-watching"
-                  items={continueWatchingItems.map((v): PageItem => ({ type: 'video', data: v }))}
+                  items={continueWatchingVideoItems.map((v): PageItem => ({ type: 'video', data: v }))}
                   renderItemCard={renderContinueWatchingCard}
                 />
               </section>
             )}
-            {watchlistItems && watchlistItems.length > 0 && (
+            {watchlistVideoItems.length > 0 && (
               <section key="my-list">
                 <div className="mb-3">
                   <h2 className="text-lg font-semibold tracking-tight">My List</h2>
                 </div>
                 <SectionCarousel
                   sectionKey="my-list"
-                  items={watchlistItems.map((v): PageItem => ({ type: 'video', data: v }))}
+                  items={watchlistVideoItems.map((v): PageItem => ({ type: 'video', data: v }))}
                   renderItemCard={renderWatchlistCard}
                 />
               </section>

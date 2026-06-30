@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { ContinueWatchingItem, Profile, VideoListItem } from '../types/api'
+import type { ContinueWatchingItem, Profile } from '../types/api'
 
 export const getProfiles = () =>
   apiRequest<{ profiles: Profile[] }>('/user/profiles').then((r) => r.profiles)
@@ -38,7 +38,7 @@ export const removeWatchProgress = (profileName: string, mediaId: string) =>
   )
 
 export const getContinueWatching = (profileName: string) =>
-  apiRequest<ContinueWatchingItem[]>(`/user/profile/${encodeURIComponent(profileName)}/continue-watching`)
+  apiRequest<ContinueWatchingItem[]>(`/user/profile/${encodeURIComponent(profileName)}/continueWatching`)
 
 export const addToWatchlist = (profileName: string, mediaId: string) =>
   apiRequest<{ message: string }>(
@@ -53,4 +53,4 @@ export const removeFromWatchlist = (profileName: string, mediaId: string) =>
   )
 
 export const getWatchlist = (profileName: string) =>
-  apiRequest<VideoListItem[]>(`/user/profile/${encodeURIComponent(profileName)}/watchlist`)
+  apiRequest<string[]>(`/user/profile/${encodeURIComponent(profileName)}/watchlist`)

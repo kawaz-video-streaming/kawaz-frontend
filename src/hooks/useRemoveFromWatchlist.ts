@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { removeFromWatchlist } from '../api/user'
-import type { VideoListItem } from '../types/api'
 
 export const useRemoveFromWatchlist = () => {
   const queryClient = useQueryClient()
@@ -9,8 +8,8 @@ export const useRemoveFromWatchlist = () => {
     mutationFn: ({ profileName, mediaId }: { profileName: string; mediaId: string }) =>
       removeFromWatchlist(profileName, mediaId),
     onSuccess: (_, { profileName, mediaId }) => {
-      queryClient.setQueryData<VideoListItem[]>(['watchlist', profileName], (old) =>
-        old?.filter((v) => v._id !== mediaId) ?? []
+      queryClient.setQueryData<string[]>(['watchlist', profileName], (old) =>
+        old?.filter((id) => id !== mediaId) ?? []
       )
     },
     onError: (err) => {
