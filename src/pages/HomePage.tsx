@@ -398,27 +398,29 @@ export const HomePage = () => {
     );
   };
 
-  const renderWatchlistCard = (item: PageItem) =>
-    item.type === 'video' ? (
+  const renderWatchlistCard = (item: PageItem) => {
+    const video = item.data as VideoListItem;
+    return (
       <button
-        key={item.data._id}
-        onClick={() => void navigate(`/videos/${item.data._id}`)}
+        key={video._id}
+        onClick={() => void navigate(`/videos/${video._id}`)}
         className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
       >
         <div className={`relative w-full ${config.paddingClass}`}>
           <ItemThumbnail
-            src={mediaThumbnailUrl(item.data._id, special)}
-            title={item.data.title}
-            focalPoint={item.data.thumbnailFocalPoint}
+            src={mediaThumbnailUrl(video._id, special)}
+            title={video.title}
+            focalPoint={video.thumbnailFocalPoint}
             aspectRatio={config.aspectRatio}
           />
         </div>
         <div className="portrait:hidden flex flex-col gap-0.5 p-2.5">
-          <p className="text-sm font-semibold leading-tight">{item.data.title}</p>
-          <p className="text-xs text-muted-foreground">{formatDuration((item.data as VideoListItem).durationInMs)}</p>
+          <p className="text-sm font-semibold leading-tight">{video.title}</p>
+          <p className="text-xs text-muted-foreground">{formatDuration(video.durationInMs)}</p>
         </div>
       </button>
-    ) : null;
+    );
+  };
 
   const renderItemCard = (item: PageItem) =>
     item.type === 'collection' ? (

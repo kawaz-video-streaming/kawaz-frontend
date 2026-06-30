@@ -112,7 +112,7 @@ export const VideoPage = () => {
   };
 
   const handleFinished = () => {
-    if (!profileName || !id) return;
+    if (!profileName || !id || offlineEntry) return;
     removeProgress({ profileName, mediaId: id });
   };
 

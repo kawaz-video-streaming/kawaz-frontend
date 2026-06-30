@@ -80,12 +80,6 @@ export interface Profile {
   avatarId: string
 }
 
-export interface WatchProgressEntry {
-  mediaId: string
-  positionInMs: number
-  updatedAt: string
-}
-
 export interface ContinueWatchingItem {
   mediaId: string
   positionInMs: number

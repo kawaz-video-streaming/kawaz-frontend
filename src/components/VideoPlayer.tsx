@@ -26,6 +26,7 @@ const SkipForwardIcon = ({ size = 22 }: { size?: number }) => (
 );
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
+const FINISHED_THRESHOLD_S = 3 * 60;
 
 const formatTime = (s: number): string => {
   if (!Number.isFinite(s) || s < 0) return '0:00';
@@ -199,7 +200,7 @@ export const VideoPlayer = ({
       const t = video.currentTime;
       setCurrentTime(t);
       const dur = video.duration;
-      if (Number.isFinite(dur) && dur > 0 && t >= dur * 0.9 && !finishedFiredRef.current) {
+      if (Number.isFinite(dur) && dur > 0 && t >= dur - FINISHED_THRESHOLD_S && !finishedFiredRef.current) {
         finishedFiredRef.current = true;
         onFinishedRef.current?.();
       }
@@ -1225,7 +1226,7 @@ export const VideoPlayer = ({
             <div
               className={cn(
                 'absolute bottom-20 right-4 z-20 flex max-w-[200px] flex-col gap-2 rounded-xl bg-black/80 p-3 backdrop-blur-sm transition-all duration-500',
-                duration - currentTime < 300 && !nextEpisodeDismissed
+                duration - currentTime < FINISHED_THRESHOLD_S && !nextEpisodeDismissed
                   ? 'pointer-events-auto opacity-100 translate-y-0'
                   : 'pointer-events-none opacity-0 translate-y-2',
               )}
@@ -1257,7 +1258,7 @@ export const VideoPlayer = ({
               onClick={onNextEpisode}
               className={cn(
                 'absolute bottom-20 right-4 z-20 flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition-all duration-500 hover:bg-black/90 active:scale-95',
-                duration - currentTime < 300 && nextEpisodeDismissed
+                duration - currentTime < FINISHED_THRESHOLD_S && nextEpisodeDismissed
                   ? 'pointer-events-auto opacity-100 translate-y-0'
                   : 'pointer-events-none opacity-0 translate-y-2',
               )}
