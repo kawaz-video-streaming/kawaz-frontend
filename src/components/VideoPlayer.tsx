@@ -112,8 +112,11 @@ export const VideoPlayer = ({
   const finishedFiredRef = useRef(false);
   const onProgressUpdateRef = useRef(onProgressUpdate);
   const onFinishedRef = useRef(onFinished);
+  const initialPositionInMsRef = useRef(initialPositionInMs);
+  const hasSeekedToInitialPositionRef = useRef(false);
   onProgressUpdateRef.current = onProgressUpdate;
   onFinishedRef.current = onFinished;
+  initialPositionInMsRef.current = initialPositionInMs;
 
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
@@ -258,6 +261,7 @@ export const VideoPlayer = ({
     let player: import('shaka-player').Player | null = null;
     let markerRenderRetryTimer: number | null = null;
     let stallRecoveryTimer: number | null = null;
+    hasSeekedToInitialPositionRef.current = false;
 
     const clearStallRecovery = () => {
       if (stallRecoveryTimer !== null) { window.clearTimeout(stallRecoveryTimer); stallRecoveryTimer = null; }
@@ -444,11 +448,14 @@ export const VideoPlayer = ({
         const manifestToLoad = bearerForLoad && !manifestUrl.includes('token=') && !manifestUrl.startsWith('offline:')
           ? manifestUrl + (manifestUrl.includes('?') ? `&token=${bearerForLoad.slice(7)}` : `?token=${bearerForLoad.slice(7)}`)
           : manifestUrl;
-        await player.load(manifestToLoad);
+        const startTime = initialPositionInMsRef.current && initialPositionInMsRef.current > 0
+          ? initialPositionInMsRef.current / 1000
+          : null;
+        await player.load(manifestToLoad, startTime);
         if (isDisposed) return;
 
-        if (initialPositionInMs && initialPositionInMs > 0) {
-          video.currentTime = initialPositionInMs / 1000;
+        if (startTime !== null) {
+          hasSeekedToInitialPositionRef.current = true;
         }
 
         refreshPlayerState();
@@ -512,6 +519,18 @@ export const VideoPlayer = ({
       })();
     };
   }, [manifestUrl, chaptersUrl, special]);
+
+  // Continue-watching position can arrive after the manifest has already
+  // loaded (its query resolves independently of manifestUrl); seek once
+  // it shows up if we haven't already applied it for this load.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || hasSeekedToInitialPositionRef.current) return;
+    if (!initialPositionInMs || initialPositionInMs <= 0) return;
+    if (video.readyState < 1) return;
+    video.currentTime = initialPositionInMs / 1000;
+    hasSeekedToInitialPositionRef.current = true;
+  }, [initialPositionInMs]);
 
   // Pre-fetch VTT + sprite for online playback so seek thumbnails use the same
   // canvas path as offline — avoids relying on Shaka's getThumbnails() API and

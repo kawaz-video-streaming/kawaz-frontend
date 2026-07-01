@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { ContinueWatchingItem, Profile } from '../types/api'
+import type { ContinueWatchingItem, Profile, WatchlistEntry, WatchlistItemKind } from '../types/api'
 
 export const getProfiles = () =>
   apiRequest<{ profiles: Profile[] }>('/user/profiles').then((r) => r.profiles)
@@ -40,17 +40,17 @@ export const removeWatchProgress = (profileName: string, mediaId: string) =>
 export const getContinueWatching = (profileName: string) =>
   apiRequest<ContinueWatchingItem[]>(`/user/profile/${encodeURIComponent(profileName)}/continueWatching`)
 
-export const addToWatchlist = (profileName: string, mediaId: string) =>
+export const addToWatchlist = (profileName: string, id: string, kind: WatchlistItemKind) =>
   apiRequest<{ message: string }>(
-    `/user/profile/${encodeURIComponent(profileName)}/watchlist/${encodeURIComponent(mediaId)}`,
+    `/user/profile/${encodeURIComponent(profileName)}/watchlist/${kind}/${encodeURIComponent(id)}`,
     { method: 'POST' },
   )
 
-export const removeFromWatchlist = (profileName: string, mediaId: string) =>
+export const removeFromWatchlist = (profileName: string, id: string, kind: WatchlistItemKind) =>
   apiRequest<{ message: string }>(
-    `/user/profile/${encodeURIComponent(profileName)}/watchlist/${encodeURIComponent(mediaId)}`,
+    `/user/profile/${encodeURIComponent(profileName)}/watchlist/${kind}/${encodeURIComponent(id)}`,
     { method: 'DELETE' },
   )
 
 export const getWatchlist = (profileName: string) =>
-  apiRequest<string[]>(`/user/profile/${encodeURIComponent(profileName)}/watchlist`)
+  apiRequest<WatchlistEntry[]>(`/user/profile/${encodeURIComponent(profileName)}/watchlist`)

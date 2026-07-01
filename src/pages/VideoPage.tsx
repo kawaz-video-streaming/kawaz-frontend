@@ -20,10 +20,6 @@ import { useAuth } from '../auth/useAuth';
 import { useContinueWatching } from '../hooks/useContinueWatching';
 import { useUpdateWatchProgress } from '../hooks/useUpdateWatchProgress';
 import { useRemoveWatchProgress } from '../hooks/useRemoveWatchProgress';
-import { useWatchlist } from '../hooks/useWatchlist';
-import { useAddToWatchlist } from '../hooks/useAddToWatchlist';
-import { useRemoveFromWatchlist } from '../hooks/useRemoveFromWatchlist';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { getFocalCropArea } from '../lib/focalPoints';
 import { buildTopographicList, buildSeasonGroups } from '../lib/collections';
@@ -101,10 +97,6 @@ export const VideoPage = () => {
   const initialPositionInMs = continueWatchingItems?.find((item) => item.mediaId === id)?.positionInMs ?? 0;
   const { mutate: updateProgress } = useUpdateWatchProgress();
   const { mutate: removeProgress } = useRemoveWatchProgress();
-  const { data: watchlistItems } = useWatchlist(profileName);
-  const isInWatchlist = watchlistItems?.includes(id ?? '') ?? false;
-  const { mutate: addToWatchlist } = useAddToWatchlist();
-  const { mutate: removeFromWatchlist } = useRemoveFromWatchlist();
 
   const handleProgressUpdate = (positionInMs: number) => {
     if (!profileName || !id || offlineEntry) return;
@@ -114,15 +106,6 @@ export const VideoPage = () => {
   const handleFinished = () => {
     if (!profileName || !id || offlineEntry) return;
     removeProgress({ profileName, mediaId: id });
-  };
-
-  const handleWatchlistToggle = () => {
-    if (!profileName || !id) return;
-    if (isInWatchlist) {
-      removeFromWatchlist({ profileName, mediaId: id });
-    } else {
-      addToWatchlist({ profileName, mediaId: id });
-    }
   };
 
   const [manifestVersion, setManifestVersion] = useState(() => Date.now());
@@ -644,15 +627,6 @@ export const VideoPage = () => {
             <div className="flex items-start justify-between gap-4">
               <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
               <div className="flex shrink-0 items-center gap-1">
-              {profileName && (
-                <button
-                  onClick={handleWatchlistToggle}
-                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-foreground"
-                  title={isInWatchlist ? 'Remove from My List' : 'Add to My List'}
-                >
-                  {isInWatchlist ? <BookmarkCheck size={20} className="text-red-500" /> : <Bookmark size={20} />}
-                </button>
-              )}
               {isNative && !isTV && (
                 <DownloadButton
                   mediaId={video._id}

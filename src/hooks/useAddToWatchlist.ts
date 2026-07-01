@@ -1,17 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { addToWatchlist } from '../api/user'
+import type { WatchlistEntry, WatchlistItemKind } from '../types/api'
 
 export const useAddToWatchlist = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ profileName, mediaId }: { profileName: string; mediaId: string }) =>
-      addToWatchlist(profileName, mediaId),
-    onSuccess: (_, { profileName, mediaId }) => {
-      queryClient.setQueryData<string[]>(['watchlist', profileName], (old) => {
+    mutationFn: ({ profileName, id, kind }: { profileName: string; id: string; kind: WatchlistItemKind }) =>
+      addToWatchlist(profileName, id, kind),
+    onSuccess: (_, { profileName, id, kind }) => {
+      queryClient.setQueryData<WatchlistEntry[]>(['watchlist', profileName], (old) => {
         if (!old) return old
-        if (old.includes(mediaId)) return old
-        return [...old, mediaId]
+        if (old.some((entry) => entry.id === id && entry.kind === kind)) return old
+        return [...old, { id, kind }]
       })
     },
     onError: (err) => {

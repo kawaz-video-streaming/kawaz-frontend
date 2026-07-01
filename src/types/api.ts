@@ -85,6 +85,13 @@ export interface ContinueWatchingItem {
   positionInMs: number
 }
 
+export type WatchlistItemKind = 'media' | 'collection'
+
+export interface WatchlistEntry {
+  id: string
+  kind: WatchlistItemKind
+}
+
 export interface Avatar {
   _id: string
   name: string
