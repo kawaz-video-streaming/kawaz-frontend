@@ -1,7 +1,21 @@
+import { Preferences } from '@capacitor/preferences'
+
 export class AuthError extends Error {}
+
+// fetch() throws a TypeError when no response is received at all (DNS failure, connection refused,
+// timeout) — as opposed to a regular Error thrown from a real HTTP response (404, 500, etc.).
+export const isNetworkError = (err: unknown): boolean => err instanceof TypeError
+
+// Not every 401 means the token is invalid (e.g. requireAdmin also responds 401 for a logged-in
+// non-admin user), so this only triggers a re-check against /user/me — it never logs out by itself.
+let onUnauthorized: (() => void) | null = null
+export const setUnauthorizedHandler = (handler: () => void) => {
+  onUnauthorized = handler
+}
 
 const handleResponse = async <T>(response: Response): Promise<T> => {
   if (response.status === 401) {
+    onUnauthorized?.()
     throw new AuthError('Unauthorized')
   }
   if (!response.ok) {
@@ -19,9 +33,25 @@ export const specialParam = (special: boolean) => special ? '?special=true' : ''
 
 const TOKEN_KEY = 'kawaz_token'
 
-export const storeToken = (token: string) => localStorage.setItem(TOKEN_KEY, token)
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
-const getToken = () => localStorage.getItem(TOKEN_KEY)
+// Stored via Capacitor Preferences (native: UserDefaults/SharedPreferences, web: localStorage
+// fallback) rather than plain localStorage — Preferences lives outside the WebView's evictable
+// "best-effort" storage quota, so it survives disk-pressure cleanups that can wipe localStorage/IndexedDB.
+// Preferences is async, so we keep an in-memory cache for the synchronous getToken() call sites below,
+// hydrated once on load via `tokenReady`.
+let cachedToken: string | null = null
+export const tokenReady: Promise<void> = Preferences.get({ key: TOKEN_KEY }).then(({ value }) => {
+  cachedToken = value
+})
+
+export const storeToken = (token: string) => {
+  cachedToken = token
+  void Preferences.set({ key: TOKEN_KEY, value: token })
+}
+export const clearToken = () => {
+  cachedToken = null
+  void Preferences.remove({ key: TOKEN_KEY })
+}
+const getToken = () => cachedToken
 export const authHeaders = (): Record<string, string> => {
   const token = getToken()
   return token !== null ? { Authorization: `Bearer ${token}` } : {}

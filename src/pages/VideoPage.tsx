@@ -1,4 +1,5 @@
 import { Captions, ChevronLeft, ChevronRight, Image, Mic, Pencil, Trash2, X, Check } from 'lucide-react';
+import { isNetworkError } from '../api/client';
 import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
 import { isDashSupported, isNative, isTV } from '../lib/platform';
 import { parseOfflineThumbnailCues, type OfflineThumbnailCue } from '../lib/offlineStorage';
@@ -16,9 +17,12 @@ import { useUpdateSubtitle } from '../hooks/useUpdateSubtitle';
 import { useCollections } from '../hooks/useCollections';
 import { useGenres } from '../hooks/useGenres';
 import { useAuth } from '../auth/useAuth';
+import { useContinueWatching } from '../hooks/useContinueWatching';
+import { useUpdateWatchProgress } from '../hooks/useUpdateWatchProgress';
+import { useRemoveWatchProgress } from '../hooks/useRemoveWatchProgress';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { getFocalCropArea } from '../lib/focalPoints';
-import { buildTopographicList, buildSeasonGroups } from '../lib/collections';
+import { buildTopographicList, buildSeasonGroups, resolveCollectionChain } from '../lib/collections';
 import { parsePositiveInt } from '../lib/parsePositiveInt';
 import { toast } from 'sonner';
 import { AuthImage, resolveAuthImageUrl } from '../components/AuthImage';
@@ -74,11 +78,11 @@ const FocalPointPicker = ({
 export const VideoPage = () => {
   const { id, collectionId: routeCollectionId } = useParams<{ id: string; collectionId?: string; }>();
   const navigate = useNavigate();
-  const { isAdmin, specialPool } = useAuth();
+  const { isAdmin, specialPool, selectedProfile } = useAuth();
   const { entries, entriesLoaded } = useOffline();
   const offlineEntry = entries.find(e => e.mediaId === (id ?? ''));
   const offlineUri = offlineEntry?.offlineUri ?? null;
-  const { data: video, isError, isLoading } = useVideo(id ?? '');
+  const { data: video, isError, error: videoError, isLoading } = useVideo(id ?? '');
   const { mutate: update, isPending: isUpdating } = useUpdateMedia(id ?? '');
   const { mutate: remove, isPending: isDeleting } = useDeleteMedia();
   const { data: collections } = useCollections();
@@ -87,6 +91,42 @@ export const VideoPage = () => {
 
   const { mutate: addSub, isPending: isAddingSub } = useAddSubtitle(id ?? '');
   const { mutate: updateSub } = useUpdateSubtitle(id ?? '');
+
+  const profileName = selectedProfile?.name ?? '';
+  const { data: continueWatchingItems } = useContinueWatching(profileName);
+  const initialPositionInMs = continueWatchingItems?.find((item) => item.mediaId === id)?.positionInMs ?? 0;
+  const { mutate: updateProgress } = useUpdateWatchProgress();
+  const { mutate: removeProgress } = useRemoveWatchProgress();
+
+  const siblingCollectionId = routeCollectionId ?? (video?.kind === 'episode' ? video.collectionId : undefined);
+  const siblings = allVideos
+    ?.filter((v) => v.collectionId === siblingCollectionId)
+    .sort((a, b) => {
+      const aNum = a.episodeNumber ?? Infinity;
+      const bNum = b.episodeNumber ?? Infinity;
+      if (aNum !== bNum) return aNum - bNum;
+      return a.title.localeCompare(b.title);
+    }) ?? [];
+  const currentIndex = siblings.findIndex((v) => v._id === id);
+  const prevVideo = currentIndex > 0 ? siblings[currentIndex - 1] : null;
+  const nextVideo = currentIndex < siblings.length - 1 ? siblings[currentIndex + 1] : null;
+  const nextEpisodePath = nextVideo && siblingCollectionId
+    ? `/collections/${siblingCollectionId}/videos/${nextVideo._id}`
+    : null;
+
+  const handleProgressUpdate = (positionInMs: number) => {
+    if (!profileName || !id || offlineEntry) return;
+    updateProgress({ profileName, mediaId: id, positionInMs });
+  };
+
+  const handleFinished = () => {
+    if (!profileName || !id || offlineEntry) return;
+    removeProgress({ profileName, mediaId: id });
+    const nextAlreadyInProgress = continueWatchingItems === undefined || continueWatchingItems.some((item) => item.mediaId === nextVideo?._id);
+    if (video?.kind === 'episode' && nextVideo && !nextAlreadyInProgress) {
+      updateProgress({ profileName, mediaId: nextVideo._id, positionInMs: 0 });
+    }
+  };
 
   const [manifestVersion, setManifestVersion] = useState(() => Date.now());
   const [showAddSubtitle, setShowAddSubtitle] = useState(false);
@@ -264,22 +304,6 @@ export const VideoPage = () => {
     });
   };
 
-  const siblingCollectionId = routeCollectionId ?? (video?.kind === 'episode' ? video.collectionId : undefined);
-  const siblings = allVideos
-    ?.filter((v) => v.collectionId === siblingCollectionId)
-    .sort((a, b) => {
-      const aNum = a.episodeNumber ?? Infinity;
-      const bNum = b.episodeNumber ?? Infinity;
-      if (aNum !== bNum) return aNum - bNum;
-      return a.title.localeCompare(b.title);
-    }) ?? [];
-  const currentIndex = siblings.findIndex((v) => v._id === id);
-  const prevVideo = currentIndex > 0 ? siblings[currentIndex - 1] : null;
-  const nextVideo = currentIndex < siblings.length - 1 ? siblings[currentIndex + 1] : null;
-  const nextEpisodePath = nextVideo && siblingCollectionId
-    ? `/collections/${siblingCollectionId}/videos/${nextVideo._id}`
-    : null;
-
   if (isLoading || (isNative && !isTV && !entriesLoaded)) {
     return (
       <div className="flex items-center justify-center py-32 text-muted-foreground">
@@ -324,6 +348,16 @@ export const VideoPage = () => {
   }
 
   if (isError || !video) {
+    if (isNetworkError(videoError)) {
+      return (
+        <div className="flex flex-col items-center justify-center py-32 text-center">
+          <p className="text-lg font-semibold">Can&apos;t reach the server</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The service may be temporarily unavailable. Please try again in a moment.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">
         <p className="text-lg font-semibold">Video not found</p>
@@ -339,24 +373,16 @@ export const VideoPage = () => {
   const manifestUrl = offlineUri ?? mediaStreamUrl(video.playUrl, special);
   const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3;
 
-  const episodeSeason = video.kind === 'episode'
-    ? (collections ?? []).find(c => c._id === video.collectionId)
-    : undefined;
-  const episodeShow = episodeSeason
-    ? (collections ?? []).find(c => c._id === episodeSeason.collectionId)
-    : undefined;
+  const episodeChain = video.kind === 'episode'
+    ? resolveCollectionChain(video.collectionId, collections ?? [])
+    : [];
+  const episodeSeason = episodeChain.length >= 2 ? episodeChain[episodeChain.length - 1] : undefined;
+  const episodeShow = episodeChain.length >= 2 ? episodeChain[0] : undefined;
 
   return (
     <div className="mx-auto max-w-6xl">
       {routeCollectionId && collections && (() => {
-        const chain: { _id: string; title: string; }[] = [];
-        let currentId: string | undefined = routeCollectionId;
-        while (currentId) {
-          const col = collections.find((c) => c._id === currentId);
-          if (!col) break;
-          chain.unshift(col);
-          currentId = col.collectionId;
-        }
+        const chain = resolveCollectionChain(routeCollectionId, collections);
         if (chain.length === 0) return null;
         return (
           <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -394,14 +420,17 @@ export const VideoPage = () => {
         className="mb-6 rounded-xl"
         nextEpisodeTitle={nextVideo?.title}
         onNextEpisode={nextEpisodePath ? () => navigate(nextEpisodePath) : undefined}
+        initialPositionInMs={initialPositionInMs}
+        onProgressUpdate={handleProgressUpdate}
+        onFinished={handleFinished}
       />
       )}
 
-      {routeCollectionId && (prevVideo || nextVideo) && (
+      {siblingCollectionId && (prevVideo || nextVideo) && (
         <div className="mb-4 flex items-center justify-between gap-2">
           {prevVideo ? (
             <Link
-              to={`/collections/${routeCollectionId}/videos/${prevVideo._id}`}
+              to={`/collections/${siblingCollectionId}/videos/${prevVideo._id}`}
               className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-red-500 hover:text-foreground"
             >
               <ChevronLeft size={16} />
@@ -412,7 +441,7 @@ export const VideoPage = () => {
           )}
           {nextVideo ? (
             <Link
-              to={`/collections/${routeCollectionId}/videos/${nextVideo._id}`}
+              to={`/collections/${siblingCollectionId}/videos/${nextVideo._id}`}
               className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-red-500 hover:text-foreground"
             >
               <span className="max-w-[180px] truncate">{nextVideo.title}</span>

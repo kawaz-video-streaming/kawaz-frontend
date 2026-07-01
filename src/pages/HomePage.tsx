@@ -1,17 +1,33 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
 import { useVideos } from '../hooks/useVideos';
 import { useCollections } from '../hooks/useCollections';
+import { useContinueWatching } from '../hooks/useContinueWatching';
+import { useWatchlist } from '../hooks/useWatchlist';
+import { useAddToWatchlist } from '../hooks/useAddToWatchlist';
+import { useRemoveFromWatchlist } from '../hooks/useRemoveFromWatchlist';
+import { isNetworkError } from '../api/client';
 import { mediaThumbnailUrl, mediaStreamUrl } from '../api/media';
 import { collectionThumbnailUrl } from '../api/mediaCollection';
 import { useAuth } from '../auth/useAuth';
 import { ORIENTATION_CONFIG } from '../hooks/useThumbnailOrientation';
 import { getObjectPositionFromFocalPoint } from '../lib/focalPoints';
-import type { CollectionListItem, VideoListItem, Coordinates } from '../types/api';
+import { resolveCollectionChain } from '../lib/collections';
+import type { CollectionListItem, VideoListItem, Coordinates, WatchlistItemKind } from '../types/api';
 import { isNative, isTV } from '../lib/platform';
 import { DownloadButton } from '../components/DownloadButton';
 import { AuthImage } from '../components/AuthImage';
+
+const WatchlistButton = ({ isWatchlisted, onToggle }: { isWatchlisted: boolean; onToggle: () => void; }) => (
+  <button
+    onClick={(e) => { e.stopPropagation(); onToggle(); }}
+    className="rounded-md bg-black/60 p-1.5 text-white/90 backdrop-blur-sm transition-colors hover:text-white"
+    title={isWatchlisted ? 'Remove from Watchlist' : 'Add to Watchlist'}
+  >
+    {isWatchlisted ? <BookmarkCheck size={14} className="text-red-500" /> : <Bookmark size={14} />}
+  </button>
+);
 
 const formatDuration = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000);
@@ -254,12 +270,98 @@ const SectionCarousel = ({
   );
 };
 
+type EnrichedContinueWatchingItem = VideoListItem & {
+  positionInMs: number
+  displayTitle: string
+  displaySubtitle: string | undefined
+  displayThumbnailUrl: string
+  displayFocalPoint: Coordinates
+}
+
 export const HomePage = () => {
   const navigate = useNavigate();
-  const { isAdmin, specialPool } = useAuth();
+  const { isAdmin, specialPool, selectedProfile } = useAuth();
   const special = isAdmin && specialPool;
-  const { data: videos, isLoading, isError } = useVideos();
+  const profileName = selectedProfile?.name ?? '';
+  const { data: videos, isLoading, isError, error: videosError } = useVideos();
   const { data: collections } = useCollections();
+  const { data: continueWatchingItems } = useContinueWatching(profileName);
+  const { data: watchlistItems } = useWatchlist(profileName);
+  const { mutate: addToWatchlist } = useAddToWatchlist();
+  const { mutate: removeFromWatchlist } = useRemoveFromWatchlist();
+
+  const continueWatchingVideoItems = useMemo((): EnrichedContinueWatchingItem[] => {
+    if (!continueWatchingItems || !videos) return []
+    // continueWatchingItems is sorted newest-first by the backend — dedupe by
+    // show so only the most recently watched episode per show surfaces here.
+    const seenShowIds = new Set<string>()
+    const items: EnrichedContinueWatchingItem[] = []
+
+    for (const { mediaId, positionInMs } of continueWatchingItems) {
+      const video = videos.find((v) => v._id === mediaId)
+      if (!video) continue
+
+      if (video.kind === 'episode' && video.collectionId) {
+        const chain = resolveCollectionChain(video.collectionId, collections ?? [])
+        const season = chain.length >= 2 ? chain[chain.length - 1] : undefined
+        const show = chain.length >= 2 ? chain[0] : undefined
+        if (show) {
+          if (seenShowIds.has(show._id)) continue
+          seenShowIds.add(show._id)
+          items.push({
+            ...video,
+            positionInMs,
+            displayTitle: show.title,
+            displaySubtitle: season?.seasonNumber != null && video.episodeNumber != null
+              ? `Season ${season.seasonNumber} · Episode ${video.episodeNumber}`
+              : undefined,
+            displayThumbnailUrl: collectionThumbnailUrl(show._id, special),
+            displayFocalPoint: show.thumbnailFocalPoint,
+          })
+          continue
+        }
+      }
+
+      items.push({
+        ...video,
+        positionInMs,
+        displayTitle: video.title,
+        displaySubtitle: undefined,
+        displayThumbnailUrl: mediaThumbnailUrl(video._id, special),
+        displayFocalPoint: video.thumbnailFocalPoint,
+      })
+    }
+
+    return items
+  }, [continueWatchingItems, videos, collections, special])
+
+  const watchlistPageItems = useMemo((): PageItem[] => {
+    if (!watchlistItems || !videos || !collections) return []
+    return watchlistItems
+      .map((entry): PageItem | null => {
+        if (entry.kind === 'media') {
+          const video = videos.find((v) => v._id === entry.id)
+          return video ? { type: 'video', data: video } : null
+        }
+        const collection = collections.find((c) => c._id === entry.id)
+        return collection ? { type: 'collection', data: collection } : null
+      })
+      .filter((item): item is PageItem => item !== null)
+  }, [watchlistItems, videos, collections])
+
+  const watchlistKeySet = useMemo(
+    () => new Set((watchlistItems ?? []).map((entry) => `${entry.kind}:${entry.id}`)),
+    [watchlistItems],
+  )
+  const isWatchlisted = (id: string, kind: WatchlistItemKind) => watchlistKeySet.has(`${kind}:${id}`);
+  const toggleWatchlist = (id: string, kind: WatchlistItemKind) => {
+    if (!profileName) return;
+    if (isWatchlisted(id, kind)) {
+      removeFromWatchlist({ profileName, id, kind });
+    } else {
+      addToWatchlist({ profileName, id, kind });
+    }
+  };
   const [selectedKind, setSelectedKind] = useState<string>('All');
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
@@ -345,6 +447,37 @@ export const HomePage = () => {
   const toggleGenre = (genre: string) =>
     setSelectedGenres((prev) => prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]);
 
+  const renderContinueWatchingCard = (item: PageItem) => {
+    const video = item.data as EnrichedContinueWatchingItem;
+    const pct = Math.min(100, Math.round((video.positionInMs / video.durationInMs) * 100));
+    return (
+      <button
+        key={video._id}
+        onClick={() => void navigate(`/videos/${video._id}`)}
+        className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-red-500"
+      >
+        <div className={`relative w-full ${config.paddingClass}`}>
+          <ItemThumbnail
+            src={video.displayThumbnailUrl}
+            title={video.displayTitle}
+            focalPoint={video.displayFocalPoint}
+            aspectRatio={config.aspectRatio}
+          />
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+            <div className="h-full bg-red-500" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+        <div className="flex flex-col gap-0.5 p-2.5">
+          <p className="text-sm font-semibold leading-tight">{video.displayTitle}</p>
+          {video.displaySubtitle && (
+            <p className="text-xs text-muted-foreground">{video.displaySubtitle}</p>
+          )}
+          <p className="text-xs text-muted-foreground">{formatDuration(video.durationInMs - video.positionInMs)} left</p>
+        </div>
+      </button>
+    );
+  };
+
   const renderItemCard = (item: PageItem) =>
     item.type === 'collection' ? (
       <button
@@ -364,6 +497,14 @@ export const HomePage = () => {
               <FolderOpen size={10} />
             </span>
           </div>
+          {profileName && (
+            <div className="absolute top-1.5 right-1.5">
+              <WatchlistButton
+                isWatchlisted={isWatchlisted(item.data._id, 'collection')}
+                onToggle={() => toggleWatchlist(item.data._id, 'collection')}
+              />
+            </div>
+          )}
         </div>
         <div className="portrait:hidden flex flex-col gap-0.5 p-2.5">
           <p className="text-sm font-semibold leading-tight">
@@ -387,6 +528,14 @@ export const HomePage = () => {
             focalPoint={item.data.thumbnailFocalPoint}
             aspectRatio={config.aspectRatio}
           />
+          {profileName && (
+            <div className="absolute top-1.5 right-1.5">
+              <WatchlistButton
+                isWatchlisted={isWatchlisted(item.data._id, 'media')}
+                onToggle={() => toggleWatchlist(item.data._id, 'media')}
+              />
+            </div>
+          )}
           {isNative && !isTV && (
             <div className="absolute bottom-1.5 right-1.5">
               <DownloadButton
@@ -514,7 +663,9 @@ export const HomePage = () => {
         )}
         {isError && (
           <div className="flex items-center justify-center py-32 text-sm text-muted-foreground">
-            Failed to load content.
+            {isNetworkError(videosError)
+              ? "Can't reach the server. The service may be temporarily unavailable — please try again in a moment."
+              : 'Failed to load content.'}
           </div>
         )}
         {!isLoading && visibleSections.length === 0 && (
@@ -525,8 +676,32 @@ export const HomePage = () => {
           </div>
         )}
 
-        {visibleSections.length > 0 && (
+        {continueWatchingVideoItems.length > 0 || watchlistPageItems.length > 0 || visibleSections.length > 0 ? (
           <div className="space-y-6 pb-8">
+            {continueWatchingVideoItems.length > 0 && (
+              <section key="continue-watching">
+                <div className="mb-3">
+                  <h2 className="text-lg font-semibold tracking-tight">Continue Watching</h2>
+                </div>
+                <SectionCarousel
+                  sectionKey="continue-watching"
+                  items={continueWatchingVideoItems.map((v): PageItem => ({ type: 'video', data: v }))}
+                  renderItemCard={renderContinueWatchingCard}
+                />
+              </section>
+            )}
+            {watchlistPageItems.length > 0 && (
+              <section key="my-list">
+                <div className="mb-3">
+                  <h2 className="text-lg font-semibold tracking-tight">Watchlist</h2>
+                </div>
+                <SectionCarousel
+                  sectionKey="my-list"
+                  items={watchlistPageItems}
+                  renderItemCard={renderItemCard}
+                />
+              </section>
+            )}
             {visibleSections.map((section) => (
               <section key={section.key}>
                 <div className="mb-3">
@@ -540,7 +715,7 @@ export const HomePage = () => {
               </section>
             ))}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
