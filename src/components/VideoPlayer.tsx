@@ -26,6 +26,7 @@ const SkipForwardIcon = ({ size = 22 }: { size?: number }) => (
 );
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL ?? '';
+const FINISHED_THRESHOLD_S = 3 * 60;
 
 const formatTime = (s: number): string => {
   if (!Number.isFinite(s) || s < 0) return '0:00';
@@ -70,6 +71,9 @@ interface VideoPlayerProps {
   className?: string;
   nextEpisodeTitle?: string;
   onNextEpisode?: () => void;
+  initialPositionInMs?: number;
+  onProgressUpdate?: (positionInMs: number) => void;
+  onFinished?: () => void;
 }
 
 export const VideoPlayer = ({
@@ -83,6 +87,9 @@ export const VideoPlayer = ({
   className,
   nextEpisodeTitle,
   onNextEpisode,
+  initialPositionInMs,
+  onProgressUpdate,
+  onFinished,
 }: VideoPlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -101,6 +108,15 @@ export const VideoPlayer = ({
   const lastTapRef = useRef<{ time: number; side: 'left' | 'right' } | null>(null);
   const skipFeedbackTimerRef = useRef<number | null>(null);
   const skipAccumulatedRef = useRef(0);
+  const progressThrottleRef = useRef<number | null>(null);
+  const finishedFiredRef = useRef(false);
+  const onProgressUpdateRef = useRef(onProgressUpdate);
+  const onFinishedRef = useRef(onFinished);
+  const initialPositionInMsRef = useRef(initialPositionInMs);
+  const hasSeekedToInitialPositionRef = useRef(false);
+  onProgressUpdateRef.current = onProgressUpdate;
+  onFinishedRef.current = onFinished;
+  initialPositionInMsRef.current = initialPositionInMs;
 
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true);
@@ -182,7 +198,22 @@ export const VideoPlayer = ({
     const video = videoRef.current;
     if (!video) return;
 
-    const onTimeUpdate = () => setCurrentTime(video.currentTime);
+    const PROGRESS_INTERVAL_MS = 10_000;
+    const onTimeUpdate = () => {
+      const t = video.currentTime;
+      setCurrentTime(t);
+      const dur = video.duration;
+      if (Number.isFinite(dur) && dur > 0 && t >= dur - FINISHED_THRESHOLD_S && !finishedFiredRef.current) {
+        finishedFiredRef.current = true;
+        onFinishedRef.current?.();
+      }
+      if (!progressThrottleRef.current) {
+        progressThrottleRef.current = window.setTimeout(() => {
+          progressThrottleRef.current = null;
+          if (!video.paused) onProgressUpdateRef.current?.(Math.round(video.currentTime * 1000));
+        }, PROGRESS_INTERVAL_MS);
+      }
+    };
     const onProgress = () => {
       if (video.buffered.length > 0) setBufferedEnd(video.buffered.end(video.buffered.length - 1));
     };
@@ -194,6 +225,8 @@ export const VideoPlayer = ({
       setControlsVisible(true);
       controlsVisibleSyncRef.current = true;
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+      if (progressThrottleRef.current) { window.clearTimeout(progressThrottleRef.current); progressThrottleRef.current = null; }
+      onProgressUpdateRef.current?.(Math.round(video.currentTime * 1000));
     };
     const onPlay = () => {
       pausedRef.current = false;
@@ -218,6 +251,7 @@ export const VideoPlayer = ({
       video.removeEventListener('pause', onPause);
       video.removeEventListener('play', onPlay);
       video.removeEventListener('volumechange', onVolumeChange);
+      if (progressThrottleRef.current) { window.clearTimeout(progressThrottleRef.current); progressThrottleRef.current = null; }
     };
   }, [scheduleHide]);
 
@@ -227,6 +261,7 @@ export const VideoPlayer = ({
     let player: import('shaka-player').Player | null = null;
     let markerRenderRetryTimer: number | null = null;
     let stallRecoveryTimer: number | null = null;
+    hasSeekedToInitialPositionRef.current = false;
 
     const clearStallRecovery = () => {
       if (stallRecoveryTimer !== null) { window.clearTimeout(stallRecoveryTimer); stallRecoveryTimer = null; }
@@ -296,6 +331,7 @@ export const VideoPlayer = ({
       setCaptionTracks([]);
       setActiveCaptionId(null);
       setSpriteDims(null);
+      finishedFiredRef.current = false;
 
       void prefetchFirstSegments(manifestUrl, special);
 
@@ -412,8 +448,15 @@ export const VideoPlayer = ({
         const manifestToLoad = bearerForLoad && !manifestUrl.includes('token=') && !manifestUrl.startsWith('offline:')
           ? manifestUrl + (manifestUrl.includes('?') ? `&token=${bearerForLoad.slice(7)}` : `?token=${bearerForLoad.slice(7)}`)
           : manifestUrl;
-        await player.load(manifestToLoad);
+        const startTime = initialPositionInMsRef.current && initialPositionInMsRef.current > 0
+          ? initialPositionInMsRef.current / 1000
+          : null;
+        await player.load(manifestToLoad, startTime);
         if (isDisposed) return;
+
+        if (startTime !== null) {
+          hasSeekedToInitialPositionRef.current = true;
+        }
 
         refreshPlayerState();
 
@@ -476,6 +519,18 @@ export const VideoPlayer = ({
       })();
     };
   }, [manifestUrl, chaptersUrl, special]);
+
+  // Continue-watching position can arrive after the manifest has already
+  // loaded (its query resolves independently of manifestUrl); seek once
+  // it shows up if we haven't already applied it for this load.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || hasSeekedToInitialPositionRef.current) return;
+    if (!initialPositionInMs || initialPositionInMs <= 0) return;
+    if (video.readyState < 1) return;
+    video.currentTime = initialPositionInMs / 1000;
+    hasSeekedToInitialPositionRef.current = true;
+  }, [initialPositionInMs]);
 
   // Pre-fetch VTT + sprite for online playback so seek thumbnails use the same
   // canvas path as offline — avoids relying on Shaka's getThumbnails() API and
@@ -1190,7 +1245,7 @@ export const VideoPlayer = ({
             <div
               className={cn(
                 'absolute bottom-20 right-4 z-20 flex max-w-[200px] flex-col gap-2 rounded-xl bg-black/80 p-3 backdrop-blur-sm transition-all duration-500',
-                duration - currentTime < 300 && !nextEpisodeDismissed
+                duration - currentTime < FINISHED_THRESHOLD_S && !nextEpisodeDismissed
                   ? 'pointer-events-auto opacity-100 translate-y-0'
                   : 'pointer-events-none opacity-0 translate-y-2',
               )}
@@ -1222,7 +1277,7 @@ export const VideoPlayer = ({
               onClick={onNextEpisode}
               className={cn(
                 'absolute bottom-20 right-4 z-20 flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition-all duration-500 hover:bg-black/90 active:scale-95',
-                duration - currentTime < 300 && nextEpisodeDismissed
+                duration - currentTime < FINISHED_THRESHOLD_S && nextEpisodeDismissed
                   ? 'pointer-events-auto opacity-100 translate-y-0'
                   : 'pointer-events-none opacity-0 translate-y-2',
               )}

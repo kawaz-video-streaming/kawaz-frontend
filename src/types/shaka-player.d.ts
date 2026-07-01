@@ -59,7 +59,7 @@ declare module 'shaka-player' {
     constructor()
     static isBrowserSupported(): boolean
     attach(video: HTMLMediaElement): Promise<void>
-    load(uri: string): Promise<void>
+    load(uri: string, startTime?: number | null): Promise<void>
     getNetworkingEngine(): {
       registerRequestFilter(filter: (type: number, request: { uris: string[]; method: string; allowCrossSiteCredentials: boolean; headers: Record<string, string> }) => void): void
       registerResponseFilter(filter: (type: number, response: { uri: string; data: ArrayBuffer }) => void): void
