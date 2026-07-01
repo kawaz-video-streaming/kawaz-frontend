@@ -26,6 +26,23 @@ export const buildTopographicList = (collections: CollectionListItem[]): Collect
   return result
 }
 
+// Walks collectionId parents upward from startCollectionId to the topmost
+// ancestor. Returns the chain ordered top-most-first (e.g. [show, season]).
+export const resolveCollectionChain = (
+  startCollectionId: string | undefined,
+  collections: CollectionListItem[],
+): CollectionListItem[] => {
+  const chain: CollectionListItem[] = []
+  let currentId = startCollectionId
+  while (currentId) {
+    const col = collections.find((c) => c._id === currentId)
+    if (!col) break
+    chain.unshift(col)
+    currentId = col.collectionId
+  }
+  return chain
+}
+
 export interface SeasonGroup {
   key: string
   label: string

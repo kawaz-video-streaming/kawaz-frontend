@@ -10,7 +10,7 @@ export const useAddToWatchlist = () => {
       addToWatchlist(profileName, id, kind),
     onSuccess: (_, { profileName, id, kind }) => {
       queryClient.setQueryData<WatchlistEntry[]>(['watchlist', profileName], (old) => {
-        if (!old) return old
+        if (!old) return [{ id, kind }]
         if (old.some((entry) => entry.id === id && entry.kind === kind)) return old
         return [...old, { id, kind }]
       })

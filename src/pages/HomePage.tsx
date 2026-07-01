@@ -13,6 +13,7 @@ import { collectionThumbnailUrl } from '../api/mediaCollection';
 import { useAuth } from '../auth/useAuth';
 import { ORIENTATION_CONFIG } from '../hooks/useThumbnailOrientation';
 import { getObjectPositionFromFocalPoint } from '../lib/focalPoints';
+import { resolveCollectionChain } from '../lib/collections';
 import type { CollectionListItem, VideoListItem, Coordinates, WatchlistItemKind } from '../types/api';
 import { isNative, isTV } from '../lib/platform';
 import { DownloadButton } from '../components/DownloadButton';
@@ -301,8 +302,9 @@ export const HomePage = () => {
       if (!video) continue
 
       if (video.kind === 'episode' && video.collectionId) {
-        const season = (collections ?? []).find((c) => c._id === video.collectionId)
-        const show = season ? (collections ?? []).find((c) => c._id === season.collectionId) : undefined
+        const chain = resolveCollectionChain(video.collectionId, collections ?? [])
+        const season = chain.length >= 2 ? chain[chain.length - 1] : undefined
+        const show = chain.length >= 2 ? chain[0] : undefined
         if (show) {
           if (seenShowIds.has(show._id)) continue
           seenShowIds.add(show._id)

@@ -22,7 +22,7 @@ import { useUpdateWatchProgress } from '../hooks/useUpdateWatchProgress';
 import { useRemoveWatchProgress } from '../hooks/useRemoveWatchProgress';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { getFocalCropArea } from '../lib/focalPoints';
-import { buildTopographicList, buildSeasonGroups } from '../lib/collections';
+import { buildTopographicList, buildSeasonGroups, resolveCollectionChain } from '../lib/collections';
 import { parsePositiveInt } from '../lib/parsePositiveInt';
 import { toast } from 'sonner';
 import { AuthImage, resolveAuthImageUrl } from '../components/AuthImage';
@@ -122,7 +122,7 @@ export const VideoPage = () => {
   const handleFinished = () => {
     if (!profileName || !id || offlineEntry) return;
     removeProgress({ profileName, mediaId: id });
-    const nextAlreadyInProgress = continueWatchingItems?.some((item) => item.mediaId === nextVideo?._id);
+    const nextAlreadyInProgress = continueWatchingItems === undefined || continueWatchingItems.some((item) => item.mediaId === nextVideo?._id);
     if (video?.kind === 'episode' && nextVideo && !nextAlreadyInProgress) {
       updateProgress({ profileName, mediaId: nextVideo._id, positionInMs: 0 });
     }
@@ -373,24 +373,16 @@ export const VideoPage = () => {
   const manifestUrl = offlineUri ?? mediaStreamUrl(video.playUrl, special);
   const thumbnailAspectRatio = editCollectionId ? 16 / 9 : 2 / 3;
 
-  const episodeSeason = video.kind === 'episode'
-    ? (collections ?? []).find(c => c._id === video.collectionId)
-    : undefined;
-  const episodeShow = episodeSeason
-    ? (collections ?? []).find(c => c._id === episodeSeason.collectionId)
-    : undefined;
+  const episodeChain = video.kind === 'episode'
+    ? resolveCollectionChain(video.collectionId, collections ?? [])
+    : [];
+  const episodeSeason = episodeChain.length >= 2 ? episodeChain[episodeChain.length - 1] : undefined;
+  const episodeShow = episodeChain.length >= 2 ? episodeChain[0] : undefined;
 
   return (
     <div className="mx-auto max-w-6xl">
       {routeCollectionId && collections && (() => {
-        const chain: { _id: string; title: string; }[] = [];
-        let currentId: string | undefined = routeCollectionId;
-        while (currentId) {
-          const col = collections.find((c) => c._id === currentId);
-          if (!col) break;
-          chain.unshift(col);
-          currentId = col.collectionId;
-        }
+        const chain = resolveCollectionChain(routeCollectionId, collections);
         if (chain.length === 0) return null;
         return (
           <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
