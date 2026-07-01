@@ -122,7 +122,8 @@ export const VideoPage = () => {
   const handleFinished = () => {
     if (!profileName || !id || offlineEntry) return;
     removeProgress({ profileName, mediaId: id });
-    if (video?.kind === 'episode' && nextVideo) {
+    const nextAlreadyInProgress = continueWatchingItems?.some((item) => item.mediaId === nextVideo?._id);
+    if (video?.kind === 'episode' && nextVideo && !nextAlreadyInProgress) {
       updateProgress({ profileName, mediaId: nextVideo._id, positionInMs: 0 });
     }
   };
@@ -433,11 +434,11 @@ export const VideoPage = () => {
       />
       )}
 
-      {routeCollectionId && (prevVideo || nextVideo) && (
+      {siblingCollectionId && (prevVideo || nextVideo) && (
         <div className="mb-4 flex items-center justify-between gap-2">
           {prevVideo ? (
             <Link
-              to={`/collections/${routeCollectionId}/videos/${prevVideo._id}`}
+              to={`/collections/${siblingCollectionId}/videos/${prevVideo._id}`}
               className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-red-500 hover:text-foreground"
             >
               <ChevronLeft size={16} />
@@ -448,7 +449,7 @@ export const VideoPage = () => {
           )}
           {nextVideo ? (
             <Link
-              to={`/collections/${routeCollectionId}/videos/${nextVideo._id}`}
+              to={`/collections/${siblingCollectionId}/videos/${nextVideo._id}`}
               className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-red-500 hover:text-foreground"
             >
               <span className="max-w-[180px] truncate">{nextVideo.title}</span>

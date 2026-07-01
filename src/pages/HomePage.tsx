@@ -291,38 +291,46 @@ export const HomePage = () => {
 
   const continueWatchingVideoItems = useMemo((): EnrichedContinueWatchingItem[] => {
     if (!continueWatchingItems || !videos) return []
-    return continueWatchingItems
-      .map(({ mediaId, positionInMs }) => {
-        const video = videos.find((v) => v._id === mediaId)
-        if (!video) return null
+    // continueWatchingItems is sorted newest-first by the backend — dedupe by
+    // show so only the most recently watched episode per show surfaces here.
+    const seenShowIds = new Set<string>()
+    const items: EnrichedContinueWatchingItem[] = []
 
-        if (video.kind === 'episode' && video.collectionId) {
-          const season = (collections ?? []).find((c) => c._id === video.collectionId)
-          const show = season ? (collections ?? []).find((c) => c._id === season.collectionId) : undefined
-          if (show) {
-            return {
-              ...video,
-              positionInMs,
-              displayTitle: show.title,
-              displaySubtitle: season?.seasonNumber != null && video.episodeNumber != null
-                ? `Season ${season.seasonNumber} · Episode ${video.episodeNumber}`
-                : undefined,
-              displayThumbnailUrl: collectionThumbnailUrl(show._id, special),
-              displayFocalPoint: show.thumbnailFocalPoint,
-            }
-          }
-        }
+    for (const { mediaId, positionInMs } of continueWatchingItems) {
+      const video = videos.find((v) => v._id === mediaId)
+      if (!video) continue
 
-        return {
-          ...video,
-          positionInMs,
-          displayTitle: video.title,
-          displaySubtitle: undefined,
-          displayThumbnailUrl: mediaThumbnailUrl(video._id, special),
-          displayFocalPoint: video.thumbnailFocalPoint,
+      if (video.kind === 'episode' && video.collectionId) {
+        const season = (collections ?? []).find((c) => c._id === video.collectionId)
+        const show = season ? (collections ?? []).find((c) => c._id === season.collectionId) : undefined
+        if (show) {
+          if (seenShowIds.has(show._id)) continue
+          seenShowIds.add(show._id)
+          items.push({
+            ...video,
+            positionInMs,
+            displayTitle: show.title,
+            displaySubtitle: season?.seasonNumber != null && video.episodeNumber != null
+              ? `Season ${season.seasonNumber} · Episode ${video.episodeNumber}`
+              : undefined,
+            displayThumbnailUrl: collectionThumbnailUrl(show._id, special),
+            displayFocalPoint: show.thumbnailFocalPoint,
+          })
+          continue
         }
+      }
+
+      items.push({
+        ...video,
+        positionInMs,
+        displayTitle: video.title,
+        displaySubtitle: undefined,
+        displayThumbnailUrl: mediaThumbnailUrl(video._id, special),
+        displayFocalPoint: video.thumbnailFocalPoint,
       })
-      .filter((v): v is EnrichedContinueWatchingItem => v !== null)
+    }
+
+    return items
   }, [continueWatchingItems, videos, collections, special])
 
   const watchlistPageItems = useMemo((): PageItem[] => {
