@@ -198,7 +198,7 @@ export const VideoPlayer = ({
     const video = videoRef.current;
     if (!video) return;
 
-    const PROGRESS_INTERVAL_MS = 15_000;
+    const PROGRESS_INTERVAL_MS = 10_000;
     const onTimeUpdate = () => {
       const t = video.currentTime;
       setCurrentTime(t);

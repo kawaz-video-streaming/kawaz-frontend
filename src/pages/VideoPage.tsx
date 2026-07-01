@@ -98,6 +98,22 @@ export const VideoPage = () => {
   const { mutate: updateProgress } = useUpdateWatchProgress();
   const { mutate: removeProgress } = useRemoveWatchProgress();
 
+  const siblingCollectionId = routeCollectionId ?? (video?.kind === 'episode' ? video.collectionId : undefined);
+  const siblings = allVideos
+    ?.filter((v) => v.collectionId === siblingCollectionId)
+    .sort((a, b) => {
+      const aNum = a.episodeNumber ?? Infinity;
+      const bNum = b.episodeNumber ?? Infinity;
+      if (aNum !== bNum) return aNum - bNum;
+      return a.title.localeCompare(b.title);
+    }) ?? [];
+  const currentIndex = siblings.findIndex((v) => v._id === id);
+  const prevVideo = currentIndex > 0 ? siblings[currentIndex - 1] : null;
+  const nextVideo = currentIndex < siblings.length - 1 ? siblings[currentIndex + 1] : null;
+  const nextEpisodePath = nextVideo && siblingCollectionId
+    ? `/collections/${siblingCollectionId}/videos/${nextVideo._id}`
+    : null;
+
   const handleProgressUpdate = (positionInMs: number) => {
     if (!profileName || !id || offlineEntry) return;
     updateProgress({ profileName, mediaId: id, positionInMs });
@@ -106,6 +122,9 @@ export const VideoPage = () => {
   const handleFinished = () => {
     if (!profileName || !id || offlineEntry) return;
     removeProgress({ profileName, mediaId: id });
+    if (video?.kind === 'episode' && nextVideo) {
+      updateProgress({ profileName, mediaId: nextVideo._id, positionInMs: 0 });
+    }
   };
 
   const [manifestVersion, setManifestVersion] = useState(() => Date.now());
@@ -283,22 +302,6 @@ export const VideoPage = () => {
       onSuccess: () => void navigate(routeCollectionId ? `/collections/${routeCollectionId}` : '/'),
     });
   };
-
-  const siblingCollectionId = routeCollectionId ?? (video?.kind === 'episode' ? video.collectionId : undefined);
-  const siblings = allVideos
-    ?.filter((v) => v.collectionId === siblingCollectionId)
-    .sort((a, b) => {
-      const aNum = a.episodeNumber ?? Infinity;
-      const bNum = b.episodeNumber ?? Infinity;
-      if (aNum !== bNum) return aNum - bNum;
-      return a.title.localeCompare(b.title);
-    }) ?? [];
-  const currentIndex = siblings.findIndex((v) => v._id === id);
-  const prevVideo = currentIndex > 0 ? siblings[currentIndex - 1] : null;
-  const nextVideo = currentIndex < siblings.length - 1 ? siblings[currentIndex + 1] : null;
-  const nextEpisodePath = nextVideo && siblingCollectionId
-    ? `/collections/${siblingCollectionId}/videos/${nextVideo._id}`
-    : null;
 
   if (isLoading || (isNative && !isTV && !entriesLoaded)) {
     return (
